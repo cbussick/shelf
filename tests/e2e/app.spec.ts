@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/isolated-test';
 import AxeBuilder from '@axe-core/playwright';
+import sharp from 'sharp';
 import { readFile, writeFile } from 'node:fs/promises';
 
 test('creates, edits, pins, searches, and deletes a note', async ({ page }) => {
@@ -713,6 +714,33 @@ test('confirms removal of draft and saved images without removing them on cancel
 });
 
 for (const width of [390, 1440]) {
+  test(`centers lightbox chevron artwork at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'New note' }).click();
+    await page.getByRole('button', { name: 'Attach an image' }).click();
+    await page.locator('input[type=file]').last().setInputFiles(Array(2).fill('tests/fixtures/image.jpg'));
+    await page.getByRole('button', { name: 'View image 1' }).click();
+    await page.evaluate(() => document.fonts.ready);
+    const preview = page.getByRole('dialog', { name: 'Image preview' });
+    for (const name of ['Previous image', 'Next image']) {
+      const button = preview.getByRole('button', { name });
+      await button.blur();
+      await page.mouse.move(0, 0);
+      const { data, info } = await sharp(await button.screenshot()).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const rows: number[] = [];
+      for (let y = 0; y < info.height; y++) {
+        for (let x = 0; x < info.width; x++) {
+          const offset = (y * info.width + x) * info.channels;
+          if (data[offset] > 200 && data[offset + 1] > 200 && data[offset + 2] > 200) rows.push(y);
+        }
+      }
+      expect(rows.length).toBeGreaterThan(0);
+      const artworkCenter = (Math.min(...rows) + Math.max(...rows) + 1) / 2;
+      expect(Math.abs(artworkCenter - info.height / 2), `${name} vertical offset`).toBeLessThanOrEqual(1);
+    }
+  });
+
   test(`opens draft and saved images in a lightbox at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/');

@@ -1,8 +1,10 @@
 import type { SVGProps } from 'react';
 
-type IconName = 'search' | 'plus' | 'image' | 'pen' | 'offline' | 'cloud-check' | 'refresh' | 'sort' | 'x' | 'trash' | 'pin' | 'pin-filled' | 'palette';
+type IconName = 'search' | 'plus' | 'image' | 'pen' | 'offline' | 'cloud-check' | 'refresh' | 'sort' | 'x' | 'trash' | 'pin' | 'pin-filled' | 'palette' | 'chevron-left' | 'chevron-right';
 const paths: Record<IconName, React.ReactNode> = {
   search: <><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></>,
+  'chevron-left': <path d="m15 6-6 6 6 6"/>,
+  'chevron-right': <path d="m9 6 6 6-6 6"/>,
   plus: <path d="M12 5v14M5 12h14"/>,
   image: <><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.3"/><path d="m3 17 5-5 4 4 4-6 5 7"/></>,
   pen: <path d="m15 4 5 5M4 20l5-1L21 7a2.1 2.1 0 0 0-4-4L5 15l-1 5Z"/>,
