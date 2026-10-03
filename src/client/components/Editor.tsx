@@ -183,7 +183,7 @@ function ImagePreview({ gallery, index, onIndexChange, onRemove, onClose }: {
       <button type="button" aria-label={`Remove image ${index + 1}`} onClick={onRemove} {...stylex.props(styles.previewRemove)}><Icon name="trash" width={20}/></button>
     </div></div>
     <button type="button" aria-label="Close image preview" onClick={() => dialog.current?.close()} {...stylex.props(styles.previewClose)}><Icon name="x"/></button>
-    {gallery.length > 1 && <><button type="button" aria-label="Previous image" onClick={() => move(-1)} {...stylex.props(styles.previewPrevious)}>‹</button><button type="button" aria-label="Next image" onClick={() => move(1)} {...stylex.props(styles.previewNext)}>›</button><span {...stylex.props(styles.previewCount)}>{index + 1} / {gallery.length}</span></>}
+    {gallery.length > 1 && <><button type="button" aria-label="Previous image" onClick={() => move(-1)} {...stylex.props(styles.previewPrevious)}><Icon name="chevron-left"/></button><button type="button" aria-label="Next image" onClick={() => move(1)} {...stylex.props(styles.previewNext)}><Icon name="chevron-right"/></button><span {...stylex.props(styles.previewCount)}>{index + 1} / {gallery.length}</span></>}
   </dialog>;
 }
 
