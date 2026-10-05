@@ -188,9 +188,11 @@ function ImagePreview({ gallery, index, onIndexChange, onRemove, onClose }: {
   return <dialog ref={dialog} aria-label="Image preview" onClose={onClose} onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }} onKeyDown={event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); } }} {...stylex.props(styles.previewDialog)}>
     <div {...stylex.props(styles.previewStage)}><div {...stylex.props(styles.previewImage)}>
       {'image' in preview ? <LocalPhoto image={preview.image} className={stylex.props(styles.previewPhoto).className}/> : <img src={preview.src} alt={preview.alt} {...stylex.props(styles.previewPhoto)}/>}
-      <button type="button" aria-label={`Remove image ${index + 1}`} onClick={onRemove} {...stylex.props(styles.previewRemove)}><Icon name="trash" width={20}/></button>
+      <div {...stylex.props(styles.previewImageActions)}>
+        <button type="button" aria-label={`Remove image ${index + 1}`} onClick={onRemove} {...stylex.props(styles.previewImageAction)}><Icon name="trash" width={20}/></button>
+        <button type="button" aria-label="Close image preview" onClick={() => dialog.current?.close()} {...stylex.props(styles.previewImageAction)}><Icon name="x"/></button>
+      </div>
     </div></div>
-    <button type="button" aria-label="Close image preview" onClick={() => dialog.current?.close()} {...stylex.props(styles.previewClose)}><Icon name="x"/></button>
     {gallery.length > 1 && <><button type="button" aria-label="Previous image" onClick={() => move(-1)} {...stylex.props(styles.previewPrevious)}><Icon name="chevron-left"/></button><button type="button" aria-label="Next image" onClick={() => move(1)} {...stylex.props(styles.previewNext)}><Icon name="chevron-right"/></button><span {...stylex.props(styles.previewCount)}>{index + 1} / {gallery.length}</span></>}
   </dialog>;
 }
