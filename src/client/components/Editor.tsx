@@ -21,6 +21,7 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
   const dialog = useRef<HTMLDialogElement>(null);
   const bodyInput = useRef<HTMLTextAreaElement>(null);
   const deleteDialog = useRef<HTMLDialogElement>(null);
+  const discardDialog = useRef<HTMLDialogElement>(null);
   const removeImageDialog = useRef<HTMLDialogElement>(null);
   const imageToRemove = useRef<{ kind: 'retained'; id: string } | { kind: 'new'; index: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -32,6 +33,7 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
   const [newImages, setNewImages] = useState<File[]>(initialImages);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const newImageUrls = useMemo(() => newImages.map(file => URL.createObjectURL(file)), [newImages]);
   useEffect(() => () => newImageUrls.forEach(url => URL.revokeObjectURL(url)), [newImageUrls]);
@@ -52,6 +54,7 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
     if (!dirty && note) return onClose();
     // An empty draft has nothing to keep; shared images do.
     if (!note && !title.trim() && !body.trim() && retainedImages.length + newImages.length === 0) return onClose();
+    if (saveFailed) return discardDialog.current?.showModal();
     void save();
   };
   const requestImageRemoval = (image: NonNullable<typeof imageToRemove.current>) => {
@@ -91,12 +94,16 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
     if (saving) return;
     const cleanTitle = title.trim();
     const cleanBody = body.trim();
-    setSaving(true); setError('');
+    setSaving(true); setError(''); setSaveFailed(false);
     try {
       await onSave({ id: note?.id, title: cleanTitle, body: cleanBody, color, pinned, retainedImages, newImages, version: note?.version, createdAt: note?.createdAt });
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not save this note.');
+      const reason = caught instanceof DOMException && caught.name === 'InvalidStateError'
+        ? 'The browser’s local database is unavailable.'
+        : caught instanceof Error ? caught.message : 'Could not save this note.';
+      setError(`${reason} Your changes are still here. Try again, or close without saving.`);
+      setSaveFailed(true);
       setSaving(false);
     }
   };
@@ -128,11 +135,12 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
           <button type="button" aria-label="Attach an image" onClick={() => input.current?.click()} {...stylex.props(styles.iconButton)}><Icon name="image"/></button>
           <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }}/>
           <ColorPicker color={color} onChange={setColor}/>
-        </div><button type="button" disabled={saving} onClick={requestClose} {...stylex.props(styles.secondary)}>Close</button></footer>
+        </div><div {...stylex.props(styles.tools)}>{saveFailed && <button type="button" disabled={saving} onClick={() => void save()} {...stylex.props(styles.primary)}>Try again</button>}<button type="button" disabled={saving} onClick={requestClose} {...stylex.props(styles.secondary)}>Close</button></div></footer>
       </div>
     </dialog>
     {previewIndex !== null && gallery[previewIndex] && <ImagePreview gallery={gallery} index={previewIndex} onIndexChange={setPreviewIndex} onRemove={() => requestImageRemoval(gallery[previewIndex].removal)} onClose={() => setPreviewIndex(null)}/>}
     <ConfirmDialog ref={removeImageDialog} title="Remove this image?" copy="This image will no longer be attached to this note." cancel="Keep image" confirm="Remove image" onConfirm={confirmImageRemoval}/>
+    <ConfirmDialog ref={discardDialog} title="Close without saving?" copy="Your latest changes could not be saved. Closing will discard those changes, but will not delete an existing note." cancel="Keep editing" confirm="Close without saving" onConfirm={onClose}/>
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => note && onDelete(note)}/>
   </>;
 }
