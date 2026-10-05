@@ -1,25 +1,32 @@
 import * as stylex from '@stylexjs/stylex';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { noteColorSchema, type NoteColor } from '../../shared/contracts';
 import type { LocalNote } from '../local-store';
 import { styles } from '../app.stylex';
 
 export type MenuTarget = { note: LocalNote; x: number; y: number; origin: HTMLElement };
 
-export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete }: {
+export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onColor }: {
   target: MenuTarget;
   onClose: () => void;
   onOpen: (note: LocalNote) => void;
   onPin: (note: LocalNote) => void;
   onDelete: (note: LocalNote) => void;
+  onColor: (note: LocalNote, color: NoteColor) => void;
 }) {
   const menu = useRef<HTMLDivElement>(null);
+  const [colorsOpen, setColorsOpen] = useState(false);
+  const colorChoicesId = useId();
   useLayoutEffect(() => {
     const element = menu.current;
     if (!element) return;
     const rect = element.getBoundingClientRect();
     element.style.left = `${Math.max(8, Math.min(target.x, innerWidth - rect.width - 8))}px`;
     element.style.top = `${Math.max(8, Math.min(target.y, innerHeight - rect.height - 8))}px`;
-    element.querySelector('button')?.focus();
+  }, [target, colorsOpen]);
+  useLayoutEffect(() => {
+    setColorsOpen(false);
+    menu.current?.querySelector('button')?.focus();
   }, [target]);
   useEffect(() => {
     const dismiss = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) onClose(); };
@@ -46,6 +53,17 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete }: {
   }}>
     <button type="button" role="menuitem" onClick={() => choose(onDelete)} {...stylex.props(styles.contextMenuDanger)}>Delete</button>
     <button type="button" role="menuitem" onClick={() => choose(onPin)} {...stylex.props(styles.contextMenuItem)}>{target.note.pinned ? 'Unpin' : 'Pin'}</button>
+    <button type="button" role="menuitem" aria-expanded={colorsOpen} aria-controls={colorsOpen ? colorChoicesId : undefined} onClick={() => setColorsOpen(value => !value)} {...stylex.props(styles.contextMenuItem)}>Change color</button>
+    {colorsOpen && <div id={colorChoicesId} role="group" aria-label="Note color">
+      {noteColorSchema.options.map(color => <button key={color} type="button" role="menuitemradio" aria-checked={target.note.color === color} onClick={() => {
+        choose(note => onColor(note, color));
+        target.origin.focus({ preventScroll: true });
+      }} {...stylex.props(styles.contextMenuItem, styles.contextMenuColor)}>
+        <span aria-hidden="true" {...stylex.props(styles.swatch, styles[color], color === 'paper' && styles.paperSwatch, styles.contextMenuSwatch)}/>
+        {color[0].toUpperCase() + color.slice(1)}
+        {target.note.color === color && <span aria-hidden="true">✓</span>}
+      </button>)}
+    </div>}
     <button type="button" role="menuitem" onClick={() => choose(onOpen)} {...stylex.props(styles.contextMenuItem)}>Open</button>
   </div>;
 }
