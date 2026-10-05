@@ -1,12 +1,13 @@
 import type { SVGProps } from 'react';
 
-type IconName = 'search' | 'plus' | 'image' | 'pen' | 'offline' | 'cloud-check' | 'refresh' | 'sort' | 'x' | 'trash' | 'pin' | 'pin-filled' | 'palette' | 'chevron-left' | 'chevron-right';
+type IconName = 'search' | 'plus' | 'image' | 'pen' | 'offline' | 'cloud-check' | 'refresh' | 'sort' | 'x' | 'trash' | 'pin' | 'pin-filled' | 'palette' | 'note' | 'chevron-left' | 'chevron-right';
 const paths: Record<IconName, React.ReactNode> = {
   search: <><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></>,
   'chevron-left': <path d="m15 6-6 6 6 6"/>,
   'chevron-right': <path d="m9 6 6 6-6 6"/>,
   plus: <path d="M12 5v14M5 12h14"/>,
   image: <><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.3"/><path d="m3 17 5-5 4 4 4-6 5 7"/></>,
+  note: <><path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10L14 3Z"/><path d="M14 3v7h7M7 14h10M7 17h7"/></>,
   pen: <path d="m15 4 5 5M4 20l5-1L21 7a2.1 2.1 0 0 0-4-4L5 15l-1 5Z"/>,
   'cloud-check': <><path d="M7 18H6a4.5 4.5 0 0 1-.5-9 6.5 6.5 0 0 1 12.4-1.5A5.2 5.2 0 0 1 20 17"/><path d="m10 16 3 3 5-6"/></>,
   offline: <><path d="m3 3 18 18M7 18H6a4.5 4.5 0 0 1-1.6-8.7M9 4a6.5 6.5 0 0 1 9 3.5A5.2 5.2 0 0 1 21 15M9 18h5"/></>,

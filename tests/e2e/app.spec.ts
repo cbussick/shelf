@@ -361,6 +361,13 @@ test('right-click note actions open, pin, and confirm deletion', async ({ page }
   await card.click({ button: 'right' });
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem')).toHaveText(['Delete', 'Pin', 'Change color', 'Open']);
+  for (const name of ['Delete', 'Pin', 'Change color', 'Open']) {
+    const action = menu.getByRole('menuitem', { name, exact: true });
+    await expect(action).toHaveAccessibleName(name);
+    await expect(action.locator('svg').first()).toBeVisible();
+    await expect(action.locator('svg').first()).toHaveAttribute('aria-hidden', 'true');
+  }
+  await expect(menu.getByRole('menuitem', { name: 'Change color' }).locator('svg')).toHaveCount(2);
   await page.keyboard.press('Escape');
   await expect(menu).not.toBeVisible();
   await expect(card).toBeFocused();
@@ -373,6 +380,7 @@ test('right-click note actions open, pin, and confirm deletion', async ({ page }
   await expect(page.getByRole('list', { name: 'Pinned notes' }).getByRole('button', { name: 'Open note: Context actions test' })).toBeVisible();
   await card.click({ button: 'right' });
   await expect(menu.getByRole('menuitem', { name: 'Unpin' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Unpin' }).locator('svg path').first()).toHaveAttribute('fill', 'currentColor');
   await menu.getByRole('menuitem', { name: 'Delete' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Delete this note?' });
   await expect(confirmation).toBeVisible();
