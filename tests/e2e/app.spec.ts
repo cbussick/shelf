@@ -749,6 +749,43 @@ for (const width of [390, 1440]) {
     }
   });
 
+  test(`keeps lightbox close and trash on portrait and landscape images at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'New note' }).click();
+    await page.getByRole('button', { name: 'Attach an image' }).click();
+    const sizes = [{ width: 400, height: 900 }, { width: 900, height: 400 }];
+    await page.locator('input[type=file]').last().setInputFiles(await Promise.all(sizes.map(async size => ({
+      name: `photo-${size.width}.jpg`, mimeType: 'image/jpeg',
+      buffer: await sharp('tests/fixtures/image.jpg').resize(size).jpeg().toBuffer(),
+    }))));
+    await page.getByRole('button', { name: 'View image 1' }).click();
+    const preview = page.getByRole('dialog', { name: 'Image preview' });
+    for (const [index, size] of sizes.entries()) {
+      const image = preview.getByRole('img');
+      await expect(image).toHaveJSProperty('naturalWidth', size.width);
+      const imageBox = (await image.boundingBox())!;
+      const closeBox = (await preview.getByRole('button', { name: 'Close image preview' }).boundingBox())!;
+      const trashBox = (await preview.getByRole('button', { name: `Remove image ${index + 1}` }).boundingBox())!;
+      expect(closeBox.width).toBe(44);
+      expect(closeBox.height).toBe(44);
+      expect(trashBox.width).toBe(44);
+      expect(trashBox.height).toBe(44);
+      expect(closeBox.y - imageBox.y).toBeCloseTo(8, 0);
+      expect(imageBox.x + imageBox.width - closeBox.x - closeBox.width).toBeCloseTo(8, 0);
+      expect(closeBox.x - trashBox.x - trashBox.width).toBeCloseTo(8, 0);
+      expect(trashBox.y).toBe(closeBox.y);
+      expect(trashBox.x).toBeGreaterThanOrEqual(imageBox.x);
+      expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(imageBox.y + imageBox.height);
+      if (index === 0) await preview.getByRole('button', { name: 'Next image' }).click();
+    }
+    await preview.getByRole('button', { name: 'Close image preview' }).click();
+    await expect(preview).not.toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Add note' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^View image/ })).toHaveCount(2);
+    await expect(page.getByRole('dialog', { name: 'Remove this image?' })).toHaveCount(0);
+  });
+
   test(`opens draft and saved images in a lightbox at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/');
@@ -779,6 +816,11 @@ for (const width of [390, 1440]) {
     expect(removeBox!.x).toBeGreaterThan(imageBox!.x + imageBox!.width / 2);
     expect(removeBox!.x + removeBox!.width).toBeLessThanOrEqual(imageBox!.x + imageBox!.width);
     expect(removeBox!.y).toBeLessThan(imageBox!.y + 16);
+    const closeBox = (await closePreview.boundingBox())!;
+    expect(closeBox.y - imageBox!.y).toBeCloseTo(8, 0);
+    expect(imageBox!.x + imageBox!.width - closeBox.x - closeBox.width).toBeCloseTo(8, 0);
+    expect(closeBox.x - removeBox!.x - removeBox!.width).toBeCloseTo(8, 0);
+    expect(closeBox.y).toBe(removeBox!.y);
     const bounds = await preview.boundingBox();
     if (width === 390) expect(bounds?.width).toBe(width);
     else expect(bounds?.width).toBeGreaterThan(800);
