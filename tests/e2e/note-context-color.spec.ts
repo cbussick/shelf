@@ -56,39 +56,113 @@ test('changes every note color without opening it or altering its content, image
   await expect(page.getByRole('list', { name: 'Pinned notes' }).getByRole('button', { name: 'Open note: Color target' })).toBeVisible();
 });
 
-test('color choices support keyboard use, dismissal, and viewport clamping', async ({ page }) => {
+test('color flyout supports keyboard navigation and flips left without moving the parent menu', async ({ page }) => {
   const card = await createNote(page);
   await page.setViewportSize({ width: 800, height: 320 });
   const menu = page.getByRole('menu', { name: 'Note actions' });
+  const submenu = page.getByRole('menu', { name: 'Note color', exact: true });
+  const trigger = menu.getByRole('menuitem', { name: 'Change color' });
   await card.evaluate(element => element.dispatchEvent(new MouseEvent('contextmenu', {
     bubbles: true, cancelable: true, button: 2, clientX: innerWidth - 1, clientY: innerHeight - 1,
   })));
+  const originalBounds = await menu.boundingBox();
   await expect(menu.getByRole('menuitem', { name: 'Delete', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('menuitem', { name: 'Change color' })).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(menu.getByRole('menuitem', { name: 'Change color' })).toHaveAttribute('aria-expanded', 'true');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  await page.keyboard.press('ArrowRight');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(submenu.getByRole('menuitemradio', { name: 'Paper' })).toBeFocused();
+  expect(await menu.boundingBox()).toEqual(originalBounds);
+  const flyoutBounds = await submenu.boundingBox();
+  expect(flyoutBounds!.x + flyoutBounds!.width).toBeLessThan(originalBounds!.x);
   await expect(menu).toBeInViewport({ ratio: 1 });
+  await expect(submenu).toBeInViewport({ ratio: 1 });
   expect((await new AxeBuilder({ page }).include('[role="menu"]').analyze()).violations).toEqual([]);
+  await page.keyboard.press('End');
+  await expect(submenu.getByRole('menuitemradio', { name: 'Peach' })).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('menuitemradio', { name: 'Paper' })).toBeFocused();
+  await expect(submenu.getByRole('menuitemradio', { name: 'Paper' })).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(submenu.getByRole('menuitemradio', { name: 'Peach' })).toBeFocused();
+  await page.keyboard.press('Home');
   await page.keyboard.press('ArrowDown');
+  await expect(submenu.getByRole('menuitemradio', { name: 'Butter' })).toBeFocused();
   await page.keyboard.press('Enter');
+  await expect(menu).not.toBeVisible();
+  await expect(submenu).not.toBeVisible();
   await expect(card).toHaveCSS('background-color', 'rgb(248, 235, 173)');
   await expect(card).toBeFocused();
   await card.click({ button: 'right' });
-  await menu.getByRole('menuitem', { name: 'Change color' }).click();
+  await trigger.click();
+  await expect(submenu.getByRole('menuitemradio', { name: 'Paper' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(submenu).not.toBeVisible();
+  await expect(menu).toBeVisible();
+  await expect(trigger).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(submenu).toBeVisible();
+  await page.keyboard.press('ArrowLeft');
+  await expect(submenu).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Open', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(menu).not.toBeVisible();
   await expect(card).toBeFocused();
   await card.click({ button: 'right' });
-  await expect(menu.getByRole('menuitemradio')).toHaveCount(0);
-  await menu.getByRole('menuitem', { name: 'Change color' }).click();
-  await page.getByRole('heading', { name: 'Your notes' }).click();
+  await expect(submenu).toHaveCount(0);
+  await trigger.click();
+  await page.mouse.click(8, 8);
   await expect(menu).not.toBeVisible();
+  await expect(submenu).not.toBeVisible();
   await expect(card).toHaveCSS('background-color', 'rgb(248, 235, 173)');
 });
+
+test('hover opens a right-hand flyout and allows crossing the gap without shifting actions', async ({ page }) => {
+  const card = await createNote(page);
+  const menu = page.getByRole('menu', { name: 'Note actions' });
+  const submenu = page.getByRole('menu', { name: 'Note color', exact: true });
+  const trigger = menu.getByRole('menuitem', { name: 'Change color' });
+  await card.click({ button: 'right' });
+  const originalBounds = await menu.boundingBox();
+  const openBounds = await menu.getByRole('menuitem', { name: 'Open', exact: true }).boundingBox();
+  await trigger.hover();
+  await expect(submenu).toBeVisible();
+  expect(await menu.boundingBox()).toEqual(originalBounds);
+  expect(await menu.getByRole('menuitem', { name: 'Open', exact: true }).boundingBox()).toEqual(openBounds);
+  expect((await submenu.boundingBox())!.x).toBeGreaterThan(originalBounds!.x + originalBounds!.width);
+  await expect(menu.getByRole('menuitem', { name: 'Delete', exact: true })).toBeFocused();
+  const from = await trigger.boundingBox();
+  const to = await submenu.getByRole('menuitemradio', { name: 'Mint' }).boundingBox();
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, { steps: 5 });
+  await expect(submenu).toBeVisible();
+  await page.waitForTimeout(250); // Still open after the pointer-leave grace period.
+  await expect(submenu).toBeVisible();
+  await page.getByRole('heading', { name: 'Your notes' }).hover();
+  await expect(submenu).not.toBeVisible();
+  await expect(menu).toBeVisible();
+  expect(await menu.boundingBox()).toEqual(originalBounds);
+  await trigger.hover();
+  await submenu.getByRole('menuitemradio', { name: 'Mint' }).click();
+  await expect(menu).not.toBeVisible();
+  await expect(card).toHaveCSS('background-color', 'rgb(219, 235, 225)');
+});
+
+for (const key of ['Tab', 'Shift+Tab']) {
+  test(`${key} leaves the entire context menu instead of traversing its items`, async ({ page }) => {
+    const card = await createNote(page);
+    const menu = page.getByRole('menu', { name: 'Note actions' });
+    await card.click({ button: 'right' });
+    await menu.getByRole('menuitem', { name: 'Change color' }).click();
+    await page.keyboard.press(key);
+    await expect(menu).not.toBeVisible();
+    await expect(page.getByRole('menu', { name: 'Note color', exact: true })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: key === 'Tab' ? 'Pin note: Color target' : 'New note', exact: true })).toBeFocused();
+  });
+}
 
 test('reports a failed color save and allows another attempt', async ({ page }) => {
   const card = await createNote(page);
