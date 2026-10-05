@@ -15,27 +15,51 @@ const parseOptionalNote = (value: unknown) => value === undefined ? undefined : 
 const parseOptionalOperation = (value: unknown) => value === undefined ? undefined : parseOperation(value);
 const parseBlob = (value: unknown) => z.instanceof(Blob).parse(value);
 
-const databasePromise = openDB('shelf', 1, {
-  upgrade(database) {
-    database.createObjectStore('notes', { keyPath: 'id' });
-    database.createObjectStore('outbox', { keyPath: 'noteId' });
-    database.createObjectStore('blobs');
-    database.createObjectStore('meta');
-  },
-});
+let databasePromise: ReturnType<typeof openDB> | undefined;
+function openDatabase() {
+  const opening = openDB('shelf', 1, {
+    upgrade(database) {
+      database.createObjectStore('notes', { keyPath: 'id' });
+      database.createObjectStore('outbox', { keyPath: 'noteId' });
+      database.createObjectStore('blobs');
+      database.createObjectStore('meta');
+    },
+    terminated() {
+      if (databasePromise === opening) databasePromise = undefined;
+    },
+  });
+  return opening;
+}
+
+async function getDatabase() {
+  const opening = databasePromise ??= openDatabase();
+  try {
+    const database = await opening;
+    // A browser can close a connection while the app is backgrounded. Check
+    // before returning a cached handle; only retry before starting any writes.
+    const probe = database.transaction('meta');
+    await probe.done;
+    return database;
+  } catch (error) {
+    if (databasePromise === opening) databasePromise = undefined;
+    if (!(error instanceof DOMException && error.name === 'InvalidStateError')) throw error;
+    (await opening).close();
+    return databasePromise ??= openDatabase();
+  }
+}
 
 export async function localNotes(): Promise<LocalNote[]> {
-  const database = await databasePromise;
+  const database = await getDatabase();
   const notes = z.array(localNoteSchema).parse(await database.getAll('notes')) as LocalNote[];
   return notes.sort((a, b) => a.position - b.position || b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
 }
 
 export async function hasLocalData(): Promise<boolean> {
-  return z.boolean().catch(false).parse(await (await databasePromise).get('meta', 'initialized'));
+  return z.boolean().catch(false).parse(await (await getDatabase()).get('meta', 'initialized'));
 }
 
 export async function clearLocalData(): Promise<void> {
-  const database = await databasePromise;
+  const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'blobs', 'meta'], 'readwrite');
   await Promise.all(['notes', 'outbox', 'blobs', 'meta'].map(name => transaction.objectStore(name).clear()));
   await transaction.done;
@@ -45,7 +69,6 @@ export async function saveLocalNote(value: {
   id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
   retainedImages: LocalImage[]; newImages: File[]; version?: number; createdAt?: string;
 }): Promise<LocalNote> {
-  const database = await databasePromise;
   const now = new Date().toISOString();
   const id = value.id ?? crypto.randomUUID();
   const images = [...value.retainedImages];
@@ -54,9 +77,10 @@ export async function saveLocalNote(value: {
     if (dimensions.width * dimensions.height > 40_000_000) throw new Error('Images may contain up to 40 megapixels.');
     const imageId = crypto.randomUUID();
     const blobId = `blob:${imageId}`;
-    await database.put('blobs', file, blobId);
+    await (await getDatabase()).put('blobs', file, blobId);
     images.push({ id: imageId, blobId, url: '', alt: file.name, mimeType: file.type as LocalImage['mimeType'], size: file.size, ...dimensions });
   }
+  const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'meta'], 'readwrite');
   const notes = transaction.objectStore('notes');
   const outbox = transaction.objectStore('outbox');
@@ -79,8 +103,8 @@ export async function saveLocalNote(value: {
 }
 
 export async function reorderLocalNotes(ids: string[]): Promise<void> {
-  const database = await databasePromise;
   const current = await localNotes();
+  const database = await getDatabase();
   if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some(id => !current.some(note => note.id === id))) throw new Error('Invalid note order.');
   const byId = new Map(current.map(note => [note.id, note]));
   const transaction = database.transaction(['notes', 'meta'], 'readwrite');
@@ -90,7 +114,7 @@ export async function reorderLocalNotes(ids: string[]): Promise<void> {
 }
 
 export async function deleteLocalNote(note: LocalNote): Promise<void> {
-  const database = await databasePromise;
+  const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox'], 'readwrite');
   const notes = transaction.objectStore('notes');
   const outbox = transaction.objectStore('outbox');
@@ -106,7 +130,7 @@ export async function deleteLocalNote(note: LocalNote): Promise<void> {
 }
 
 export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number; conflict: boolean; connection: 'connected' | 'offline' | 'unauthorized' }> {
-  const database = await databasePromise;
+  let database = await getDatabase();
   const entries = z.array(outboxSchema).parse(await database.getAll('outbox')) as OutboxEntry[];
   let conflict = false;
   let connection: 'connected' | 'offline' | 'unauthorized' = 'connected';
@@ -127,6 +151,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
           expectedVersion: entry.expectedVersion,
           retainedImageIds,
         }, files);
+        database = await getDatabase();
         // Reconcile the server acknowledgement and any newer local edit in one transaction.
         // A save can arrive while the request is in flight; never overwrite it with the old response.
         const transaction = database.transaction(['notes', 'outbox'], 'readwrite');
@@ -149,6 +174,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
         await removeBlobs(note);
         continue;
       }
+      database = await getDatabase();
       const latestOperation = parseOptionalOperation(await database.get('outbox', entry.noteId));
       if (latestOperation?.mutationId === entry.mutationId) await database.delete('outbox', entry.noteId);
     } catch (error) {
@@ -181,6 +207,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
     try {
       // Include newly created notes, but leave notes added on another device for the server to append.
       await api.reorderNotes((await localNotes()).map(note => note.id));
+      database = await getDatabase();
       const latest = await database.get('meta', 'pendingOrder') as typeof order;
       if (latest?.token === order.token) await database.delete('meta', 'pendingOrder');
     } catch (error) {
@@ -190,6 +217,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
 
   try {
     const remote = await api.notes();
+    database = await getDatabase();
     const pendingOrder = await database.get('meta', 'pendingOrder');
     const pending = new Set((z.array(outboxSchema).parse(await database.getAll('outbox')) as OutboxEntry[]).map(item => item.noteId));
     const remoteIds = new Set(remote.notes.map(note => note.id));
@@ -212,12 +240,12 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
 
 export async function imageSource(image: LocalImage): Promise<string> {
   if (!image.blobId) return image.url;
-  const blob = parseBlob(await (await databasePromise).get('blobs', image.blobId));
+  const blob = parseBlob(await (await getDatabase()).get('blobs', image.blobId));
   return URL.createObjectURL(blob);
 }
 
 async function cloneAsConflict(note: LocalNote) {
-  const database = await databasePromise;
+  let database = await getDatabase();
   const id = crypto.randomUUID();
   const images: LocalImage[] = [];
   for (const image of note.images) {
@@ -226,6 +254,7 @@ async function cloneAsConflict(note: LocalNote) {
     else blob = await fetch(image.url).then(response => response.blob());
     const imageId = crypto.randomUUID();
     const blobId = `blob:${imageId}`;
+    database = await getDatabase();
     await database.put('blobs', blob, blobId);
     images.push({ ...image, id: imageId, url: '', blobId });
   }
@@ -235,7 +264,7 @@ async function cloneAsConflict(note: LocalNote) {
 }
 
 async function removeBlobs(note: LocalNote) {
-  const database = await databasePromise;
+  const database = await getDatabase();
   await Promise.all(note.images.flatMap(image => image.blobId ? [database.delete('blobs', image.blobId)] : []));
 }
 
