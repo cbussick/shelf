@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { NoteColor } from '../shared/contracts';
 import { api, ApiError } from './api';
 import { styles } from './app.stylex';
 import { Auth, Brand } from './components/Auth';
@@ -162,6 +163,13 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     setNotes(await localNotes()); notify(note.pinned ? 'Note unpinned' : 'Note pinned'); void synchronize();
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-pin-id="${note.id}"]`)?.focus({ preventScroll: true }));
   };
+  const changeColor = async (note: LocalNote, color: NoteColor) => {
+    try {
+      const current = (await localNotes()).find(item => item.id === note.id);
+      if (!current || current.color === color) return;
+      await save({ ...current, color, retainedImages: current.images, newImages: [] });
+    } catch { notify('Could not change note color. Try again.'); }
+  };
   const reorder = async (source: string, target: string) => {
     const moving = notes.find(note => note.id === source);
     if (!moving || moving.pinned !== notes.find(note => note.id === target)?.pinned) return;
@@ -210,7 +218,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
       {filtered.length === 0 && <section {...stylex.props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...stylex.props(styles.secondary)}>Clear search</button>}</section>}
     </main>
     <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
-    {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={note => setEditor({ note })} onPin={pin} onDelete={confirmDelete}/>}
+    {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={note => setEditor({ note })} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
     {editor && <Editor note={editor.note} initialImages={editor.files} onSave={save} onDelete={remove} onClose={closeEditor}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>

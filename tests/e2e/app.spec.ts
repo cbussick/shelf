@@ -360,7 +360,7 @@ test('right-click note actions open, pin, and confirm deletion', async ({ page }
   const menu = page.getByRole('menu', { name: 'Note actions' });
   await card.click({ button: 'right' });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveText(['Delete', 'Pin', 'Open']);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Delete', 'Pin', 'Change color', 'Open']);
   await page.keyboard.press('Escape');
   await expect(menu).not.toBeVisible();
   await expect(card).toBeFocused();
