@@ -111,11 +111,11 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
     const item = event.target as HTMLElement;
     if (item !== colorTrigger.current && item.parentElement === menu.current) closeColors();
   }}>
-    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onDelete)} {...stylex.props(styles.contextMenuDanger)}>Delete</button>
-    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onPin)} {...stylex.props(styles.contextMenuItem)}>{target.note.pinned ? 'Unpin' : 'Pin'}</button>
+    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onDelete)} {...stylex.props(styles.contextMenuDanger)}><Icon name="trash"/>Delete</button>
+    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onPin)} {...stylex.props(styles.contextMenuItem)}><Icon name={target.note.pinned ? 'pin-filled' : 'pin'}/>{target.note.pinned ? 'Unpin' : 'Pin'}</button>
     <button ref={colorTrigger} type="button" role="menuitem" tabIndex={-1} aria-haspopup="menu" aria-expanded={colorsOpen} aria-controls={colorsOpen ? colorChoicesId : undefined}
       onPointerEnter={() => openColors()} onPointerLeave={scheduleSubmenuClose} onClick={() => openColors(true)}
-      {...stylex.props(styles.contextMenuItem, styles.contextMenuSubmenuTrigger, colorsOpen && styles.contextMenuActive)}>Change color<Icon name="chevron-right"/></button>
+      {...stylex.props(styles.contextMenuItem, colorsOpen && styles.contextMenuActive)}><Icon name="palette"/>Change color<Icon name="chevron-right" {...stylex.props(styles.contextMenuChevron)}/></button>
     {colorsOpen && <div ref={submenu} id={colorChoicesId} role="menu" aria-label="Note color" onPointerEnter={cancelSubmenuClose} onPointerLeave={scheduleSubmenuClose} {...stylex.props(styles.contextMenu)}>
       {noteColorSchema.options.map(color => <button key={color} type="button" role="menuitemradio" tabIndex={-1} aria-checked={target.note.color === color} onClick={() => {
         choose(note => onColor(note, color));
@@ -126,6 +126,6 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
         {target.note.color === color && <span aria-hidden="true">✓</span>}
       </button>)}
     </div>}
-    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onOpen)} {...stylex.props(styles.contextMenuItem)}>Open</button>
+    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onOpen)} {...stylex.props(styles.contextMenuItem)}><Icon name="note"/>Open</button>
   </div>;
 }
