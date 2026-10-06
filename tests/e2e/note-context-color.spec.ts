@@ -28,6 +28,9 @@ test('changes every note color without opening it or altering its content, image
     ['Mint', 'rgb(219, 235, 225)'],
     ['Lilac', 'rgb(234, 228, 243)'],
     ['Peach', 'rgb(246, 223, 210)'],
+    ['Blue', 'rgb(217, 232, 248)'],
+    ['Orange', 'rgb(248, 210, 168)'],
+    ['Rose', 'rgb(243, 220, 229)'],
   ];
   let selected = 'Paper';
   for (const [name, background] of options) {
@@ -51,7 +54,7 @@ test('changes every note color without opening it or altering its content, image
     selected = name;
   }
   await page.reload();
-  await expect(card).toHaveCSS('background-color', 'rgb(246, 223, 210)');
+  await expect(card).toHaveCSS('background-color', 'rgb(243, 220, 229)');
   await expect(card.locator('img')).toBeVisible();
   await expect(page.getByRole('list', { name: 'Pinned notes' }).getByRole('button', { name: 'Open note: Color target' })).toBeVisible();
 });
@@ -81,11 +84,11 @@ test('color flyout supports keyboard navigation and flips left without moving th
   await expect(submenu).toBeInViewport({ ratio: 1 });
   expect((await new AxeBuilder({ page }).include('[role="menu"]').analyze()).violations).toEqual([]);
   await page.keyboard.press('End');
-  await expect(submenu.getByRole('menuitemradio', { name: 'Peach' })).toBeFocused();
+  await expect(submenu.getByRole('menuitemradio', { name: 'Rose' })).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(submenu.getByRole('menuitemradio', { name: 'Paper' })).toBeFocused();
   await page.keyboard.press('ArrowUp');
-  await expect(submenu.getByRole('menuitemradio', { name: 'Peach' })).toBeFocused();
+  await expect(submenu.getByRole('menuitemradio', { name: 'Rose' })).toBeFocused();
   await page.keyboard.press('Home');
   await page.keyboard.press('ArrowDown');
   await expect(submenu.getByRole('menuitemradio', { name: 'Butter' })).toBeFocused();

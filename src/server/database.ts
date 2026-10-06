@@ -1,9 +1,22 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Environment, Note } from '../shared/contracts.js';
+import { noteColorSchema, type Environment, type Note } from '../shared/contracts.js';
 
 export type AppDatabase = Database.Database;
+
+const noteColors = noteColorSchema.options.map(color => `'${color}'`);
+const notesColumns = `
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  color TEXT NOT NULL CHECK (color IN (${noteColors.join(',')})),
+  pinned INTEGER NOT NULL CHECK (pinned IN (0,1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  version INTEGER NOT NULL CHECK (version > 0),
+  position INTEGER NOT NULL DEFAULT 0
+`;
 
 export function openDatabase(environment: Environment): AppDatabase {
   mkdirSync(environment.DATA_DIR, { recursive: true, mode: 0o700 });
@@ -23,16 +36,7 @@ export function openDatabase(environment: Environment): AppDatabase {
       expires_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
-    CREATE TABLE IF NOT EXISTS notes (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      body TEXT NOT NULL,
-      color TEXT NOT NULL CHECK (color IN ('paper','butter','mint','lilac','peach')),
-      pinned INTEGER NOT NULL CHECK (pinned IN (0,1)),
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      version INTEGER NOT NULL CHECK (version > 0)
-    );
+    CREATE TABLE IF NOT EXISTS notes (${notesColumns});
     CREATE TABLE IF NOT EXISTS images (
       id TEXT PRIMARY KEY,
       note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
@@ -52,8 +56,32 @@ export function openDatabase(environment: Environment): AppDatabase {
     const update = database.prepare('UPDATE notes SET position = ? WHERE id = ?');
     database.transaction(() => old.forEach((note, index) => update.run(index, note.id)))();
   }
+  expandNoteColors(database);
   database.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(new Date().toISOString());
   return database;
+}
+
+function expandNoteColors(database: AppDatabase) {
+  const table = database.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notes'").get() as { sql: string };
+  if (noteColors.every(color => table.sql.includes(color))) return;
+
+  // SQLite cannot alter a CHECK constraint. Rebuild the parent table without
+  // cascading deletion of its images, then validate references before committing.
+  database.pragma('foreign_keys = OFF');
+  try {
+    database.transaction(() => {
+      database.exec(`
+        CREATE TABLE notes_expanded (${notesColumns});
+        INSERT INTO notes_expanded (id, title, body, color, pinned, created_at, updated_at, version, position)
+          SELECT id, title, body, color, pinned, created_at, updated_at, version, position FROM notes;
+        DROP TABLE notes;
+        ALTER TABLE notes_expanded RENAME TO notes;
+      `);
+      if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('Note color migration failed foreign key validation.');
+    })();
+  } finally {
+    database.pragma('foreign_keys = ON');
+  }
 }
 
 type NoteRow = {

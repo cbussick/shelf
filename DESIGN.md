@@ -6,7 +6,7 @@ Shelf is a single-owner, self-hosted home for text and image notes. It intention
 
 ## Visual direction
 
-- Canvas `#F7F8FA`; ink `#263630`; evergreen `#285B48`; butter `#F8EBAD`; mint `#DBEBE1`; lilac `#EAE4F3`; peach `#F6DFD2`.
+- Canvas `#F7F8FA`; ink `#263630`; evergreen `#285B48`; butter `#F8EBAD`; mint `#DBEBE1`; lilac `#EAE4F3`; peach `#F6DFD2`; blue `#D9E8F8`; orange `#F8D2A8`; rose `#F3DCE5`.
 - Manrope throughout.
 - Four masonry-style columns on desktop, three on tablet, and two on phones.
 - Pinned notes form a separate section above other notes. Empty sections disappear.

@@ -1,13 +1,13 @@
 import * as stylex from '@stylexjs/stylex';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { NoteColor } from '../../shared/contracts';
+import { noteColorSchema, type NoteColor } from '../../shared/contracts';
 import { styles } from '../app.stylex';
 import type { LocalImage, LocalNote } from '../local-store';
 import { LocalPhoto } from './NoteBoard';
 import { Icon } from './Icon';
 import { ImageMosaic } from './ImageMosaic';
 
-const colors: NoteColor[] = ['paper', 'butter', 'mint', 'lilac', 'peach'];
+const colors = noteColorSchema.options;
 
 export type EditorValue = {
   id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
