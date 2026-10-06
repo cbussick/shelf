@@ -125,7 +125,17 @@ export const styles = stylex.create({
   loginCard: { width: 'min(420px, 100%)', padding: 32, border: `1px solid ${colors.line}`, borderRadius: 18, backgroundColor: '#fff', boxShadow: '0 12px 50px #26363012' },
   loginTitle: { fontSize: 30, margin: '24px 0 8px' },
   loginCopy: { color: colors.muted, lineHeight: 1.6, fontSize: 14 },
-  password: { width: '100%', height: 48, border: `1px solid ${colors.line}`, borderRadius: 9, paddingInline: 14, marginBlock: '18px 10px', backgroundColor: colors.canvas },
+  passwordField: { display: 'grid', gap: 8, marginBlock: '18px 10px' },
+  passwordLabel: { fontSize: 13, fontWeight: 700 },
+  passwordControl: {
+    display: 'flex', alignItems: 'center', height: 48, border: '1px solid #9eada2', borderRadius: 9, backgroundColor: colors.paper,
+    ':hover': { borderColor: '#718076' },
+    ':focus-within': { borderColor: colors.green, outline: `2px solid ${colors.green}`, outlineOffset: 2 },
+  },
+  passwordControlError: { borderColor: colors.danger, ':hover': { borderColor: colors.danger } },
+  password: { flex: 1, minWidth: 0, width: '100%', height: '100%', borderWidth: 0, borderRadius: 9, paddingInline: 14, backgroundColor: 'transparent', color: colors.ink, fontSize: 16, outline: 'none' },
+  passwordToggle: { display: 'grid', placeItems: 'center', width: 44, height: 44, flexShrink: 0, marginRight: 1, padding: 0, borderRadius: 7, color: colors.muted, ':hover': { color: colors.green, backgroundColor: colors.canvas }, ':focus-visible': { outline: `2px solid ${colors.green}`, outlineOffset: -3 } },
+  loginError: { paddingInline: 0, ':not(:empty)': { marginBottom: 10 } },
   fullButton: { width: '100%' },
   statusRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, fontSize: 12, color: colors.muted },
 });
