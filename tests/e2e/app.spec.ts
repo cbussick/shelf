@@ -1125,10 +1125,10 @@ test('requires the owner password in a new browser profile', async ({ browser, b
   const page = await context.newPage();
   await page.goto(baseURL!);
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
-  await page.getByLabel('Password').fill('incorrect password value');
+  await page.getByLabel('Password', { exact: true }).fill('incorrect password value');
   await page.getByRole('button', { name: 'Open Shelf' }).click();
   await expect(page.getByRole('alert')).toContainText('Incorrect password');
-  await page.getByLabel('Password').fill('correct horse battery staple');
+  await page.getByLabel('Password', { exact: true }).fill('correct horse battery staple');
   await page.getByRole('button', { name: 'Open Shelf' }).click();
   await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible();
   await context.close();
