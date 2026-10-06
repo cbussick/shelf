@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const noteColorSchema = z.enum(['paper', 'butter', 'mint', 'lilac', 'peach']);
+export const noteColorSchema = z.enum(['paper', 'butter', 'mint', 'lilac', 'peach', 'blue', 'orange', 'rose']);
 export type NoteColor = z.infer<typeof noteColorSchema>;
 
 export const imageSchema = z.object({

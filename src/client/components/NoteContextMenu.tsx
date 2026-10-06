@@ -21,6 +21,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
   const focusColors = useRef(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [colorsOpen, setColorsOpen] = useState(false);
+  const [focusedColor, setFocusedColor] = useState<NoteColor>(noteColorSchema.options[0]);
   const colorChoicesId = useId();
   const cancelSubmenuClose = () => clearTimeout(closeTimer.current);
   const closeColors = () => {
@@ -117,7 +118,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
       onPointerEnter={() => openColors()} onPointerLeave={scheduleSubmenuClose} onClick={() => openColors(true)}
       {...stylex.props(styles.contextMenuItem, colorsOpen && styles.contextMenuActive)}><Icon name="palette"/>Change color<Icon name="chevron-right" {...stylex.props(styles.contextMenuChevron)}/></button>
     {colorsOpen && <div ref={submenu} id={colorChoicesId} role="menu" aria-label="Note color" onPointerEnter={cancelSubmenuClose} onPointerLeave={scheduleSubmenuClose} {...stylex.props(styles.contextMenu)}>
-      {noteColorSchema.options.map(color => <button key={color} type="button" role="menuitemradio" tabIndex={-1} aria-checked={target.note.color === color} onClick={() => {
+      {noteColorSchema.options.map(color => <button key={color} type="button" role="menuitemradio" tabIndex={focusedColor === color ? 0 : -1} onFocus={() => setFocusedColor(color)} aria-checked={target.note.color === color} onClick={() => {
         choose(note => onColor(note, color));
         target.origin.focus({ preventScroll: true });
       }} {...stylex.props(styles.contextMenuItem, styles.contextMenuColor)}>

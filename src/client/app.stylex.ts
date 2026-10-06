@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex';
 
 export const colors = stylex.defineVars({
   canvas: '#f7f8fa', paper: '#fff', ink: '#263630', muted: '#646f67', green: '#285b48', line: '#e5e8e6',
-  butter: '#f8ebad', mint: '#dbebe1', lilac: '#eae4f3', peach: '#f6dfd2', danger: '#a03832',
+  butter: '#f8ebad', mint: '#dbebe1', lilac: '#eae4f3', peach: '#f6dfd2', blue: '#d9e8f8', orange: '#f8d2a8', rose: '#f3dce5', danger: '#a03832',
 });
 
 export const styles = stylex.create({
@@ -41,6 +41,7 @@ export const styles = stylex.create({
   linkedContent: { position: 'relative', pointerEvents: 'none' },
   noteLink: { position: 'relative', zIndex: 1, pointerEvents: 'auto', color: colors.green, textDecoration: 'underline', textUnderlineOffset: 2, cursor: 'pointer', ':focus-visible': { outline: `2px solid ${colors.green}`, outlineOffset: 2 } },
   paper: { '--note-color': colors.paper }, butter: { '--note-color': colors.butter }, mint: { '--note-color': colors.mint }, lilac: { '--note-color': colors.lilac }, peach: { '--note-color': colors.peach },
+  blue: { '--note-color': colors.blue }, orange: { '--note-color': colors.orange }, rose: { '--note-color': colors.rose },
   noteContent: { display: 'block', padding: '22px 23px 17px', paddingRight: 54, '@media (max-width: 700px)': { padding: '15px 14px 13px', paddingRight: 46 } },
   imageContent: { padding: '15px 20px 16px', paddingRight: 54, '@media (max-width: 700px)': { padding: '12px 13px', paddingRight: 46 } },
   noteTitle: { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden', fontSize: 17, fontWeight: 800, lineHeight: 1.5, marginBottom: 9, letterSpacing: -.25, overflowWrap: 'anywhere', '@media (max-width: 700px)': { fontSize: 15 }, '@media (max-width: 360px)': { fontSize: 14 } },
@@ -103,7 +104,7 @@ export const styles = stylex.create({
   tools: { display: 'flex', alignItems: 'center', gap: 8 },
   colorPickerAnchor: { position: 'relative' },
   colorPopover: { position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, zIndex: 2, padding: 14, border: `1px solid ${colors.line}`, borderRadius: 12, backgroundColor: '#fff', boxShadow: '0 8px 28px #18251e30' },
-  colorPicker: { display: 'flex', gap: 10, borderWidth: 0, padding: 0, margin: 0 },
+  colorPicker: { display: 'grid', gridTemplateColumns: 'repeat(4, 36px)', gap: 10, borderWidth: 0, padding: 0, margin: 0 },
   swatch: { display: 'grid', placeItems: 'center', width: 36, height: 36, backgroundColor: 'var(--note-color)', borderStyle: 'solid', borderWidth: 1, borderColor: '#26363040', borderRadius: '50%', cursor: 'pointer' },
   paperSwatch: { borderWidth: 2, borderColor: '#66786b' },
   swatchSelected: { outline: `2px solid ${colors.green}`, outlineOffset: 2 },

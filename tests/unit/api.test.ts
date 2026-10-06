@@ -78,11 +78,23 @@ describe('storage', () => {
 });
 
 describe('notes API', () => {
+  it.each(['blue', 'orange', 'rose'])('creates and updates %s notes', async color => {
+    await setup();
+    const id = crypto.randomUUID();
+    const payload = { id, title: 'New color', body: '', color, pinned: false, expectedVersion: 0, retainedImageIds: [] };
+    const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(payload));
+    expect(created.status).toBe(201);
+    expect(created.body.note.color).toBe(color);
+    const updated = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, title: 'Updated', expectedVersion: 1 }));
+    expect(updated.status).toBe(200);
+    expect((await agent.get('/api/notes')).body.notes[0]).toMatchObject({ color, title: 'Updated', version: 2 });
+  });
+
   it('validates, creates, updates, detects conflicts, and deletes a note', async () => {
     await setup();
     const id = crypto.randomUUID();
     const payload = { id, title: 'A note', body: 'Hello', color: 'mint', pinned: true, expectedVersion: 0, retainedImageIds: [] };
-    expect((await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, color: 'blue' }))).status).toBe(400);
+    expect((await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, color: 'unknown' }))).status).toBe(400);
     const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(payload));
     expect(created.status).toBe(201);
     expect(created.body.note).toMatchObject({ id, title: 'A note', version: 1, pinned: true });
