@@ -165,6 +165,7 @@ test('overview shortcuts search, create, and confirm deletion only for a focused
   await page.keyboard.press('d');
   const confirmation = page.getByRole('dialog', { name: 'Delete this note?' });
   await expect(confirmation).toBeVisible();
+  await expect(confirmation).toHaveCSS('border-width', '0px');
   await page.keyboard.press('n');
   await page.keyboard.press('f');
   await expect(page.getByRole('dialog', { name: 'Add note' })).toHaveCount(0);
@@ -693,6 +694,7 @@ test('confirms removal of draft and saved images without removing them on cancel
   await editor.getByRole('button', { name: 'View image 1' }).click();
   await preview.getByRole('button', { name: 'Remove image 1' }).click();
   await expect(confirmation).toBeVisible();
+  await expect(confirmation).toHaveCSS('border-width', '0px');
   await confirmation.getByRole('button', { name: 'Keep image' }).click();
   await expect(preview).toBeVisible();
   await preview.getByRole('button', { name: 'Remove image 1' }).click();
