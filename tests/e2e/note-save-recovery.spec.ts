@@ -59,6 +59,7 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
     await close();
     const confirmation = page.getByRole('dialog', { name: 'Close without saving?' });
     await expect(confirmation).toBeVisible();
+    await expect(confirmation).toHaveCSS('border-width', '0px');
     await confirmation.getByRole('button', { name: 'Keep editing' }).click();
     await expect(editor.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue('Unsaved changes');
     await close();
