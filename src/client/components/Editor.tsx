@@ -127,7 +127,7 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
         {gallery.length > 1 && <ImageMosaic editor images={gallery.map(item => 'image' in item ? <LocalPhoto key={item.image.id} image={item.image} className={stylex.props(styles.mosaicPhoto).className}/> : <img key={item.src} src={item.src} alt={item.alt} {...stylex.props(styles.mosaicPhoto)}/>)} onOpen={setPreviewIndex}/>}
         <div {...stylex.props(styles.editorFields)}>
           <label className="sr-only" htmlFor="note-title">Title</label><input id="note-title" maxLength={160} placeholder="Title" value={title} onChange={event => setTitle(event.target.value)} {...stylex.props(styles.titleInput)}/>
-          <label className="sr-only" htmlFor="note-body">Note</label><textarea ref={bodyInput} id="note-body" maxLength={20_000} placeholder="Start anywhere…" value={body} onChange={event => setBody(event.target.value)} {...stylex.props(styles.bodyInput)}/>
+          <label className="sr-only" htmlFor="note-body">Note</label><textarea ref={bodyInput} id="note-body" spellCheck={false} maxLength={20_000} placeholder="Start anywhere…" value={body} onChange={event => setBody(event.target.value)} {...stylex.props(styles.bodyInput)}/>
         </div>
         <p role="alert" {...stylex.props(styles.error)}>{error}</p>
         {saving && <span role="status" className="sr-only">Saving note…</span>}
