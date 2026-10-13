@@ -19,7 +19,9 @@ const formats = new Map<string, { mimeType: NoteAudio['mimeType']; extension: st
 
 export async function inspectAudio(path: string) {
   const detected = await fileTypeFromFile(path);
-  const format = detected && formats.get(detected.mime);
+  // File signatures can include codec parameters (Opus: audio/ogg; codecs=opus).
+  // Match the container type and keep the stored MIME type canonical.
+  const format = detected && formats.get(detected.mime.split(';')[0].trim().toLowerCase());
   if (!format) throw new Error('Choose an MP3, M4A, WAV, Ogg, WebM, FLAC or AAC audio file.');
   const metadata = await parseFile(path, { skipCovers: true, duration: true });
   if (!metadata.format.numberOfChannels || !metadata.format.sampleRate || metadata.format.trackInfo.some(track => track.type === TrackType.video)) {

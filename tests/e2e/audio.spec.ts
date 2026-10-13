@@ -61,6 +61,28 @@ test('audio-only capture, card playback, seek, download, retention through pin/c
   expect((await (await page.request.get('/api/notes')).json()).notes[0].audio).toEqual([]);
 });
 
+test('Opus upload syncs on mobile, survives reload, and does not block subsequent text notes', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add audio', exact: true }).click();
+  await page.locator('nav input[type=file][accept^="audio/"]').setInputFiles('tests/fixtures/audio.opus');
+  await editorFor(page).getByRole('button', { name: 'Close note' }).click();
+  await expect(editorFor(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Play audio.opus' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'New note' }).click();
+  await editorFor(page).getByRole('textbox', { name: 'Title' }).fill('Text after Opus');
+  await editorFor(page).getByRole('button', { name: 'Close note' }).click();
+  await expect(editorFor(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  const notes = (await (await page.request.get('/api/notes')).json()).notes;
+  expect(notes).toHaveLength(2);
+  expect(notes.find((note: { audio: unknown[] }) => note.audio.length).audio[0].mimeType).toBe('audio/ogg');
+});
+
 test('multiple audio attachments share a scrollable attachment area with images without a count limit', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');

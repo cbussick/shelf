@@ -114,6 +114,20 @@ describe('audio attachments', () => {
     expect((await agent.get(audio.url)).status).toBe(404);
   });
 
+  it('uploads real Ogg Opus audio and normalizes its codec-qualified MIME type', async () => {
+    await setup();
+    const input = payload();
+    const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
+      .attach('audio', 'tests/fixtures/audio.opus');
+    expect(created.status).toBe(201);
+    expect(created.body.note.audio[0]).toMatchObject({ name: 'audio.opus', mimeType: 'audio/ogg' });
+    expect(created.body.note.audio[0].duration).toBeGreaterThan(0);
+    const playback = await agent.get(created.body.note.audio[0].url);
+    expect(playback.status).toBe(200);
+    expect(playback.headers['content-type']).toContain('audio/ogg');
+    expect(playback.body).toEqual(await readFile('tests/fixtures/audio.opus'));
+  });
+
   it('supports more than six audio files alongside images, retains their order, and preserves audio for old clients', async () => {
     await setup();
     const input = payload();
