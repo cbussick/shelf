@@ -126,7 +126,7 @@ export function AudioRecorder({ onKeep, onClose }: { onKeep: (file: File) => voi
     {confirmDiscard ? <><p>Discard this recording?</p><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => setConfirmDiscard(false)} {...stylex.props(styles.secondary)}>Go back</button><button type="button" onClick={onClose} {...stylex.props(styles.danger)}>Discard recording</button></div></> : <div {...stylex.props(styles.dialogActions)}>
       {phase === 'ready' && <button type="button" onClick={() => void start()} {...stylex.props(styles.primary)}><Icon name="microphone" width={18}/>Start recording</button>}
       {phase === 'recording' && <button type="button" onClick={stop} {...stylex.props(styles.primary)}><Icon name="stop" width={18}/>Stop recording</button>}
-      {phase === 'preview' && <><button type="button" onClick={onClose} {...stylex.props(styles.secondary)}>Discard recording</button><button type="button" onClick={() => { if (file) onKeep(file); }} {...stylex.props(styles.primary)}>Keep recording</button></>}
+      {phase === 'preview' && <><button type="button" onClick={onClose} {...stylex.props(styles.secondary)}>Discard</button><button type="button" onClick={() => { if (file) onKeep(file); }} {...stylex.props(styles.primary)}>Add to note</button></>}
     </div>}
   </dialog>;
 }

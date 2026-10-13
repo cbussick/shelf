@@ -232,7 +232,7 @@ test('conflict copies retain audio and uploaded audio does not autoplay or downl
 
 recordingTest.describe('microphone recording', () => {
 
-  recordingTest('records real browser audio, previews it, keeps it, and stops the microphone', async ({ page }) => {
+  recordingTest('confirms real browser audio with Add to note, attaches it, and stops the microphone', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Add audio', exact: true }).click();
     await page.getByRole('button', { name: 'Record with microphone' }).click();
@@ -241,11 +241,15 @@ recordingTest.describe('microphone recording', () => {
     await expect(recorder.getByRole('button', { name: 'Stop recording' })).toBeVisible();
     await expect(recorder.getByRole('status')).toContainText('0:01');
     await recorder.getByRole('button', { name: 'Stop recording' }).click();
-    await expect(recorder.getByRole('button', { name: 'Keep recording' })).toBeVisible();
+    await expect(recorder.getByRole('button', { name: 'Add to note', exact: true })).toBeVisible();
+    await expect(recorder.getByRole('button', { name: 'Discard', exact: true })).toBeVisible();
+    await expect(recorder.getByRole('button', { name: 'Keep recording', exact: true })).toHaveCount(0);
     await recorder.getByRole('button', { name: /^Play Recording / }).click();
     await expect(recorder.getByRole('button', { name: /^Pause Recording / })).toBeVisible();
-    await recorder.getByRole('button', { name: 'Keep recording' }).click();
+    await recorder.getByRole('button', { name: 'Add to note', exact: true }).click();
     await expect(recorder).toHaveCount(0);
+    await expect(editorFor(page).getByRole('region', { name: 'Audio attachments' })).toBeVisible();
+    expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
     await editorFor(page).getByRole('button', { name: 'Close note' }).click();
     await expect(editorFor(page)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
@@ -293,6 +297,23 @@ recordingTest.describe('microphone recording', () => {
     await expect(recorder.getByRole('status')).toContainText('Recording did not start');
     await expect(recorder.getByRole('button', { name: 'Start recording' })).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { acquiredStream: MediaStream }).acquiredStream.getTracks().every(track => track.readyState === 'ended'))).toBe(true);
+  });
+
+  recordingTest('Discard dismisses a recording preview without attaching or saving it', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Add audio', exact: true }).click();
+    await page.getByRole('button', { name: 'Record with microphone' }).click();
+    const recorder = page.getByRole('dialog', { name: 'Record audio', exact: true });
+    await recorder.getByRole('button', { name: 'Start recording' }).click();
+    await expect(recorder.getByRole('status')).toContainText('0:01');
+    await recorder.getByRole('button', { name: 'Stop recording' }).click();
+    await expect(recorder.getByRole('button', { name: 'Add to note', exact: true })).toBeVisible();
+    await recorder.getByRole('button', { name: 'Discard', exact: true }).click();
+    await expect(recorder).toHaveCount(0);
+    await expect(editorFor(page).getByRole('region', { name: 'Audio attachments' })).toHaveCount(0);
+    await editorFor(page).getByRole('button', { name: 'Close note' }).click();
+    await expect(editorFor(page)).toHaveCount(0);
+    expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
   });
 
   recordingTest('explicit discard stops recording without attaching it', async ({ page }) => {
