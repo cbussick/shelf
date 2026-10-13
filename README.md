@@ -1,13 +1,13 @@
 # Shelf
 
-A small, private, self-hosted notes app for text and images. It is designed for one owner and works across desktop, tablet, and phone.
+A small, private, self-hosted notes app for text, images, and audio. It is designed for one owner and works across desktop, tablet, and phone.
 
 ## Stack
 
 - React, TypeScript, Vite, StyleX, and TanStack Query
 - Express and TypeScript
-- SQLite for notes, sessions, and image metadata
-- Filesystem storage for image bytes
+- SQLite for notes, sessions, and attachment metadata
+- Filesystem storage for image and audio bytes
 - Zod parsing at environment, HTTP, browser-storage, and API boundaries
 - IndexedDB and a service worker for local-first editing and offline startup
 - Docker Compose for deployment
@@ -16,6 +16,9 @@ A small, private, self-hosted notes app for text and images. It is designed for 
 
 - Create, edit, search, pin, color, and permanently delete notes
 - Up to six JPG, PNG, WebP, or GIF images per note
+- Audio uploads up to 100 MB each, with no fixed audio count limit per note
+- Microphone recording with preview, keep/discard, and a 30-minute limit
+- Audio playback on note cards and an audio list alongside images in the editor
 - Local-first saving with an honest sync status
 - Offline startup after the first successful visit
 - Offline note creation and editing; queued changes sync while Shelf is open and connected
@@ -62,7 +65,7 @@ Expose it privately to your Tailnet with HTTPS:
 tailscale serve --bg localhost:3000
 ```
 
-Use the `https://…ts.net` URL reported by Tailscale. HTTPS is required for installation and service-worker functionality. Do not use Tailscale Funnel unless you intentionally want public internet access.
+Use the `https://…ts.net` URL reported by Tailscale. HTTPS is required for installation, service-worker functionality, and microphone recording (localhost is allowed for development). Do not use Tailscale Funnel unless you intentionally want public internet access.
 
 The first visit creates the only owner account. There are no default credentials.
 
@@ -75,9 +78,10 @@ The `shelf-data` Docker volume contains:
 /data/shelf.sqlite-wal
 /data/shelf.sqlite-shm
 /data/images/
+/data/audio/
 ```
 
-Back up the database and image directory together. The safest simple procedure is:
+Back up the database, image directory, and audio directory together. `/data/uploads/` holds temporary request files, not saved attachments; it is cleared on startup. The safest simple procedure is:
 
 ```bash
 mkdir -p backups
@@ -138,7 +142,17 @@ On an Android phone or tablet, install Shelf from Chrome while connected to its 
 
 This requires a browser that supports Web Share Target (such as Chrome on Android). iOS/iPadOS PWAs cannot currently appear in the system share sheet; use **Add an image** in Shelf instead.
 
+## Add audio
+
+Use the waveform **Add audio** button in the bottom toolbar or an open note. Choose **Upload audio file** or **Record with microphone**. Files may be MP3, M4A, WAV, Ogg/Opus, audio-only WebM, FLAC, or AAC, up to 100 MB each. There is no fixed number of audio attachments per note; the six-image limit is unchanged. Uploaded originals are preserved, with no conversion or transcription. Browser playback depends on the file's codec; use **Download** if your browser cannot play it.
+
+For microphone capture, allow the browser's microphone permission, then start, stop, preview, and **Keep recording** or **Discard recording**. Kept recordings become attachments; close the note to save them on the device and queue synchronization. Recording stops at 30 minutes or the file-size limit. Keep Shelf in the foreground: switching apps, locking the device, or losing the microphone can interrupt capture. If Shelf detects that it has left the foreground, it stops capture and offers the recorded portion for review. A closed or killed browser may lose an unkept recording.
+
+One player appears on each note card; notes with several recordings offer a count that opens the full list. Playback never starts automatically, and starting another player pauses the previous one. Audio added on a device remains available there offline after sync, subject to browser storage availability. Audio from other devices is streamed when played, not automatically downloaded or kept offline. The Android share target remains image-only; use the file picker for audio on any device.
+
 ## Sync behavior
+
+Conflict copies include the newest local edit and any available attachments. If another device has already deleted an attachment that was never downloaded here, its bytes cannot be recovered: Shelf reports this, preserves the remaining edit, and records the missing filename in the copy's body when there is room. This does not block other notes from syncing.
 
 Drag a note by its top-left handle to reorder it within Pinned or Other notes. The handle also supports arrow keys. Order is saved locally first and synced across devices; moving a note does not change its edit date. Newly created notes appear first. When searching, only visible notes can be used as drop targets.
 
@@ -152,6 +166,6 @@ Mobile operating systems can suspend web apps after they are backgrounded. An ed
 - Authentication remains enabled as defense in depth.
 - Passwords use Argon2id; raw session tokens are never stored in SQLite.
 - Cookies are HTTP-only and SameSite Strict; production cookies are Secure behind HTTPS.
-- Uploads are limited by count, bytes, decoded dimensions, and detected file contents.
+- Images are limited by count, bytes, decoded dimensions, and detected file contents. Audio is streamed to private temporary files, limited to 100 MB per file, and checked for an actual audio stream before being stored. Playback and downloads require authentication.
 - API mutations reject cross-site browser requests.
 - SQLite queries are parameterized and API inputs are parsed with Zod.

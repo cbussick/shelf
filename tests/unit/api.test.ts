@@ -6,7 +6,8 @@ import request, { type Agent } from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../../src/server/app';
 import { openDatabase, type AppDatabase } from '../../src/server/database';
-import type { Environment } from '../../src/shared/contracts';
+import { MAX_AUDIO_BYTES, type Environment } from '../../src/shared/contracts';
+import { wavAudio } from '../fixtures/audio';
 
 let directory: string;
 let database: AppDatabase;
@@ -29,6 +30,15 @@ async function setup() {
 }
 
 describe('authentication gates', () => {
+  it('allows same-origin microphone/blob playback and upgrades insecure resources only in production', async () => {
+    const development = await request(app).get('/api/auth/status');
+    expect(development.headers['permissions-policy']).toContain('microphone=(self)');
+    expect(development.headers['content-security-policy']).toContain("media-src 'self' blob:");
+    expect(development.headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+    const productionApp = createApp(database, { NODE_ENV: 'production', PORT: 3000, DATA_DIR: directory, SESSION_DAYS: 30 });
+    expect((await request(productionApp).get('/api/auth/status')).headers['content-security-policy']).toContain('upgrade-insecure-requests');
+  });
+
   it('sets up exactly one owner and stores an opaque server-side session', async () => {
     expect((await agent.get('/api/auth/status')).body).toEqual({ authenticated: false, setupRequired: true });
     expect((await agent.post('/api/auth/setup').send({ password: 'short' })).status).toBe(400);
@@ -74,6 +84,101 @@ describe('storage', () => {
     expect(database.prepare('SELECT count(*) AS count FROM owner').get()).toEqual({ count: 1 });
     expect(database.prepare('SELECT title FROM notes WHERE id = ?').get(id)).toEqual({ title: 'Existing note' });
     expect(await readdir(directory)).not.toContain('jot.sqlite');
+  });
+});
+
+describe('audio attachments', () => {
+  const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] as string[] });
+
+  it('stores audio-only notes, authenticates playback, supports ranges and downloads, and removes bytes', async () => {
+    await setup();
+    const input = payload();
+    const bytes = wavAudio();
+    const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
+      .attach('audio', bytes, { filename: 'A sound.wav', contentType: 'audio/wav' });
+    expect(created.status).toBe(201);
+    const audio = created.body.note.audio[0];
+    expect(audio).toMatchObject({ name: 'A sound.wav', mimeType: 'audio/wav', size: bytes.length, duration: 1 });
+    expect((await request(app).get(audio.url)).status).toBe(401);
+    const playback = await agent.get(audio.url).set('Range', 'bytes=0-43');
+    expect(playback.status).toBe(206);
+    expect(playback.headers['content-range']).toBe(`bytes 0-43/${bytes.length}`);
+    expect(playback.headers['content-type']).toContain('audio/wav');
+    expect(playback.headers['cache-control']).toContain('no-store');
+    expect((await agent.get(`${audio.url}?download=1`)).headers['content-disposition']).toContain('A sound.wav');
+    const removed = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, expectedVersion: 1 }));
+    expect(removed.status).toBe(200);
+    expect(removed.body.note.audio).toEqual([]);
+    expect(await readdir(join(directory, 'audio'))).toEqual([]);
+    await expect.poll(() => readdir(join(directory, 'uploads'))).toEqual([]);
+    expect((await agent.get(audio.url)).status).toBe(404);
+  });
+
+  it('supports more than six audio files alongside images, retains their order, and preserves audio for old clients', async () => {
+    await setup();
+    const input = payload();
+    let upload = agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input));
+    for (let index = 0; index < 9; index++) upload = upload.attach('audio', wavAudio(), { filename: `${index}.wav`, contentType: 'audio/wav' });
+    const created = await upload.attach('images', 'tests/fixtures/image.jpg');
+    expect(created.status).toBe(201);
+    expect(created.body.note.audio.map((audio: { name: string }) => audio.name)).toEqual(Array.from({ length: 9 }, (_, index) => `${index}.wav`));
+    const audioIds = created.body.note.audio.map((audio: { id: string }) => audio.id).reverse();
+    const updated = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, retainedImageIds: [created.body.note.images[0].id], retainedAudioIds: audioIds, expectedVersion: 1 }));
+    expect(updated.status).toBe(200);
+    expect(updated.body.note.audio.map((audio: { id: string }) => audio.id)).toEqual(audioIds);
+    const { retainedAudioIds: _omitted, ...oldInput } = input;
+    const oldClient = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...oldInput, title: 'Older client edit', expectedVersion: 2 }));
+    expect(oldClient.status).toBe(200);
+    expect(oldClient.body.note.audio.map((audio: { id: string }) => audio.id)).toEqual(audioIds);
+    expect((await agent.delete(`/api/notes/${input.id}`).send({ expectedVersion: 3 })).status).toBe(204);
+    await expect.poll(() => readdir(join(directory, 'audio'))).toEqual([]);
+  });
+
+  it('allows audio above 25 MB and rejects audio above 100 MB without leaving temporary files', async () => {
+    await setup();
+    const input = payload();
+    const bytes = Buffer.concat([wavAudio(), Buffer.alloc(26 * 1024 * 1024)]);
+    const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
+      .attach('audio', bytes, { filename: 'large.wav', contentType: 'audio/wav' });
+    expect(created.status).toBe(201);
+    expect(created.body.note.audio[0].size).toBe(bytes.length);
+    const rejected = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, expectedVersion: 1 }))
+      .attach('audio', Buffer.alloc(MAX_AUDIO_BYTES + 1), { filename: 'too-large.wav', contentType: 'audio/wav' });
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.error).toContain('100 MB');
+    await expect.poll(() => readdir(join(directory, 'uploads'))).toEqual([]);
+    expect((await agent.get('/api/notes')).body.notes[0].version).toBe(1);
+  });
+
+  it('rejects fake audio, empty files, and attachments belonging to another note, without orphaning files', async () => {
+    await setup();
+    const input = payload();
+    const fake = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
+      .attach('audio', wavAudio(), { filename: 'valid.wav', contentType: 'audio/wav' })
+      .attach('audio', Buffer.from('<script>fake</script>'), { filename: 'fake.mp3', contentType: 'audio/mpeg' });
+    expect(fake.status).toBe(400);
+    expect(await readdir(join(directory, 'audio'))).toEqual([]);
+    await expect.poll(() => readdir(join(directory, 'uploads'))).toEqual([]);
+    const empty = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
+      .attach('audio', Buffer.alloc(0), { filename: 'empty.wav', contentType: 'audio/wav' });
+    expect(empty.status).toBe(400);
+    const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
+      .attach('audio', wavAudio(), { filename: 'real.wav', contentType: 'audio/wav' });
+    const other = payload();
+    const foreign = await agent.put(`/api/notes/${other.id}`).field('payload', JSON.stringify({ ...other, retainedAudioIds: [created.body.note.audio[0].id] }));
+    expect(foreign.status).toBe(400);
+    expect(foreign.body.error).toContain('does not belong');
+  });
+
+  it('keeps one winner when concurrent audio saves start at the same version', async () => {
+    await setup();
+    const input = payload();
+    const responses = await Promise.all(['one', 'two'].map(name => agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, title: name }))
+      .attach('audio', wavAudio(), { filename: `${name}.wav`, contentType: 'audio/wav' })));
+    expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+    expect(await readdir(join(directory, 'audio'))).toHaveLength(1);
+    await expect.poll(() => readdir(join(directory, 'uploads'))).toEqual([]);
+    expect((await agent.get('/api/notes')).body.notes[0].version).toBe(1);
   });
 });
 

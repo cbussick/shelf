@@ -2,20 +2,25 @@ import * as stylex from '@stylexjs/stylex';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { noteColorSchema, type NoteColor } from '../../shared/contracts';
 import { styles } from '../app.stylex';
-import type { LocalImage, LocalNote } from '../local-store';
+import type { LocalAudio, LocalImage, LocalNote } from '../local-store';
 import { LocalPhoto } from './NoteBoard';
 import { Icon } from './Icon';
 import { ImageMosaic } from './ImageMosaic';
+import { audioFileKey, validateAudioFile } from '../audio';
+import { AddAudio } from './AddAudio';
+import { AudioPlayer } from './AudioPlayer';
+import { AudioRecorder } from './AudioRecorder';
 
 const colors = noteColorSchema.options;
 
 export type EditorValue = {
   id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
   retainedImages: LocalImage[]; newImages: File[]; version?: number; createdAt?: string;
+  retainedAudio: LocalAudio[]; newAudio: File[];
 };
 
-export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: {
-  note?: LocalNote; initialImages?: File[]; onSave: (value: EditorValue) => Promise<void>;
+export function Editor({ note, initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose }: {
+  note?: LocalNote; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<void>;
   onDelete: (note: LocalNote) => Promise<void>; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -25,12 +30,19 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
   const removeImageDialog = useRef<HTMLDialogElement>(null);
   const imageToRemove = useRef<{ kind: 'retained'; id: string } | { kind: 'new'; index: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const removeAudioDialog = useRef<HTMLDialogElement>(null);
+  const audioToRemove = useRef<{ kind: 'retained'; id: string } | { kind: 'new'; file: File } | null>(null);
   const [title, setTitle] = useState(note?.title ?? '');
   const [body, setBody] = useState(note?.body ?? '');
   const [color, setColor] = useState<NoteColor>(note?.color ?? 'paper');
   const [pinned, setPinned] = useState(note?.pinned ?? false);
   const [retainedImages, setRetainedImages] = useState(note?.images ?? []);
   const [newImages, setNewImages] = useState<File[]>(initialImages);
+  const [retainedAudio, setRetainedAudio] = useState(note?.audio ?? []);
+  const [newAudio, setNewAudio] = useState<File[]>(initialAudio);
+  const [recordingOpen, setRecordingOpen] = useState(false);
+  const hasAudio = retainedAudio.length + newAudio.length > 0;
+  const editorPhoto = stylex.props(styles.editorPhoto, hasAudio && styles.mixedEditorPhoto);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -41,19 +53,21 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
     ...retainedImages.map(image => ({ image, removal: { kind: 'retained' as const, id: image.id } })),
     ...newImages.map((file, index) => ({ src: newImageUrls[index], alt: file.name, removal: { kind: 'new' as const, index } })),
   ];
-  const initial = useRef(snapshot({ title, body, color, pinned, retainedImages, newImages }));
-  const dirty = initial.current !== snapshot({ title, body, color, pinned, retainedImages, newImages });
+  const initial = useRef(snapshot({ title, body, color, pinned, retainedImages, newImages, retainedAudio, newAudio }));
+  const dirty = initial.current !== snapshot({ title, body, color, pinned, retainedImages, newImages, retainedAudio, newAudio });
 
   useEffect(() => {
     dialog.current?.showModal();
     if (!note) bodyInput.current?.focus();
+    // Mount the recorder only after the editor is in the browser's top layer.
+    if (initialRecording) setRecordingOpen(true);
     return () => dialog.current?.close();
-  }, [note]);
+  }, [note, initialRecording]);
   const requestClose = () => {
-    if (saving) return;
+    if (saving || recordingOpen) return;
     if (!dirty && note) return onClose();
     // An empty draft has nothing to keep; shared images do.
-    if (!note && !title.trim() && !body.trim() && retainedImages.length + newImages.length === 0) return onClose();
+    if (!note && !title.trim() && !body.trim() && retainedImages.length + newImages.length + retainedAudio.length + newAudio.length === 0) return onClose();
     if (saveFailed) return discardDialog.current?.showModal();
     void save();
   };
@@ -80,6 +94,23 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
     if (retainedImages.length + newImages.length + accepted.length > 6) return setError('Up to 6 images per note.');
     setNewImages(current => [...current, ...accepted]);
   };
+  const addAudio = (files: File[]) => {
+    try {
+      files.forEach(validateAudioFile);
+      setNewAudio(current => [...current, ...files]);
+      setError('');
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not attach this audio.'); }
+  };
+  const requestAudioRemoval = (audio: NonNullable<typeof audioToRemove.current>) => {
+    audioToRemove.current = audio;
+    removeAudioDialog.current?.showModal();
+  };
+  const confirmAudioRemoval = () => {
+    const audio = audioToRemove.current;
+    audioToRemove.current = null;
+    if (audio?.kind === 'retained') setRetainedAudio(current => current.filter(item => item.id !== audio.id));
+    else if (audio?.kind === 'new') setNewAudio(current => current.filter(file => file !== audio.file));
+  };
   const pasteImages = (event: React.ClipboardEvent<HTMLDialogElement>) => {
     if (saving) return;
     const items = [...event.clipboardData.items].filter(item => item.kind === 'file' && item.type.startsWith('image/'));
@@ -96,7 +127,7 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
     const cleanBody = body.trim();
     setSaving(true); setError(''); setSaveFailed(false);
     try {
-      await onSave({ id: note?.id, title: cleanTitle, body: cleanBody, color, pinned, retainedImages, newImages, version: note?.version, createdAt: note?.createdAt });
+      await onSave({ id: note?.id, title: cleanTitle, body: cleanBody, color, pinned, retainedImages, newImages, retainedAudio, newAudio, version: note?.version, createdAt: note?.createdAt });
       onClose();
     } catch (caught) {
       const reason = caught instanceof DOMException && caught.name === 'InvalidStateError'
@@ -121,23 +152,34 @@ export function Editor({ note, initialImages = [], onSave, onDelete, onClose }: 
             <button type="button" aria-label="Close note" disabled={saving} onClick={requestClose} {...stylex.props(styles.iconButton)}><Icon name="x"/></button>
           </div>
         </header>
+        <div {...stylex.props(styles.editorAttachments)}>
         {gallery.length === 1 && <div {...stylex.props(styles.editorImages)}><div {...stylex.props(styles.editorImage, styles.editorImageCentered, styles.editorImageEnd)}>
-          <button type="button" aria-label="View image 1" onClick={() => setPreviewIndex(0)} {...stylex.props(styles.photoButton)}>{'image' in gallery[0] ? <LocalPhoto image={gallery[0].image} className={stylex.props(styles.editorPhoto).className}/> : <img src={gallery[0].src} alt={gallery[0].alt} {...stylex.props(styles.editorPhoto)}/>}</button>
+          <button type="button" aria-label="View image 1" onClick={() => setPreviewIndex(0)} {...stylex.props(styles.photoButton)}>{'image' in gallery[0] ? <LocalPhoto image={gallery[0].image} className={editorPhoto.className}/> : <img src={gallery[0].src} alt={gallery[0].alt} {...editorPhoto}/>}</button>
         </div></div>}
         {gallery.length > 1 && <ImageMosaic editor images={gallery.map(item => 'image' in item ? <LocalPhoto key={item.image.id} image={item.image} className={stylex.props(styles.mosaicPhoto).className}/> : <img key={item.src} src={item.src} alt={item.alt} {...stylex.props(styles.mosaicPhoto)}/>)} onOpen={setPreviewIndex}/>}
+        {hasAudio && <section aria-label="Audio attachments" {...stylex.props(styles.audioList)}>
+          <h3 {...stylex.props(styles.audioListHeading)}>Audio · {retainedAudio.length + newAudio.length} {retainedAudio.length + newAudio.length === 1 ? 'file' : 'files'}</h3>
+          {retainedAudio.map(audio => <AudioPlayer key={audio.id} audio={audio} onRemove={() => requestAudioRemoval({ kind: 'retained', id: audio.id })}/>)}
+          {newAudio.map(file => <AudioPlayer key={audioFileKey(file)} file={file} onRemove={() => requestAudioRemoval({ kind: 'new', file })}/>)}
+        </section>}
+        </div>
         <div {...stylex.props(styles.editorFields)}>
           <label className="sr-only" htmlFor="note-title">Title</label><input id="note-title" maxLength={160} placeholder="Title" value={title} onChange={event => setTitle(event.target.value)} {...stylex.props(styles.titleInput)}/>
           <label className="sr-only" htmlFor="note-body">Note</label><textarea ref={bodyInput} id="note-body" spellCheck={false} maxLength={20_000} placeholder="Start anywhere…" value={body} onChange={event => setBody(event.target.value)} {...stylex.props(styles.bodyInput)}/>
         </div>
+        {(newAudio.length > 0 || (dirty && (retainedAudio.length > 0 || (note?.audio.length ?? 0) > 0))) && !saving && <p role="status" {...stylex.props(styles.audioDraftStatus)}>Audio changes are not saved yet. Close the note to save on this device.</p>}
         <p role="alert" {...stylex.props(styles.error)}>{error}</p>
         {saving && <span role="status" className="sr-only">Saving note…</span>}
         <footer {...stylex.props(styles.editorFooter)}><div {...stylex.props(styles.tools)}>
+          <AddAudio onUpload={addAudio} onRecord={() => setRecordingOpen(true)} disabled={saving}/>
           <button type="button" aria-label="Attach an image" onClick={() => input.current?.click()} {...stylex.props(styles.iconButton)}><Icon name="image"/></button>
           <input ref={input} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }}/>
           <ColorPicker color={color} onChange={setColor}/>
         </div><div {...stylex.props(styles.tools)}>{saveFailed && <button type="button" disabled={saving} onClick={() => void save()} {...stylex.props(styles.primary)}>Try again</button>}<button type="button" disabled={saving} onClick={requestClose} {...stylex.props(styles.secondary)}>Close</button></div></footer>
       </div>
     </dialog>
+    {recordingOpen && <AudioRecorder onKeep={file => { addAudio([file]); setRecordingOpen(false); }} onClose={() => setRecordingOpen(false)}/>}
+    <ConfirmDialog ref={removeAudioDialog} title="Remove this audio?" copy="This audio will no longer be attached to this note." cancel="Keep audio" confirm="Remove audio" onConfirm={confirmAudioRemoval}/>
     {previewIndex !== null && gallery[previewIndex] && <ImagePreview gallery={gallery} index={previewIndex} onIndexChange={setPreviewIndex} onRemove={() => requestImageRemoval(gallery[previewIndex].removal)} onClose={() => setPreviewIndex(null)}/>}
     <ConfirmDialog ref={removeImageDialog} title="Remove this image?" copy="This image will no longer be attached to this note." cancel="Keep image" confirm="Remove image" onConfirm={confirmImageRemoval}/>
     <ConfirmDialog ref={discardDialog} title="Close without saving?" copy="Your latest changes could not be saved. Closing will discard those changes, but will not delete an existing note." cancel="Keep editing" confirm="Close without saving" onConfirm={onClose}/>
@@ -208,6 +250,6 @@ function formatTimestamp(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
-function snapshot(value: { title: string; body: string; color: NoteColor; pinned: boolean; retainedImages: LocalImage[]; newImages: File[] }) {
-  return JSON.stringify({ ...value, retainedImages: value.retainedImages.map(image => image.id), newImages: value.newImages.map(file => [file.name, file.size, file.lastModified]) });
+function snapshot(value: { title: string; body: string; color: NoteColor; pinned: boolean; retainedImages: LocalImage[]; newImages: File[]; retainedAudio: LocalAudio[]; newAudio: File[] }) {
+  return JSON.stringify({ ...value, retainedImages: value.retainedImages.map(image => image.id), newImages: value.newImages.map(file => [file.name, file.size, file.lastModified]), retainedAudio: value.retainedAudio.map(audio => audio.id), newAudio: value.newAudio.map(file => [file.name, file.size, file.lastModified]) });
 }

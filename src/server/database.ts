@@ -49,6 +49,17 @@ export function openDatabase(environment: Environment): AppDatabase {
       position INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS images_note ON images(note_id, position);
+    CREATE TABLE IF NOT EXISTS audio (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      filename TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      duration REAL,
+      position INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS audio_note ON audio(note_id, position);
   `);
   if (!database.prepare('PRAGMA table_info(notes)').all().some(column => (column as { name: string }).name === 'position')) {
     database.exec('ALTER TABLE notes ADD COLUMN position INTEGER NOT NULL DEFAULT 0');
@@ -93,11 +104,17 @@ type ImageRow = {
   width: number; height: number; size: number; position: number;
 };
 
+type AudioRow = {
+  id: string; note_id: string; filename: string; name: string; mime_type: Note['audio'][number]['mimeType'];
+  size: number; duration: number | null; position: number;
+};
+
 export function readNote(database: AppDatabase, id: string): Note | undefined {
   const row = database.prepare('SELECT * FROM notes WHERE id = ?').get(id) as NoteRow | undefined;
   if (!row) return undefined;
   const images = database.prepare('SELECT * FROM images WHERE note_id = ? ORDER BY position').all(id) as ImageRow[];
-  return mapNote(row, images);
+  const audio = database.prepare('SELECT * FROM audio WHERE note_id = ? ORDER BY position').all(id) as AudioRow[];
+  return mapNote(row, images, audio);
 }
 
 export function readNotes(database: AppDatabase): Note[] {
@@ -105,10 +122,17 @@ export function readNotes(database: AppDatabase): Note[] {
   const images = database.prepare('SELECT * FROM images ORDER BY note_id, position').all() as ImageRow[];
   const byNote = new Map<string, ImageRow[]>();
   for (const image of images) byNote.set(image.note_id, [...(byNote.get(image.note_id) ?? []), image]);
-  return notes.map(note => mapNote(note, byNote.get(note.id) ?? []));
+  const audio = database.prepare('SELECT * FROM audio ORDER BY note_id, position').all() as AudioRow[];
+  const audioByNote = new Map<string, AudioRow[]>();
+  for (const attachment of audio) {
+    const group = audioByNote.get(attachment.note_id) ?? [];
+    group.push(attachment);
+    audioByNote.set(attachment.note_id, group);
+  }
+  return notes.map(note => mapNote(note, byNote.get(note.id) ?? [], audioByNote.get(note.id) ?? []));
 }
 
-function mapNote(row: NoteRow, images: ImageRow[]): Note {
+function mapNote(row: NoteRow, images: ImageRow[], audio: AudioRow[]): Note {
   return {
     id: row.id,
     title: row.title,
@@ -119,6 +143,14 @@ function mapNote(row: NoteRow, images: ImageRow[]): Note {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     version: row.version,
+    audio: audio.map(attachment => ({
+      id: attachment.id,
+      url: `/api/audio/${attachment.id}`,
+      name: attachment.name,
+      mimeType: attachment.mime_type,
+      size: attachment.size,
+      duration: attachment.duration,
+    })),
     images: images.map(image => ({
       id: image.id,
       url: `/api/images/${image.id}`,

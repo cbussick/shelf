@@ -9,7 +9,7 @@ async function createNote(page: Page, withImage = false) {
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Keep this text');
   if (withImage) {
     await page.getByRole('button', { name: 'Pin note' }).click();
-    await page.locator('dialog input[type=file]').setInputFiles('tests/fixtures/image.jpg');
+    await page.locator('dialog input[type=file][accept^="image/"]').setInputFiles('tests/fixtures/image.jpg');
   }
   await page.getByRole('button', { name: 'Close note' }).click();
   const card = page.getByRole('button', { name: 'Open note: Color target' });

@@ -5,6 +5,7 @@ import { imageSource } from '../local-store';
 import { styles } from '../app.stylex';
 import { Icon } from './Icon';
 import { ImageMosaic } from './ImageMosaic';
+import { AudioPlayer } from './AudioPlayer';
 import { LinkedText } from './LinkedText';
 import { linkParts } from './link-parts';
 
@@ -180,20 +181,24 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
       {note.title && <span {...stylex.props(styles.noteTitle)}>{hasLinks ? <LinkedText parts={titleParts}/> : note.title}</span>}
       {note.body && <span {...stylex.props(styles.noteBody)}>{hasLinks ? <LinkedText parts={bodyParts}/> : note.body}</span>}
     </span>}
+    {note.audio.length > 0 && <div {...stylex.props(styles.cardAudio)}>
+      <AudioPlayer key={note.audio[0].id} audio={note.audio[0]} compact/>
+      {note.audio.length > 1 && <button type="button" onClick={onCardClick} {...stylex.props(styles.audioMore)}>{note.audio.length - 1} more audio {note.audio.length === 2 ? 'file' : 'files'}</button>}
+    </div>}
   </>;
   const buttonProps = {
     type: 'button' as const, 'data-note-id': note.id,
-    'aria-label': `Open note: ${note.title || note.body || image?.alt || 'Image note'}`,
+    'aria-label': `Open note: ${note.title || note.body || image?.alt || note.audio[0]?.name || 'Image note'}`,
     title: 'Drag to reorder · arrow keys to move', onClick: onCardClick, onPointerDown,
     onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => { event.preventDefault(); if (navigator.maxTouchPoints === 0) onContextMenu(note, event); },
     onDragStart: (event: React.DragEvent<HTMLButtonElement>) => event.preventDefault(), onKeyDown,
   };
   return <li data-item-id={note.id} {...stylex.props(styles.noteItem, dropTarget && styles.dropTarget)}>
-    {hasLinks ? <div {...stylex.props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>
+    {hasLinks || note.audio.length > 0 ? <div {...stylex.props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>
       <button {...buttonProps} {...stylex.props(styles.cardOverlay)}/>
       {content}
     </div> : <button {...buttonProps} {...stylex.props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>{content}</button>}
-    {!dropTarget && <button type="button" data-pin-id={note.id} aria-label={`${note.pinned ? 'Unpin' : 'Pin'} note: ${note.title || note.body || 'Image note'}`} aria-pressed={note.pinned} title={note.pinned ? 'Unpin note' : 'Pin note'} onClick={() => onPin(note)} {...stylex.props(styles.pin, styles.pinVisibility, note.pinned && styles.pinned)}><Icon name={note.pinned ? 'pin-filled' : 'pin'} width={18}/></button>}
+    {!dropTarget && <button type="button" data-pin-id={note.id} aria-label={`${note.pinned ? 'Unpin' : 'Pin'} note: ${note.title || note.body || note.audio[0]?.name || 'Image note'}`} aria-pressed={note.pinned} title={note.pinned ? 'Unpin note' : 'Pin note'} onClick={() => onPin(note)} {...stylex.props(styles.pin, styles.pinVisibility, note.pinned && styles.pinned)}><Icon name={note.pinned ? 'pin-filled' : 'pin'} width={18}/></button>}
   </li>;
 }
 

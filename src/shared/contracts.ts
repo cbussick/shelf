@@ -14,6 +14,19 @@ export const imageSchema = z.object({
 });
 export type NoteImage = z.infer<typeof imageSchema>;
 
+export const MAX_AUDIO_BYTES = 100 * 1024 * 1024;
+export const MAX_RECORDING_SECONDS = 30 * 60;
+export const audioMimeTypeSchema = z.enum(['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/flac', 'audio/aac']);
+export const audioSchema = z.object({
+  id: z.uuid(),
+  url: z.string().startsWith('/api/audio/'),
+  name: z.string().max(500),
+  mimeType: audioMimeTypeSchema,
+  size: z.number().int().nonnegative().max(MAX_AUDIO_BYTES),
+  duration: z.number().positive().finite().nullable(),
+});
+export type NoteAudio = z.infer<typeof audioSchema>;
+
 export const noteSchema = z.object({
   id: z.uuid(),
   title: z.string().max(160),
@@ -25,6 +38,7 @@ export const noteSchema = z.object({
   updatedAt: z.iso.datetime(),
   version: z.number().int().positive(),
   images: z.array(imageSchema).max(6),
+  audio: z.array(audioSchema).default([]),
 });
 export type Note = z.infer<typeof noteSchema>;
 
@@ -40,6 +54,15 @@ export const noteWriteSchema = z.object({
   pinned: z.boolean(),
   expectedVersion: z.number().int().nonnegative(),
   retainedImageIds: z.array(z.uuid()).max(6),
+  newImageIds: z.array(z.uuid()).max(6).refine(ids => new Set(ids).size === ids.length).optional(),
+  // Older clients omit this field; preserve their note's existing audio.
+  retainedAudioIds: z.array(z.uuid()).refine(ids => new Set(ids).size === ids.length).optional(),
+  // Stable IDs reconcile editors opened during upload; browser recordings
+  // sometimes need a duration fallback because their container omits it.
+  newAudio: z.array(z.object({
+    id: z.uuid(),
+    duration: z.number().positive().finite().max(MAX_RECORDING_SECONDS).nullable(),
+  })).refine(uploads => new Set(uploads.map(upload => upload.id)).size === uploads.length).optional(),
 });
 export type NoteWrite = z.infer<typeof noteWriteSchema>;
 

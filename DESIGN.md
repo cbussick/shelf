@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-Shelf is a single-owner, self-hosted home for text and image notes. It intentionally excludes checklists, drawings, labels, archive, reminders, sharing, and a persistent trash folder.
+Shelf is a single-owner, self-hosted home for text, image, and audio notes. It intentionally excludes checklists, drawings, labels, archive, reminders, sharing, and a persistent trash folder.
 
 ## Visual direction
 
@@ -11,6 +11,8 @@ Shelf is a single-owner, self-hosted home for text and image notes. It intention
 - Four masonry-style columns on desktop, three on tablet, and two on phones.
 - Pinned notes form a separate section above other notes. Empty sections disappear.
 - Images retain their proportions. Color remains a lightweight visual preference rather than a taxonomy.
+- Images and audio share an attachment area, with an image gallery followed by a scrollable audio list. Cards show one compact player and a count for additional audio files.
+- A waveform Add audio action sits beside image capture in the bottom toolbar and inside the editor. It offers upload or microphone recording; capture is explicitly previewed and kept/discarded.
 - Dates are plain text. The interface avoids decorative navigation, metrics, and feature advertising.
 
 ## Responsive behavior
@@ -30,7 +32,9 @@ The interface reports local, syncing, synced, offline, and failure states separa
 
 ## PWA behavior
 
-The manifest provides installation metadata. The service worker precaches the application shell and caches successfully retrieved note images. Notes and pending image blobs live in IndexedDB.
+The manifest provides installation metadata. The service worker precaches the application shell and caches successfully retrieved note images. Notes and pending image/audio blobs live in IndexedDB. Audio added on this device is retained locally after acknowledgement; audio from other devices is streamed only on demand. There is no automatic audio download or audio service-worker cache.
+
+Audio uploads have a 100 MB per-file limit and no fixed per-note count limit. The server streams multipart uploads to private per-request directories, validates audio metadata/content, and checks the note version again at commit. Stable attachment IDs reconcile editors opened during an upload. Uploaded files are not transcoded or transcribed. Microphone recording chooses a browser-supported compressed format, stops at 30 minutes or the byte limit, and releases its microphone when stopped/discarded. Capture is stopped for review when the app leaves the foreground; background recording is not promised.
 
 The app retries synchronization on saves, reconnection, foregrounding, explicit requests, and a short foreground polling interval. It does not promise background execution after a mobile OS suspends it.
 
