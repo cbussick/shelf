@@ -30,10 +30,11 @@ export const api = {
   logout: () => request('/api/auth/logout', okResponseSchema, { method: 'POST' }),
   notes: () => request('/api/notes', noteListResponseSchema),
   reorderNotes: (ids: string[]) => request('/api/notes/order', okResponseSchema, jsonRequest(reorderNotesSchema.parse({ ids }), 'PUT')),
-  saveNote: (input: NoteWrite, images: File[]) => {
+  saveNote: (input: NoteWrite, images: File[], audio: File[] = []) => {
     const form = new FormData();
     form.set('payload', JSON.stringify(input));
     for (const image of images) form.append('images', image, image.name);
+    for (const attachment of audio) form.append('audio', attachment, attachment.name);
     return request(`/api/notes/${input.id}`, noteResponseSchema, { method: 'PUT', body: form });
   },
   deleteNote: (id: string, expectedVersion: number) => request(`/api/notes/${id}`, okResponseSchema, jsonRequest({ expectedVersion }, 'DELETE')),

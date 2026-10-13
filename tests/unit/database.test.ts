@@ -35,6 +35,7 @@ it.each([true, false])('expands the legacy palette without losing notes or image
   expect(notes).toEqual([{
     id: 'note', title: 'Existing title', body: 'Existing body', color: 'peach', pinned: true,
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z', version: 7, position: hasPosition ? 42 : 0,
+    audio: [],
     images: [{ id: 'image', url: '/api/images/image', alt: 'Existing alt', mimeType: 'image/jpeg', width: 100, height: 80, size: 1024 }],
   }]);
   expect(database.pragma('foreign_keys', { simple: true })).toBe(1);

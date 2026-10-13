@@ -7,6 +7,8 @@ import { styles } from './app.stylex';
 import { Auth, Brand } from './components/Auth';
 import { ConfirmDialog, Editor, type EditorValue } from './components/Editor';
 import { Icon } from './components/Icon';
+import { AddAudio } from './components/AddAudio';
+import { validateAudioFile } from './audio';
 import { NoteBoard } from './components/NoteBoard';
 import { NoteContextMenu, type MenuTarget } from './components/NoteContextMenu';
 import { clearShares, discardShare, getShare } from './incoming-share';
@@ -30,7 +32,7 @@ export function App() {
 function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout: () => void }) {
   const [notes, setNotes] = useState<LocalNote[]>([]);
   const [query, setQuery] = useState('');
-  const [editor, setEditor] = useState<{ note?: LocalNote; files?: File[]; shareId?: string }>();
+  const [editor, setEditor] = useState<{ note?: LocalNote; files?: File[]; audio?: File[]; recording?: boolean; shareId?: string }>();
   const [menu, setMenu] = useState<MenuTarget>();
   const [syncState, setSyncState] = useState<SyncState>(offlineEntry ? 'offline' : 'connecting');
   const [pending, setPending] = useState(0);
@@ -67,7 +69,8 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
             setNotes(result.notes); setPending(result.pending);
             setSyncState(result.connection === 'offline' || !navigator.onLine ? 'offline' : result.connection === 'unauthorized' ? 'error' : result.pending ? 'local' : 'synced');
           }
-          if (result.conflict) notify('Both versions were kept after a conflicting edit.');
+          if (result.missingAttachments.length) notify(`Both versions were kept, but ${result.missingAttachments.length} attachment(s) had already been removed from the server and could not be copied.`);
+          else if (result.conflict) notify('Both versions were kept after a conflicting edit.');
         } catch (error) {
           setSyncState(error instanceof ApiError && error.status === 0 ? 'offline' : 'error');
         }
@@ -143,7 +146,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
-    return notes.filter(note => [note.title, note.body, ...note.images.map(image => image.alt)].join(' ').toLocaleLowerCase().includes(normalized));
+    return notes.filter(note => [note.title, note.body, ...note.images.map(image => image.alt), ...note.audio.map(audio => audio.name)].join(' ').toLocaleLowerCase().includes(normalized));
   }, [notes, query]);
   const pinned = filtered.filter(note => note.pinned);
   const others = filtered.filter(note => !note.pinned);
@@ -159,7 +162,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     notify('Note permanently deleted'); void synchronize();
   };
   const pin = async (note: LocalNote) => {
-    await saveLocalNote({ ...note, pinned: !note.pinned, retainedImages: note.images, newImages: [] });
+    await saveLocalNote({ ...note, pinned: !note.pinned, retainedImages: note.images, newImages: [], retainedAudio: note.audio, newAudio: [] });
     setNotes(await localNotes()); notify(note.pinned ? 'Note unpinned' : 'Note pinned'); void synchronize();
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-pin-id="${note.id}"]`)?.focus({ preventScroll: true }));
   };
@@ -167,7 +170,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     try {
       const current = (await localNotes()).find(item => item.id === note.id);
       if (!current || current.color === color) return;
-      await save({ ...current, color, retainedImages: current.images, newImages: [] });
+      await save({ ...current, color, retainedImages: current.images, newImages: [], retainedAudio: current.audio, newAudio: [] });
     } catch { notify('Could not change note color. Try again.'); }
   };
   const reorder = async (source: string, target: string) => {
@@ -191,6 +194,10 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     if (!files?.length) return;
     setEditor({ files: [...files] });
   };
+  const chooseAudio = (files: File[]) => {
+    try { files.forEach(validateAudioFile); setEditor({ audio: files }); }
+    catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach this audio.'); }
+  };
   const closeEditor = async () => {
     if (editor?.shareId) {
       try { await discardShare(editor.shareId); }
@@ -212,7 +219,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
       <div {...stylex.props(styles.accountActions)}><button type="button" aria-label={status.label} onClick={() => syncDialog.current?.showModal()} {...stylex.props(styles.syncButton)}><Icon name={status.icon}/><span>{status.label}</span></button><button type="button" onClick={() => void logout()} {...stylex.props(styles.signOutButton)}>Sign out</button></div>
     </header>
     <main id="main" {...stylex.props(styles.workspace)}><section {...stylex.props(styles.pageHeading)}><h1 {...stylex.props(styles.h1)}>Your notes</h1></section>
-      <nav aria-label="Create a note" {...stylex.props(styles.floatingCapture)}><button type="button" aria-label="Add an image" onClick={() => imageInput.current?.click()} {...stylex.props(styles.mobileButton)}><Icon name="image"/></button><span {...stylex.props(styles.mobileDivider)}/><button type="button" onClick={() => setEditor({})} {...stylex.props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
+      <nav aria-label="Create a note" {...stylex.props(styles.floatingCapture)}><button type="button" aria-label="Add an image" onClick={() => imageInput.current?.click()} {...stylex.props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => setEditor({ recording: true })}/><span {...stylex.props(styles.mobileDivider)}/><button type="button" onClick={() => setEditor({})} {...stylex.props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
       {pinned.length > 0 && <NoteBoard notes={pinned} heading="Pinned" label="Pinned notes" onOpen={note => setEditor({ note })} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/>}
       {others.length > 0 && <div {...stylex.props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={note => setEditor({ note })} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
       {filtered.length === 0 && <section {...stylex.props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...stylex.props(styles.secondary)}>Clear search</button>}</section>}
@@ -220,7 +227,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={note => setEditor({ note })} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
-    {editor && <Editor note={editor.note} initialImages={editor.files} onSave={save} onDelete={remove} onClose={closeEditor}/>}
+    {editor && <Editor note={editor.note} initialImages={editor.files} initialAudio={editor.audio} initialRecording={editor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
     {toast && <div role="status" {...stylex.props(styles.toast)}>{toast}</div>}
   </>;

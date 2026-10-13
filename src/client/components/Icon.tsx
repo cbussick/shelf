@@ -1,7 +1,14 @@
 import type { SVGProps } from 'react';
 
-type IconName = 'search' | 'plus' | 'image' | 'pen' | 'offline' | 'cloud-check' | 'refresh' | 'sort' | 'x' | 'trash' | 'pin' | 'pin-filled' | 'palette' | 'note' | 'chevron-left' | 'chevron-right' | 'eye' | 'eye-off';
+type IconName = 'search' | 'plus' | 'image' | 'pen' | 'offline' | 'cloud-check' | 'refresh' | 'sort' | 'x' | 'trash' | 'pin' | 'pin-filled' | 'palette' | 'note' | 'chevron-left' | 'chevron-right' | 'eye' | 'eye-off' | 'audio' | 'microphone' | 'play' | 'pause' | 'stop' | 'download' | 'upload';
 const paths: Record<IconName, React.ReactNode> = {
+  audio: <path d="M3 10v4M7 6v12M12 3v18M17 7v10M21 10v4"/>,
+  microphone: <><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></>,
+  play: <path d="m8 5 11 7-11 7Z" fill="currentColor"/>,
+  pause: <><path d="M8 5v14M16 5v14" strokeWidth="3"/></>,
+  stop: <rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor"/>,
+  download: <path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/>,
+  upload: <path d="M12 16V4m-5 5 5-5 5 5M4 17v4h16v-4"/>,
   search: <><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></>,
   eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></>,
   'eye-off': <><path d="m3 3 18 18M10.6 5.1A13 13 0 0 1 12 5c6.5 0 10 7 10 7a20 20 0 0 1-3 3.9M6.3 6.3A20 20 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5.7-1.7M9.9 9.9a3 3 0 0 0 4.2 4.2"/></>,

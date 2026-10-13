@@ -74,7 +74,7 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
 test('reconnects when the local database closes during image decoding', async ({ page }) => {
   await trackDatabase(page);
   const editor = await openExistingNote(page);
-  await editor.locator('input[type="file"]').setInputFiles('tests/fixtures/image.jpg');
+  await editor.locator('input[type="file"][accept^="image/"]').setInputFiles('tests/fixtures/image.jpg');
   await page.evaluate(() => {
     const decode = window.createImageBitmap;
     window.createImageBitmap = (async (...args: Parameters<typeof decode>) => {
