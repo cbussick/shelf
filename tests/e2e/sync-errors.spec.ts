@@ -48,6 +48,26 @@ test('a rejected pending note shows the upload error and can be retried without 
   expect((await (await page.request.get('/api/notes')).json()).notes[0].title).toBe('Still on this device');
 });
 
+test('keeps a rejected upload error when going offline and clears it after reconnecting successfully', async ({ page, context }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  await page.route('**/api/notes/*', route => route.fulfill({ status: 400, json: { error: 'Choose a valid audio file.' } }));
+  await page.getByRole('button', { name: 'New note' }).click();
+  await editorFor(page).getByRole('textbox', { name: 'Title' }).fill('Retry after reconnecting');
+  await editorFor(page).getByRole('button', { name: 'Close note' }).click();
+  await expect(editorFor(page)).toHaveCount(0);
+  await expect(errorButton(page)).toBeVisible();
+  await context.setOffline(true);
+  await expect(page.getByRole('button', { name: 'Saved on device', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Saved on device', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toHaveText('Choose a valid audio file. (HTTP 400)');
+  await page.unroute('**/api/notes/*');
+  await context.setOffline(false);
+  await expect(page.getByRole('dialog', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('dialog').getByRole('alert')).toHaveCount(0);
+  expect((await (await page.request.get('/api/notes')).json()).notes[0].title).toBe('Retry after reconnecting');
+});
+
 test('explains an unauthorized session rather than losing the error inside sync', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();

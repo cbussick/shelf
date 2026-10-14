@@ -84,7 +84,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   useEffect(() => {
     void localNotes().then(setNotes).then(synchronize);
     const online = () => void synchronize();
-    const offline = () => { setSyncError(undefined); setSyncState('offline'); };
+    const offline = () => setSyncState('offline');
     const visible = () => { if (document.visibilityState === 'visible') void synchronize(); };
     const interval = setInterval(() => { if (document.visibilityState === 'visible') void synchronize(); }, 15_000);
     addEventListener('online', online); addEventListener('offline', offline); document.addEventListener('visibilitychange', visible);
