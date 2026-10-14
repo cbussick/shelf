@@ -137,6 +137,7 @@ export const styles = stylex.create({
   smallDialog: { width: 'min(430px, calc(100% - 32px))', padding: 30 },
   dialogTitle: { fontSize: 22, letterSpacing: -.6, margin: '0 0 12px' },
   dialogCopy: { fontSize: 13, color: '#637067', lineHeight: 1.8 },
+  syncError: { fontSize: 13, color: colors.danger, backgroundColor: colors.canvas, padding: 12, borderRadius: 8, margin: '16px 0 0', lineHeight: 1.65, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: '40dvh', overflowY: 'auto' },
   dialogActions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 },
   updateNotice: { position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 25, width: 'min(540px, calc(100% - 32px))', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '14px 18px', borderRadius: 12, backgroundColor: colors.ink, color: '#fff', boxShadow: '0 8px 24px #0003', fontSize: 13, '@media (max-width: 700px)': { bottom: 'calc(92px + env(safe-area-inset-bottom))' } },
   updateButton: { minHeight: 44, paddingInline: 14, borderRadius: 8, backgroundColor: colors.butter, color: colors.ink, fontWeight: 700, whiteSpace: 'nowrap', ':disabled': { opacity: 0.5 } },

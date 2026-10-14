@@ -156,7 +156,7 @@ Conflict copies include the newest local edit and any available attachments. If 
 
 Drag a note by its top-left handle to reorder it within Pinned or Other notes. The handle also supports arrow keys. Order is saved locally first and synced across devices; moving a note does not change its edit date. Newly created notes appear first. When searching, only visible notes can be used as drop targets.
 
-Edits are committed to IndexedDB first and sent to the server immediately when possible. The header distinguishes **Saved on device**, **Syncing…**, **Synced**, and failure/offline states.
+Edits are committed to IndexedDB first and sent to the server immediately when possible. The header distinguishes **Saved on device**, **Syncing…**, **Synced**, and failure/offline states. Open the sync status to see the latest error message and HTTP status, when available. Error details remain available during retries and clear when the server connection recovers and sync completes successfully.
 
 Mobile operating systems can suspend web apps after they are backgrounded. An edit made offline may therefore remain only on its original device until Shelf is opened again with connectivity. Incoming shares are temporary on-device drafts (not notes) until saved, and expire after 24 hours.
 
