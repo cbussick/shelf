@@ -35,6 +35,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   const [editor, setEditor] = useState<{ note?: LocalNote; files?: File[]; audio?: File[]; recording?: boolean; shareId?: string }>();
   const [menu, setMenu] = useState<MenuTarget>();
   const [syncState, setSyncState] = useState<SyncState>(offlineEntry ? 'offline' : 'connecting');
+  const [syncError, setSyncError] = useState<string>();
   const [pending, setPending] = useState(0);
   const [toast, setToast] = useState('');
   const syncing = useRef(false);
@@ -67,11 +68,13 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
           const result = await syncNotes();
           if (!syncRequested.current) {
             setNotes(result.notes); setPending(result.pending);
+            setSyncError(result.connection === 'unauthorized' ? 'Your session is no longer authorized. Sign in again to sync. (HTTP 401)' : result.connection === 'offline' ? 'The server is unreachable.' : undefined);
             setSyncState(result.connection === 'offline' || !navigator.onLine ? 'offline' : result.connection === 'unauthorized' ? 'error' : result.pending ? 'local' : 'synced');
           }
           if (result.missingAttachments.length) notify(`Both versions were kept, but ${result.missingAttachments.length} attachment(s) had already been removed from the server and could not be copied.`);
           else if (result.conflict) notify('Both versions were kept after a conflicting edit.');
         } catch (error) {
+          setSyncError(syncErrorDetails(error));
           setSyncState(error instanceof ApiError && error.status === 0 ? 'offline' : 'error');
         }
       } while (syncRequested.current);
@@ -228,7 +231,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={note => setEditor({ note })} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
     {editor && <Editor note={editor.note} initialImages={editor.files} initialAudio={editor.audio} initialRecording={editor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
-    <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
+    <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
     {toast && <div role="status" {...stylex.props(styles.toast)}>{toast}</div>}
   </>;
 }
@@ -236,9 +239,14 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
 function syncStatus(state: SyncState, pending: number): { label: string; copy: string; icon: 'offline' | 'cloud-check' | 'refresh' } {
   if (state === 'syncing' || state === 'connecting') return { label: 'Syncing…', copy: 'Checking your server for changes.', icon: 'refresh' };
   if (state === 'offline') return { label: pending ? 'Saved on device' : 'Offline', copy: pending ? `${pending} change${pending === 1 ? '' : 's'} will sync when Shelf is open and connected.` : 'Your downloaded notes remain available on this device.', icon: 'offline' };
-  if (state === 'local' || pending) return { label: 'Saved on device', copy: `${pending} change${pending === 1 ? '' : 's'} still need${pending === 1 ? 's' : ''} to reach your server.`, icon: 'refresh' };
   if (state === 'error') return { label: 'Sync needs attention', copy: 'Your notes are safe on this device. Try syncing again.', icon: 'offline' };
+  if (state === 'local' || pending) return { label: 'Saved on device', copy: `${pending} change${pending === 1 ? '' : 's'} still need${pending === 1 ? 's' : ''} to reach your server.`, icon: 'refresh' };
   return { label: 'Synced', copy: 'This device and your server are up to date.', icon: 'cloud-check' };
+}
+
+function syncErrorDetails(error: unknown): string {
+  const message = error instanceof Error && error.message.trim() ? error.message : 'An unexpected error prevented syncing.';
+  return error instanceof ApiError && error.status > 0 ? `${message} (HTTP ${error.status})` : message;
 }
 
 function Loading() { return <main {...stylex.props(styles.loginPage)}><p>Opening Shelf…</p></main>; }
