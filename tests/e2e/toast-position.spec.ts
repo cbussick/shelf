@@ -12,10 +12,12 @@ test('updated note toast stays above the create action on desktop and phone', as
     await page.getByRole('button', { name: 'Open note: Position check' }).click();
     await page.getByRole('textbox', { name: 'Note', exact: true }).fill(`Updated at ${width}`);
     await page.getByRole('button', { name: 'Close note' }).click();
-    const toast = page.getByRole('status').filter({ hasText: 'Note updated' });
+    const toast = page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem').filter({ hasText: 'Note updated' });
     await expect(toast).toBeVisible();
-    const toastBox = await toast.boundingBox();
-    const actionBox = await page.getByRole('navigation', { name: 'Create a note' }).boundingBox();
-    expect(toastBox && actionBox && actionBox.y - (toastBox.y + toastBox.height), `toast gap at ${width}px`).toBeGreaterThanOrEqual(12);
+    await expect.poll(async () => {
+      const toastBox = (await toast.boundingBox())!;
+      const actionBox = (await page.getByRole('navigation', { name: 'Create a note' }).boundingBox())!;
+      return actionBox.y - (toastBox.y + toastBox.height);
+    }, { message: `toast gap at ${width}px` }).toBeGreaterThanOrEqual(12);
   }
 });

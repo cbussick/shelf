@@ -181,7 +181,7 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
   await card.click({ button: 'right' });
   await menu.getByRole('menuitem', { name: 'Change color' }).click();
   await menu.getByRole('menuitemradio', { name: 'Mint' }).click();
-  await expect(page.getByRole('status')).toHaveText('Could not change note color. Try again.');
+  await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toHaveText('Could not change note color. Try again.');
   await expect(card).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await page.evaluate(() => (window as unknown as { restoreWrites: () => void }).restoreWrites());
   await card.click({ button: 'right' });

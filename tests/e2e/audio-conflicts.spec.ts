@@ -62,7 +62,7 @@ test('a recording removed on another device cannot block conflict recovery or lo
     await editorFor(second).getByRole('button', { name: 'Close note' }).click();
     await expect(editorFor(second)).toHaveCount(0);
     await expect(second.getByRole('button', { name: 'Open note: Second device edit (conflict copy)', exact: true })).toBeVisible();
-    await expect(second.getByRole('status').filter({ hasText: 'already been removed' })).toBeVisible();
+    await expect(second.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem').filter({ hasText: 'already been removed' })).toBeVisible();
     await syncConflictCopy(second);
     const notes = (await (await second.request.get('/api/notes')).json()).notes;
     const copy = notes.find((saved: { title: string }) => saved.title === 'Second device edit (conflict copy)');

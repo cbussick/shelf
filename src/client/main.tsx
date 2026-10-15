@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './App';
 import { styles } from './app.stylex';
+// Bundle Sonner's CSS: the CSP intentionally blocks its runtime style-tag injection.
+import 'sonner/dist/styles.css';
 import './index.css';
 
 let updateAvailable = false;
