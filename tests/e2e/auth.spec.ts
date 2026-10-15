@@ -2,6 +2,32 @@ import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '../fixtures/isolated-test';
 
 for (const width of [390, 1280]) {
+  for (const setupRequired of [false, true]) {
+    test(`keeps the ${setupRequired ? 'setup' : 'login'} password border visible without focus at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.route('**/api/auth/status', route => route.fulfill({ json: { authenticated: false, setupRequired } }));
+      await page.goto('/');
+      const password = page.getByLabel('Password', { exact: true });
+      const control = password.locator('..');
+      const assertBorder = async () => {
+        for (const side of ['top', 'right', 'bottom', 'left']) {
+          await expect(control).toHaveCSS(`border-${side}-style`, 'solid');
+          await expect(control).toHaveCSS(`border-${side}-width`, '1px');
+          await expect(control).not.toHaveCSS(`border-${side}-color`, 'rgba(0, 0, 0, 0)');
+        }
+      };
+      await expect(password).not.toBeFocused();
+      await assertBorder();
+      await password.focus();
+      await assertBorder();
+      await page.getByRole('button', { name: 'Show password', exact: true }).click();
+      await expect(password).toHaveAttribute('type', 'text');
+      await page.getByRole('heading').click();
+      await expect(password).not.toBeFocused();
+      await assertBorder();
+    });
+  }
+
   test(`reveals and hides the login password at ${width}px`, async ({ browser, baseURL }) => {
     const context = await browser.newContext({ viewport: { width, height: 844 }, storageState: { cookies: [], origins: [] } });
     try {

@@ -150,7 +150,7 @@ export const styles = stylex.create({
   passwordField: { display: 'grid', gap: 8, marginBlock: '18px 10px' },
   passwordLabel: { fontSize: 13, fontWeight: 700 },
   passwordControl: {
-    display: 'flex', alignItems: 'center', height: 48, border: '1px solid #9eada2', borderRadius: 9, backgroundColor: colors.paper,
+    display: 'flex', alignItems: 'center', height: 48, borderWidth: 1, borderStyle: 'solid', borderColor: '#9eada2', borderRadius: 9, backgroundColor: colors.paper,
     ':hover': { borderColor: '#718076' },
     ':focus-within': { borderColor: colors.green, outline: `2px solid ${colors.green}`, outlineOffset: 2 },
   },
