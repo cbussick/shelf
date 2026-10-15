@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { audioTime, recordingDuration } from '../audio';
 import { styles } from '../app.stylex';
 import { audioSource, type LocalAudio } from '../local-store';
@@ -18,6 +19,16 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(audio?.duration ?? (file ? recordingDuration(file) : null) ?? 0);
   const [error, setError] = useState('');
+  const errorToastId = useId();
+  const playbackError = () => {
+    if (!mounted.current) return;
+    if (compact) {
+      toast.error(`Could not play ${name}`, {
+        id: errorToastId, description: 'Check your connection and try again.', duration: 6000,
+        cancel: { label: 'Dismiss', onClick: () => {} },
+      });
+    } else setError('Could not play this audio. Check your connection or download it to play elsewhere.');
+  };
   useEffect(() => { if (audio?.duration) setDuration(audio.duration); }, [audio?.duration]);
   useEffect(() => {
     mounted.current = true;
@@ -26,8 +37,9 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       mounted.current = false;
       element?.pause();
       if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+      toast.dismiss(errorToastId);
     };
-  }, []);
+  }, [errorToastId]);
   const load = async () => {
     if (!source.current) source.current = (file ? Promise.resolve(URL.createObjectURL(file)) : audioSource(audio!)).then(url => {
       if (url.startsWith('blob:')) {
@@ -49,9 +61,10 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       if (mounted.current) {
         if (element.error) element.load();
         await element.play();
+        if (mounted.current) toast.dismiss(errorToastId);
       }
     } catch {
-      if (mounted.current) setError('Could not play this audio. Check your connection or download it to play elsewhere.');
+      playbackError();
     } finally { if (mounted.current) setLoading(false); }
   };
   const download = async () => {
@@ -82,6 +95,6 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
     }} onDurationChange={() => {
       const seconds = player.current?.duration;
       if (seconds && Number.isFinite(seconds)) setDuration(seconds);
-    }} onError={() => { setPlaying(false); setError('Could not play this audio. Check your connection or download it to play elsewhere.'); }}/>
+    }} onError={() => { setPlaying(false); playbackError(); }}/>
   </div>;
 }

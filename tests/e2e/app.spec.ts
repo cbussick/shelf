@@ -974,7 +974,7 @@ test('receives an Android share as a draft and saves it on close', async ({ page
   await expect(page.getByRole('button', { name: 'Open note: image.jpg' })).toBeVisible();
   expect(new URL(page.url()).search).toBe('');
   await page.goto(first);
-  await expect(page.getByRole('status')).toContainText('no longer available');
+  await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toContainText('no longer available');
 
   const second = await share();
   await page.goto(second);
@@ -987,7 +987,7 @@ test('receives an Android share as a draft and saves it on close', async ({ page
   await expect(page.getByRole('button', { name: 'Open note: Shared screenshot note' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
   await page.goto(second);
-  await expect(page.getByRole('status')).toContainText('no longer available');
+  await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toContainText('no longer available');
 });
 
 test('can receive and save a shared screenshot offline', async ({ page, context }) => {

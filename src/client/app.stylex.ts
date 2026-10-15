@@ -142,7 +142,6 @@ export const styles = stylex.create({
   updateNotice: { position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 25, width: 'min(540px, calc(100% - 32px))', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '14px 18px', borderRadius: 12, backgroundColor: colors.ink, color: '#fff', boxShadow: '0 8px 24px #0003', fontSize: 13, '@media (max-width: 700px)': { bottom: 'calc(92px + env(safe-area-inset-bottom))' } },
   updateButton: { minHeight: 44, paddingInline: 14, borderRadius: 8, backgroundColor: colors.butter, color: colors.ink, fontWeight: 700, whiteSpace: 'nowrap', ':disabled': { opacity: 0.5 } },
   updateDismiss: { minHeight: 44, paddingInline: 8, color: '#fff' },
-  toast: { position: 'fixed', bottom: 'calc(92px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', backgroundColor: colors.ink, color: '#fff', padding: '13px 22px', borderRadius: 10, fontSize: 12, zIndex: 20, boxShadow: '0 4px 16px #0002', maxWidth: 'calc(100% - 32px)', textAlign: 'center' },
   loginPage: { minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 24, backgroundColor: colors.canvas },
   loginCard: { width: 'min(420px, 100%)', padding: 32, border: `1px solid ${colors.line}`, borderRadius: 18, backgroundColor: '#fff', boxShadow: '0 12px 50px #26363012' },
   loginTitle: { fontSize: 30, margin: '24px 0 8px' },
