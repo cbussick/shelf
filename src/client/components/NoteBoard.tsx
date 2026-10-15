@@ -236,7 +236,11 @@ function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: LocalN
     };
     const observer = new ResizeObserver(layout);
     observer.observe(board);
-    board.querySelectorAll('img').forEach(image => image.addEventListener('load', layout));
+    // Grid row spans keep the board size fixed when a card's content changes.
+    // Observe the measured cards too, including async image loads and audio errors.
+    for (const item of board.children) {
+      if (item.firstElementChild) observer.observe(item.firstElementChild);
+    }
     layout();
     return () => observer.disconnect();
   }, [ref, notes]);
