@@ -11,7 +11,6 @@ import { Icon } from './components/Icon';
 import { AddAudio } from './components/AddAudio';
 import { validateAudioFile } from './audio';
 import { NoteBoard } from './components/NoteBoard';
-import { NavigationDiagnostics } from './components/NavigationDiagnostics';
 import { NoteContextMenu, type MenuTarget } from './components/NoteContextMenu';
 import { clearShares, discardShare, getShare } from './incoming-share';
 import { clearLocalData, deleteLocalNote, hasLocalData, localNotes, reorderLocalNotes, saveLocalNote, syncNotes, type LocalNote } from './local-store';
@@ -26,10 +25,7 @@ export function App() {
     if (auth.error instanceof ApiError && auth.error.status === 0) void hasLocalData().then(setOfflineAccess);
   }, [auth.error]);
   if (auth.isPending) return <Loading/>;
-  if (auth.data?.authenticated || offlineAccess) {
-    if (location.pathname === '/diagnostics/navigation') return <NavigationDiagnostics/>;
-    return <NotesApp offlineEntry={!auth.data?.authenticated} onLogout={() => { setOfflineAccess(false); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>;
-  }
+  if (auth.data?.authenticated || offlineAccess) return <NotesApp offlineEntry={!auth.data?.authenticated} onLogout={() => { setOfflineAccess(false); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>;
   if (auth.error && !offlineAccess) return <Auth setupRequired={false} onAuthenticated={() => void queryClient.invalidateQueries({ queryKey: ['auth'] })}/>;
   return <Auth setupRequired={auth.data?.setupRequired ?? false} onAuthenticated={() => void queryClient.invalidateQueries({ queryKey: ['auth'] })}/>;
 }
@@ -234,7 +230,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={note => setEditor({ note })} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
     {editor && <Editor note={editor.note} initialImages={editor.files} initialAudio={editor.audio} initialRecording={editor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
-    <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p><p {...stylex.props(styles.dialogCopy)}><a href="/diagnostics/navigation">Navigation display test</a></p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
+    <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
     <Toaster theme="dark" position="bottom-center" offset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }} mobileOffset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))', left: 16, right: 16 }} style={{ fontFamily: 'inherit' }} toastOptions={{ style: { background: colors.ink, borderColor: colors.ink, borderRadius: 10 }, cancelButtonStyle: { minHeight: 44 } }}/>
   </>;
 }

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/isolated-test';
 
-test('manifest-only dark theme experiment keeps the page light', async ({ page, request }) => {
+test('keeps the installed-app theme dark and the page light', async ({ page, request }) => {
   await page.goto('/');
   const manifestLink = page.locator('link[rel="manifest"]');
   await expect(manifestLink).toHaveAttribute('href', '/manifest.webmanifest');
