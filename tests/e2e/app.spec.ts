@@ -222,6 +222,7 @@ test('shows the simplified copy and gives sync its own dismissible dialog', asyn
   const syncDialog = page.getByRole('dialog', { name: 'Synced' });
   await expect(syncDialog).toBeVisible();
   await expect(syncDialog.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
+  await expect(syncDialog.getByRole('link')).toHaveCount(0);
   await syncDialog.getByRole('button', { name: 'Back' }).click();
   await expect(syncDialog).not.toBeVisible();
   await page.getByRole('button', { name: 'Synced' }).click();
