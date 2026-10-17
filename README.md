@@ -136,6 +136,14 @@ docker compose up -d --build
 
 The PWA downloads frontend updates in the background and offers a **Refresh app** button when one is ready. Finish editing before refreshing; updates never force a reload mid-note. If an older installed version does not show the prompt, open `/share-target` in the browser (GET is a read-only page load). This URL bypasses the old worker's cached navigation and loads the latest page; you can then use **Refresh app** if offered. Close and reopen the installed app afterwards. Do not clear browser site data to update the app: that data may include unsynced notes.
 
+## Temporary Android navigation display test
+
+For investigating invisible Android system navigation buttons, open Shelf's sync status (for example, **Synced**) and choose **Navigation display test**. This opens `/diagnostics/navigation` in the same app window; use the installed Shelf app to reproduce installed-app-only problems. The page requires the usual Shelf access and does not change notes or send diagnostic readings to the server.
+
+Start with both controls light. Change only **Page background** to dark and screenshot the Android buttons plus the test readings. Then try a light page with a dark **System theme colour**. These controls independently change the HTML/body background and the page's `theme-color` metadata; they do not change the manifest or Android settings. The readings show the window mode, bottom safe-area inset, and viewport heights. **Reset test**, reopening the page, or returning to notes restores the normal colours. Browser tests check the controls, not native Android system-bar rendering.
+
+This is temporary instrumentation, not a navigation-bar fix. Remove the page, sync-dialog link, tests, and this section after the device investigation is complete.
+
 ## Share screenshots from Android
 
 On an Android phone or tablet, install Shelf from Chrome while connected to its HTTPS URL. In your screenshots or photos app, tap **Share → Shelf.** The image opens in a new note: add text or more images, then close the note to save it. Closing an empty draft without images does not create a note. Shares received offline can be saved on the device and will sync when Shelf is open and connected again. If the app was installed before this feature was deployed, you may need to reinstall it for Android to register the new share target.
