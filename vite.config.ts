@@ -21,7 +21,7 @@ export default defineConfig({
           action: '/share-target', method: 'POST', enctype: 'multipart/form-data',
           params: { files: [{ name: 'images', accept: ['image/jpeg', '.jpg', '.jpeg', 'image/png', '.png', 'image/webp', '.webp', 'image/gif', '.gif'] }] },
         },
-        background_color: '#f7f8fa', theme_color: '#f7f8fa',
+        background_color: '#f7f8fa', theme_color: '#263630',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },

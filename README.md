@@ -142,6 +142,10 @@ For investigating invisible Android system navigation buttons, open Shelf's sync
 
 Start with both controls light. Change only **Page background** to dark and screenshot the Android buttons plus the test readings. Then try a light page with a dark **System theme colour**. These controls independently change the HTML/body background and the page's `theme-color` metadata; they do not change the manifest or Android settings. The readings show the window mode, bottom safe-area inset, and viewport heights. **Reset test**, reopening the page, or returning to notes restores the normal colours. Browser tests check the controls, not native Android system-bar rendering.
 
+The current follow-up experiment sets only the installed-app manifest's `theme_color` to dark green (`#263630`). The page's `theme-color`, light colour scheme, canvas, and manifest `background_color` remain unchanged. On the Pixel 9a, changing the page background did not reach the native navigation bar; changing page theme metadata changed only the top status bar. The manifest-only experiment is not yet confirmed to fix the bottom buttons.
+
+An existing installation may keep old manifest metadata even after **Refresh app** loads the latest frontend. Chrome documents that manifest updates can take a day or two. For WebAPK installations, `about://webapks` in Chrome shows update status and an **Update** control if Shelf is listed; follow [Chrome's Android manifest-update steps](https://web.dev/articles/manifest-updates#updates_on_chrome_for_android) to request an update without reinstalling or clearing app data. If Shelf is not listed, this WebAPK-specific procedure does not apply. An unchanged bar before the installed metadata updates is inconclusive.
+
 This is temporary instrumentation, not a navigation-bar fix. Remove the page, sync-dialog link, tests, and this section after the device investigation is complete.
 
 ## Share screenshots from Android
