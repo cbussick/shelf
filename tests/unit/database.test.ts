@@ -3,12 +3,35 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openDatabase, readNotes, type AppDatabase } from '../../src/server/database';
+import { openDatabase, readNote, readNotes, type AppDatabase } from '../../src/server/database';
 
 let directory: string;
 let database: AppDatabase | undefined;
 beforeEach(async () => { directory = await mkdtemp(join(tmpdir(), 'shelf-colors-')); });
 afterEach(async () => { database?.close(); database = undefined; await rm(directory, { recursive: true, force: true }); });
+
+it('groups images and audio by note while preserving attachment order and empty notes', () => {
+  database = openDatabase({ NODE_ENV: 'test', PORT: 3000, DATA_DIR: directory, SESSION_DAYS: 30 });
+  const insertNote = database.prepare("INSERT INTO notes (id,title,body,color,pinned,created_at,updated_at,version,position) VALUES (?,'','','paper',0,?,?,1,?)");
+  const now = '2026-01-01T00:00:00.000Z';
+  for (const [position, id] of ['second', 'empty', 'first'].entries()) insertNote.run(id, now, now, position);
+  const insertImage = database.prepare("INSERT INTO images (id,note_id,filename,alt,mime_type,width,height,size,position) VALUES (?,?,?,'Image','image/jpeg',100,80,1024,?)");
+  const insertAudio = database.prepare("INSERT INTO audio (id,note_id,filename,name,mime_type,size,duration,position) VALUES (?,?,?,'Audio','audio/wav',1024,1,?)");
+  for (const noteId of ['first', 'second']) {
+    for (const position of [1, 0]) {
+      const id = `${noteId}-${position}`;
+      insertImage.run(`image-${id}`, noteId, `${id}.jpg`, position);
+      insertAudio.run(`audio-${id}`, noteId, `${id}.wav`, position);
+    }
+  }
+  const notes = readNotes(database);
+  expect(notes.map(note => note.id)).toEqual(['second', 'empty', 'first']);
+  expect(notes).toEqual(notes.map(note => readNote(database!, note.id)));
+  for (const note of notes) {
+    expect(note.images.map(image => image.id)).toEqual(note.id === 'empty' ? [] : [`image-${note.id}-0`, `image-${note.id}-1`]);
+    expect(note.audio.map(audio => audio.id)).toEqual(note.id === 'empty' ? [] : [`audio-${note.id}-0`, `audio-${note.id}-1`]);
+  }
+});
 
 it.each([true, false])('expands the legacy palette without losing notes or images (position column: %s)', hasPosition => {
   const legacy = new Database(join(directory, 'shelf.sqlite'));

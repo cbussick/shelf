@@ -153,7 +153,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
           </div>
         </header>
         <div {...stylex.props(styles.editorAttachments)}>
-        {gallery.length === 1 && <div {...stylex.props(styles.editorImages)}><div {...stylex.props(styles.editorImage, styles.editorImageCentered, styles.editorImageEnd)}>
+        {gallery.length === 1 && <div {...stylex.props(styles.editorImages)}><div {...stylex.props(styles.editorImage)}>
           <button type="button" aria-label="View image 1" onClick={() => setPreviewIndex(0)} {...stylex.props(styles.photoButton)}>{'image' in gallery[0] ? <LocalPhoto image={gallery[0].image} className={editorPhoto.className}/> : <img src={gallery[0].src} alt={gallery[0].alt} {...editorPhoto}/>}</button>
         </div></div>}
         {gallery.length > 1 && <ImageMosaic editor images={gallery.map(item => 'image' in item ? <LocalPhoto key={item.image.id} image={item.image} className={stylex.props(styles.mosaicPhoto).className}/> : <img key={item.src} src={item.src} alt={item.alt} {...stylex.props(styles.mosaicPhoto)}/>)} onOpen={setPreviewIndex}/>}

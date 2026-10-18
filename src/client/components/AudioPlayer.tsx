@@ -67,6 +67,10 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       playbackError();
     } finally { if (mounted.current) setLoading(false); }
   };
+  const updateDuration = () => {
+    const seconds = player.current?.duration;
+    if (seconds && Number.isFinite(seconds)) setDuration(seconds);
+  };
   const download = async () => {
     try {
       const url = await load();
@@ -89,12 +93,6 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
     <audio ref={player} preload="none" onPlay={() => {
       document.querySelectorAll('audio').forEach(other => { if (other !== player.current) other.pause(); });
       setPlaying(true);
-    }} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onTimeUpdate={() => setPosition(player.current?.currentTime ?? 0)} onLoadedMetadata={() => {
-      const seconds = player.current?.duration;
-      if (seconds && Number.isFinite(seconds)) setDuration(seconds);
-    }} onDurationChange={() => {
-      const seconds = player.current?.duration;
-      if (seconds && Number.isFinite(seconds)) setDuration(seconds);
-    }} onError={() => { setPlaying(false); playbackError(); }}/>
+    }} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onTimeUpdate={() => setPosition(player.current?.currentTime ?? 0)} onLoadedMetadata={updateDuration} onDurationChange={updateDuration} onError={() => { setPlaying(false); playbackError(); }}/>
   </div>;
 }

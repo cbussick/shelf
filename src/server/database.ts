@@ -120,16 +120,20 @@ export function readNote(database: AppDatabase, id: string): Note | undefined {
 export function readNotes(database: AppDatabase): Note[] {
   const notes = database.prepare('SELECT * FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all() as NoteRow[];
   const images = database.prepare('SELECT * FROM images ORDER BY note_id, position').all() as ImageRow[];
-  const byNote = new Map<string, ImageRow[]>();
-  for (const image of images) byNote.set(image.note_id, [...(byNote.get(image.note_id) ?? []), image]);
   const audio = database.prepare('SELECT * FROM audio ORDER BY note_id, position').all() as AudioRow[];
-  const audioByNote = new Map<string, AudioRow[]>();
-  for (const attachment of audio) {
-    const group = audioByNote.get(attachment.note_id) ?? [];
+  const imagesByNote = groupAttachments(images);
+  const audioByNote = groupAttachments(audio);
+  return notes.map(note => mapNote(note, imagesByNote.get(note.id) ?? [], audioByNote.get(note.id) ?? []));
+}
+
+function groupAttachments<T extends { note_id: string }>(attachments: T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const attachment of attachments) {
+    const group = groups.get(attachment.note_id) ?? [];
     group.push(attachment);
-    audioByNote.set(attachment.note_id, group);
+    groups.set(attachment.note_id, group);
   }
-  return notes.map(note => mapNote(note, byNote.get(note.id) ?? [], audioByNote.get(note.id) ?? []));
+  return groups;
 }
 
 function mapNote(row: NoteRow, images: ImageRow[], audio: AudioRow[]): Note {

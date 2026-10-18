@@ -1,19 +1,18 @@
 import { openDB } from 'idb';
 import { z } from 'zod';
-import { audioSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema, type Note, type NoteAudio, type NoteColor, type NoteImage } from '../shared/contracts';
-import { api, ApiError, conflictResponseSchema } from './api';
+import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema, type Note, type NoteAudio, type NoteColor, type NoteImage } from '../shared/contracts';
+import { api, ApiError } from './api';
 import { audioMimeType, recordingDuration, validateAudioFile } from './audio';
 
 export type LocalImage = NoteImage & { blobId?: string };
 export type LocalAudio = NoteAudio & { blobId?: string };
 export type LocalNote = Omit<Note, 'images' | 'audio' | 'version'> & { images: LocalImage[]; audio: LocalAudio[]; version: number };
-type OutboxEntry = { noteId: string; type: 'save' | 'delete'; expectedVersion: number; mutationId: string };
 const localImageSchema = imageSchema.extend({ url: z.string(), blobId: z.string().optional() });
 const localAudioSchema = audioSchema.extend({ url: z.string(), blobId: z.string().optional() });
 const localNoteSchema = noteSchema.omit({ images: true, audio: true, version: true, position: true }).extend({ images: z.array(localImageSchema).max(6), audio: z.array(localAudioSchema).default([]), version: z.number().int().nonnegative(), position: z.number().int().default(0) });
 const outboxSchema = z.object({ noteId: z.uuid(), type: z.enum(['save', 'delete']), expectedVersion: z.number().int().nonnegative(), mutationId: z.uuid() });
-const parseNote = (value: unknown) => localNoteSchema.parse(value) as LocalNote;
-const parseOperation = (value: unknown) => outboxSchema.parse(value) as OutboxEntry;
+const parseNote = (value: unknown) => localNoteSchema.parse(value);
+const parseOperation = (value: unknown) => outboxSchema.parse(value);
 const parseOptionalNote = (value: unknown) => value === undefined ? undefined : parseNote(value);
 const parseOptionalOperation = (value: unknown) => value === undefined ? undefined : parseOperation(value);
 const parseBlob = (value: unknown) => z.instanceof(Blob).parse(value);
@@ -53,7 +52,7 @@ async function getDatabase() {
 
 export async function localNotes(): Promise<LocalNote[]> {
   const database = await getDatabase();
-  const notes = z.array(localNoteSchema).parse(await database.getAll('notes')) as LocalNote[];
+  const notes = z.array(localNoteSchema).parse(await database.getAll('notes'));
   return notes.sort((a, b) => a.position - b.position || b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
 }
 
@@ -126,8 +125,8 @@ export async function saveLocalNote(value: {
 export async function reorderLocalNotes(ids: string[]): Promise<void> {
   const current = await localNotes();
   const database = await getDatabase();
-  if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some(id => !current.some(note => note.id === id))) throw new Error('Invalid note order.');
   const byId = new Map(current.map(note => [note.id, note]));
+  if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some(id => !byId.has(id))) throw new Error('Invalid note order.');
   const transaction = database.transaction(['notes', 'meta'], 'readwrite');
   for (const [position, id] of ids.entries()) await transaction.objectStore('notes').put({ ...byId.get(id)!, position });
   await transaction.objectStore('meta').put({ ids, token: crypto.randomUUID() }, 'pendingOrder');
@@ -153,7 +152,7 @@ export async function deleteLocalNote(note: LocalNote): Promise<void> {
 
 export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number; conflict: boolean; missingAttachments: string[]; connection: 'connected' | 'offline' | 'unauthorized' }> {
   let database = await getDatabase();
-  const entries = z.array(outboxSchema).parse(await database.getAll('outbox')) as OutboxEntry[];
+  const entries = z.array(outboxSchema).parse(await database.getAll('outbox'));
   let conflict = false;
   const missingAttachments: string[] = [];
   let connection: 'connected' | 'offline' | 'unauthorized' = 'connected';
@@ -219,7 +218,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
     } catch (error) {
       if (error instanceof ApiError && error.status === 409 && note && entry.type === 'save') {
         conflict = true;
-        const parsed = conflictResponseSchema.safeParse(error.body);
+        const parsed = errorResponseSchema.safeParse(error.body);
         const serverNote = parsed.success ? parsed.data.note : undefined;
         // Copy the latest local edit, not the snapshot sent by the failed PUT.
         // Preparing a copy can fetch bytes; validate its mutation again before
@@ -289,7 +288,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
     const remote = await api.notes();
     database = await getDatabase();
     const pendingOrder = await database.get('meta', 'pendingOrder');
-    const pending = new Set((z.array(outboxSchema).parse(await database.getAll('outbox')) as OutboxEntry[]).map(item => item.noteId));
+    const pending = new Set(z.array(outboxSchema).parse(await database.getAll('outbox')).map(item => item.noteId));
     const remoteIds = new Set(remote.notes.map(note => note.id));
     const transaction = database.transaction(['notes', 'meta', 'blobs'], 'readwrite');
     for (const note of remote.notes) if (!pending.has(note.id)) {
@@ -299,7 +298,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
       }
       await transaction.objectStore('notes').put(pendingOrder && local ? { ...note, position: local.position } : note);
     }
-    for (const local of z.array(localNoteSchema).parse(await transaction.objectStore('notes').getAll()) as LocalNote[]) {
+    for (const local of z.array(localNoteSchema).parse(await transaction.objectStore('notes').getAll())) {
       if (local.version > 0 && !pending.has(local.id) && !remoteIds.has(local.id)) {
         await transaction.objectStore('notes').delete(local.id);
         for (const audio of local.audio) for (const key of audioBlobKeys(audio)) await transaction.objectStore('blobs').delete(key);
