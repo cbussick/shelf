@@ -96,14 +96,12 @@ export const styles = stylex.create({
   audioDraftStatus: { paddingInline: 30, margin: '0 0 8px', fontSize: 12, color: colors.muted, lineHeight: 1.6, '@media (max-width: 700px)': { paddingInline: 24 } },
   audioError: { fontSize: 12, color: colors.danger, margin: '8px 0', lineHeight: 1.6 },
   audioPopover: { position: 'absolute', bottom: 'calc(100% + 8px)', left: 0, zIndex: 3, width: 240, maxWidth: 'calc(100dvw - 32px)', padding: 6, border: `1px solid ${colors.line}`, borderRadius: 10, backgroundColor: '#fff', boxShadow: '0 8px 28px #18251e30', color: colors.ink },
-  bottomAudioPopover: { left: -64, '@media (max-width: 700px)': { left: -64 } },
+  bottomAudioPopover: { left: -64 },
   audioRecorderHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   recordingStatus: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, minHeight: 96, color: colors.danger, fontSize: 20, fontVariantNumeric: 'tabular-nums' },
   editorImages: { display: 'flex', overflowX: 'hidden', overflowY: 'auto', paddingInline: 30, flexShrink: 0, maxHeight: 'min(440px, 45dvh)', alignItems: 'flex-start' },
   editorMosaic: { width: 'calc(100% - 60px)', maxWidth: 520, margin: '0 auto 8px', borderRadius: 8, aspectRatio: '2.3 / 1', flexShrink: 0, '@media (max-width: 700px)': { width: 'calc(100% - 48px)' } },
-  editorImageCentered: { marginLeft: 'auto' },
-  editorImageEnd: { marginRight: 'auto' },
-  editorImage: { position: 'relative', maxWidth: '100%', flexShrink: 1 },
+  editorImage: { position: 'relative', maxWidth: '100%', flexShrink: 1, marginInline: 'auto' },
   photoButton: { display: 'block', maxWidth: '100%', padding: 0, borderRadius: 8, cursor: 'zoom-in', ':focus-visible': { outline: `3px solid ${colors.green}`, outlineOffset: 2 } },
   editorPhoto: { display: 'block', maxWidth: '100%', maxHeight: 'min(440px, 45dvh)', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8 },
   previewDialog: {
@@ -158,5 +156,4 @@ export const styles = stylex.create({
   passwordToggle: { display: 'grid', placeItems: 'center', width: 44, height: 44, flexShrink: 0, marginRight: 1, padding: 0, borderRadius: 7, color: colors.muted, ':hover': { color: colors.green, backgroundColor: colors.canvas }, ':focus-visible': { outline: `2px solid ${colors.green}`, outlineOffset: -3 } },
   loginError: { paddingInline: 0, ':not(:empty)': { marginBottom: 10 } },
   fullButton: { width: '100%' },
-  statusRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, fontSize: 12, color: colors.muted },
 });

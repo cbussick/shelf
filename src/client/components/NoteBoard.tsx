@@ -129,7 +129,7 @@ export function NoteBoard({ notes, heading, label, onOpen, onPin, onContextMenu,
     if (!active || active.pointerId !== event.pointerId) return;
     const id = active.active && !within(event, active.origin) ? noteAt(event) : undefined;
     const insideBoard = board.current?.getBoundingClientRect();
-    const inBoard = insideBoard && event.clientX >= insideBoard.left && event.clientX <= insideBoard.right && event.clientY >= insideBoard.top && event.clientY <= insideBoard.bottom;
+    const inBoard = insideBoard && within(event, insideBoard);
     const destination = within(event, active.origin) ? undefined : id && id !== active.source ? id : inBoard ? preview.current?.target : undefined;
     cancel();
     if (destination && destination !== active.source) onReorder(active.source, destination);

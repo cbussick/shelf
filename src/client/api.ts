@@ -1,4 +1,4 @@
-import { z, type ZodType } from 'zod';
+import type { ZodType } from 'zod';
 import {
   authStatusSchema, credentialsSchema, errorResponseSchema, noteListResponseSchema, noteResponseSchema,
   okResponseSchema, reorderNotesSchema, type NoteWrite,
@@ -43,5 +43,3 @@ export const api = {
 function jsonRequest(body: unknown, method = 'POST'): RequestInit {
   return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
 }
-
-export const conflictResponseSchema = z.object({ error: z.string(), note: noteResponseSchema.shape.note.optional() });
