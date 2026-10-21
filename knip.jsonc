@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/knip@6.42.1/schema.json",
+  // npm start points at compiled output; audit its TypeScript source instead.
+  // Vite and vite-plugin-pwa discover main.tsx and the injectManifest worker.
+  "entry": ["src/server/index.ts!"],
+  "project": ["src/**/*.{ts,tsx}!", "tests/**/*.ts", "*.ts"],
+  // Shared schemas used within contracts.ts remain runtime code.
+  "ignoreExportsUsedInFile": true
+}
