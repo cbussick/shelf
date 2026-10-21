@@ -72,6 +72,8 @@ no application code, test coverage, or timeouts were weakened.
   temporary databases. Installed dependencies, browsers and builds were removed
   after checks; diagnostic evidence is retained outside tracked files.
 
-The local follow-up is not pushed to PR #63: ordinary Git over SSH still fails
-while the configured key is locked. The task branch and worktree are retained;
-no direct main merge or deployment was performed.
+These results record the initial security follow-up. The combined branch also
+retains newer main's Node 24.22.1 floor. Current verification and integration
+status are tracked in [PR #63](https://github.com/cbussick/shelf/pull/63).
+Publishing uses ordinary Git over SSH; integration must use the reviewed PR.
+Verification did not change a deployment or production data.
