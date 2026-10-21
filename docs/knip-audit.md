@@ -53,8 +53,8 @@ dependencies, browser download, build and test outputs were removed after checks
 Vite is updated from 7.3.6 to **7.3.7**, the patched release for the three
 advisories above. The manifest minimum and locked Vite entry are the only
 dependency changes. No forced audit fix, dependency override, or suppression is
-used. Both `npm run audit` and the full `npm audit --json` now pass with zero
-vulnerabilities.
+used. Both `npm run audit` and the full `npm audit --json` passed with zero
+vulnerabilities at that verification point.
 
 The first follow-up browser run passed 111 tests and reproduced the original
 320px color-test race. Its trace shows the test's API read preceding the note
@@ -77,3 +77,21 @@ retains newer main's Node 24.22.1 floor. Current verification and integration
 status are tracked in [PR #63](https://github.com/cbussick/shelf/pull/63).
 Publishing uses ordinary Git over SSH; integration must use the reviewed PR.
 Verification did not change a deployment or production data.
+
+## Vitest audit follow-up
+
+The combined PR #63 verification passed the configured high-severity audit gate,
+but its latest full report contained two moderate Vitest/mocker findings:
+GHSA-qxg6-89mg-rqv8 and GHSA-xp26-3454-mjgp. The initial zero count above was
+historical, not the combined branch's audit count. The PR report was corrected.
+
+Vitest and its internal packages are now locked to **4.1.12**, with the direct
+minimum raised to `^4.1.12`. Compatible development-only Chai and tinyrainbow
+resolutions also advance. No production dependency version, application code,
+test assertion, timeout, or audit policy changes.
+
+On Node 24.22.1, both Knip modes, typecheck, build and the audit gate pass. The
+full installed `npm audit --json` independently reports **zero** findings. All
+23 unit tests, 112 E2E tests and 10 additional color-test viewport repetitions
+pass using isolated servers/data. Task-generated dependencies, browsers and
+builds were cleaned after verification.
