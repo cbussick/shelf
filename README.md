@@ -44,10 +44,15 @@ Useful checks:
 
 ```bash
 npm run typecheck
+npm run knip
+npm run knip:production
 npm test
 npm run build
 npm run audit
 ```
+
+Both Knip modes check unused code and dependencies. See [the audit notes](docs/knip-audit.md)
+for runtime roots, retained APIs, and verification limitations.
 
 ## Deploy with Docker Compose and Tailscale Serve
 
