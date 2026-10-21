@@ -22,7 +22,7 @@ configuration and production project scope resolve those false positives.
 `ignoreExportsUsedInFile` retains genuinely internally used schemas/helpers.
 No application code, tests, or APIs were deleted.
 
-## Verification
+## Original verification (superseded by follow-up below)
 
 - `npm run knip` and `npm run knip:production`: pass (0 issues).
 - Temporary `src/shared/knipProbe.ts`, imported only by a unit test: normal
@@ -47,3 +47,31 @@ Tests used their existing per-test temporary databases and local servers. No
 live data, deployments, credentials, or services were used. Installs and heavy
 checks were serialized with `/tmp/fernblick-knip-heavy.lock`. Task-created
 dependencies, browser download, build and test outputs were removed after checks.
+
+## Security follow-up and verification
+
+Vite is updated from 7.3.6 to **7.3.7**, the patched release for the three
+advisories above. The manifest minimum and locked Vite entry are the only
+dependency changes. No forced audit fix, dependency override, or suppression is
+used. Both `npm run audit` and the full `npm audit --json` now pass with zero
+vulnerabilities.
+
+The first follow-up browser run passed 111 tests and reproduced the original
+320px color-test race. Its trace shows the test's API read preceding the note
+upload. Clicking Close starts an asynchronous save; the background Synced label
+can still describe the pre-save state until closing completes. The test now waits
+for the editor to be hidden before checking Synced and reading the persisted
+color. The persistence, reload, accessibility, and color assertions are unchanged;
+no application code, test coverage, or timeouts were weakened.
+
+- `npm run typecheck`, `npm run build`, both Knip modes and audit: pass.
+- `npx --no-install playwright test tests/e2e/editor-colors.spec.ts --repeat-each=5`:
+  all 10 viewport cases pass after the explicit save-completion wait.
+- Subsequent full `npm test`: all 23 unit tests and all 112 E2E tests pass,
+  including the WebKit audio case. Tests use their existing isolated servers and
+  temporary databases. Installed dependencies, browsers and builds were removed
+  after checks; diagnostic evidence is retained outside tracked files.
+
+The local follow-up is not pushed to PR #63: ordinary Git over SSH still fails
+while the configured key is locked. The task branch and worktree are retained;
+no direct main merge or deployment was performed.

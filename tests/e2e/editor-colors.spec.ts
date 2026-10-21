@@ -25,6 +25,7 @@ for (const width of [1440, 320]) {
       await expect(editor.getByRole('radio')).toHaveCount(0);
     }
     await page.getByRole('button', { name: 'Close note' }).click();
+    await expect(editor).toBeHidden();
     await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
     expect((await (await request.get('/api/notes')).json()).notes[0].color).toBe('rose');
     await page.reload();
