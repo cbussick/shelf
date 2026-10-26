@@ -5,6 +5,7 @@ import { imageSource } from '../local-store';
 import { styles } from '../app.stylex';
 import { Icon } from './Icon';
 import { ImageMosaic } from './ImageMosaic';
+import { Photo } from './Photo';
 import { AudioPlayer } from './AudioPlayer';
 import { LinkedText } from './LinkedText';
 import { linkParts } from './link-parts';
@@ -176,7 +177,7 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
   const hasLinks = [...titleParts, ...bodyParts].some(part => part.href);
   const content = <>
     {note.images.length === 1 && <LocalPhoto image={image}/>}
-    {note.images.length > 1 && <ImageMosaic images={note.images.map(item => <LocalPhoto key={item.id} image={item} className={stylex.props(styles.mosaicPhoto).className}/>)}/>}
+    {note.images.length > 1 && <ImageMosaic images={note.images.map(item => <LocalPhoto key={item.id} image={item} crop className={stylex.props(styles.mosaicPhoto).className}/>)}/>}
     {(note.title || note.body) && <span {...stylex.props(styles.noteContent, image && styles.imageContent, hasLinks && styles.linkedContent)}>
       {note.title && <span {...stylex.props(styles.noteTitle)}>{hasLinks ? <LinkedText parts={titleParts}/> : note.title}</span>}
       {note.body && <span {...stylex.props(styles.noteBody)}>{hasLinks ? <LinkedText parts={bodyParts}/> : note.body}</span>}
@@ -202,7 +203,7 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
   </li>;
 }
 
-export function LocalPhoto({ image, className }: { image: LocalImage; className?: string }) {
+export function LocalPhoto({ image, className, crop }: { image: LocalImage; className?: string; crop?: boolean }) {
   const [source, setSource] = useState(image.url);
   useEffect(() => {
     let objectUrl = '';
@@ -214,7 +215,7 @@ export function LocalPhoto({ image, className }: { image: LocalImage; className?
     });
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [image]);
-  return <img src={source} alt={image.alt} width={image.width} height={image.height} className={className} {...(!className ? stylex.props(styles.photo) : {})}/>;
+  return <Photo src={source} alt={image.alt} width={image.width} height={image.height} rotation={image.rotation} crop={crop} className={className ?? stylex.props(styles.photo).className}/>;
 }
 
 function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: LocalNote[]) {

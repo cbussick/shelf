@@ -46,7 +46,8 @@ export function openDatabase(environment: Environment): AppDatabase {
       width INTEGER NOT NULL,
       height INTEGER NOT NULL,
       size INTEGER NOT NULL,
-      position INTEGER NOT NULL
+      position INTEGER NOT NULL,
+      rotation INTEGER NOT NULL DEFAULT 0 CHECK (rotation IN (0,90,180,270))
     );
     CREATE INDEX IF NOT EXISTS images_note ON images(note_id, position);
     CREATE TABLE IF NOT EXISTS audio (
@@ -66,6 +67,9 @@ export function openDatabase(environment: Environment): AppDatabase {
     const old = database.prepare('SELECT id FROM notes ORDER BY updated_at DESC, id ASC').all() as { id: string }[];
     const update = database.prepare('UPDATE notes SET position = ? WHERE id = ?');
     database.transaction(() => old.forEach((note, index) => update.run(index, note.id)))();
+  }
+  if (!database.prepare('PRAGMA table_info(images)').all().some(column => (column as { name: string }).name === 'rotation')) {
+    database.exec('ALTER TABLE images ADD COLUMN rotation INTEGER NOT NULL DEFAULT 0 CHECK (rotation IN (0,90,180,270))');
   }
   expandNoteColors(database);
   database.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(new Date().toISOString());
@@ -101,7 +105,7 @@ type NoteRow = {
 };
 type ImageRow = {
   id: string; note_id: string; filename: string; alt: string; mime_type: Note['images'][number]['mimeType'];
-  width: number; height: number; size: number; position: number;
+  width: number; height: number; size: number; position: number; rotation: Note['images'][number]['rotation'];
 };
 
 type AudioRow = {
@@ -163,6 +167,7 @@ function mapNote(row: NoteRow, images: ImageRow[], audio: AudioRow[]): Note {
       width: image.width,
       height: image.height,
       size: image.size,
+      rotation: image.rotation,
     })),
   };
 }

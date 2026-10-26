@@ -87,6 +87,52 @@ describe('storage', () => {
   });
 });
 
+describe('image rotation', () => {
+  it('persists lossless orientation on uploads and retained images, preserving it for old clients', async () => {
+    await setup();
+    const id = crypto.randomUUID();
+    const imageId = crypto.randomUUID();
+    const input = { id, title: 'Rotation', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [] };
+    const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...input, newImageIds: [imageId], imageRotations: [{ id: imageId, rotation: 90 }] }))
+      .attach('images', 'tests/fixtures/image.jpg');
+    expect(created.status).toBe(201);
+    expect(created.body.note.images[0]).toMatchObject({ id: imageId, rotation: 90 });
+    const original = await readFile('tests/fixtures/image.jpg');
+    expect((await agent.get(created.body.note.images[0].url)).body).toEqual(original);
+    const retained = { ...input, retainedImageIds: [imageId], expectedVersion: 1 };
+    const updated = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...retained, imageRotations: [{ id: imageId, rotation: 270 }] }));
+    expect(updated.status).toBe(200);
+    expect(updated.body.note.images[0].rotation).toBe(270);
+    const oldClient = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...retained, expectedVersion: 2 }));
+    expect(oldClient.status).toBe(200);
+    expect(oldClient.body.note.images[0].rotation).toBe(270);
+    const reset = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...retained, expectedVersion: 3, imageRotations: [{ id: imageId, rotation: 0 }] }));
+    expect(reset.status).toBe(200);
+    expect((await agent.get('/api/notes')).body.notes[0].images[0].rotation).toBe(0);
+    expect((await agent.get(created.body.note.images[0].url)).body).toEqual(original);
+  });
+
+  it('rejects invalid, duplicate and foreign rotation metadata without changing the note', async () => {
+    await setup();
+    const id = crypto.randomUUID();
+    const input = { id, title: 'Rotation', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [] };
+    const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(input)).attach('images', 'tests/fixtures/image.jpg');
+    expect(created.status).toBe(201);
+    const imageId = created.body.note.images[0].id;
+    const retained = { ...input, expectedVersion: 1, retainedImageIds: [imageId] };
+    for (const imageRotations of [
+      [{ id: imageId, rotation: 45 }], [{ id: imageId, rotation: -90 }],
+      [{ id: crypto.randomUUID(), rotation: 90 }],
+      [{ id: imageId, rotation: 90 }, { id: imageId, rotation: 180 }],
+    ]) {
+      expect((await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...retained, imageRotations }))).status).toBe(400);
+    }
+    const otherId = crypto.randomUUID();
+    expect((await agent.put(`/api/notes/${otherId}`).field('payload', JSON.stringify({ ...input, id: otherId, imageRotations: [{ id: imageId, rotation: 90 }] }))).status).toBe(400);
+    expect((await agent.get('/api/notes')).body.notes[0]).toMatchObject({ version: 1, images: [{ id: imageId, rotation: 0 }] });
+  });
+});
+
 describe('audio attachments', () => {
   const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] as string[] });
 

@@ -59,8 +59,10 @@ it.each([true, false])('expands the legacy palette without losing notes or image
     id: 'note', title: 'Existing title', body: 'Existing body', color: 'peach', pinned: true,
     createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z', version: 7, position: hasPosition ? 42 : 0,
     audio: [],
-    images: [{ id: 'image', url: '/api/images/image', alt: 'Existing alt', mimeType: 'image/jpeg', width: 100, height: 80, size: 1024 }],
+    images: [{ id: 'image', url: '/api/images/image', alt: 'Existing alt', mimeType: 'image/jpeg', width: 100, height: 80, size: 1024, rotation: 0 }],
   }]);
+  expect(database.prepare('UPDATE images SET rotation=270 WHERE id=?').run('image').changes).toBe(1);
+  expect(() => database!.prepare('UPDATE images SET rotation=45 WHERE id=?').run('image')).toThrow(/CHECK constraint/);
   expect(database.pragma('foreign_keys', { simple: true })).toBe(1);
   expect(database.pragma('foreign_key_check')).toEqual([]);
   const update = database.prepare('UPDATE notes SET color = ? WHERE id = ?');
@@ -68,7 +70,7 @@ it.each([true, false])('expands the legacy palette without losing notes or image
   expect(() => update.run('unknown', 'note')).toThrow(/CHECK constraint/);
   database.close();
   database = openDatabase(environment);
-  expect(readNotes(database)).toEqual([{ ...notes[0], color: 'rose' }]);
+  expect(readNotes(database)).toEqual([{ ...notes[0], color: 'rose', images: [{ ...notes[0].images[0], rotation: 270 }] }]);
   database.prepare('DELETE FROM notes WHERE id = ?').run('note');
   expect(database.prepare('SELECT * FROM images').all()).toEqual([]);
 });
