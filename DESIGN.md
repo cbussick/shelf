@@ -10,7 +10,7 @@ Shelf is a single-owner, self-hosted home for text, image, and audio notes. It i
 - Manrope throughout.
 - Four masonry-style columns on desktop, three on tablet, and two on phones.
 - Pinned notes form a separate section above other notes. Empty sections disappear.
-- Images retain their proportions. Color remains a lightweight visual preference rather than a taxonomy.
+- Images retain their proportions. The image preview offers clockwise and counterclockwise quarter-turns; orientation saves with the note and syncs without rewriting the original image bytes. Color remains a lightweight visual preference rather than a taxonomy.
 - Images and audio share an attachment area, with an image gallery followed by a scrollable audio list. Cards show one compact player and a count for additional audio files.
 - A waveform Add audio action sits beside image capture in the bottom toolbar and inside the editor. It offers upload or microphone recording; capture is explicitly previewed and kept/discarded.
 - Dates are plain text. The interface avoids decorative navigation, metrics, and feature advertising.

@@ -18,6 +18,8 @@ const paths = {
   note: <><path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10L14 3Z"/><path d="M14 3v7h7M7 14h10M7 17h7"/></>,
   'cloud-check': <><path d="M7 18H6a4.5 4.5 0 0 1-.5-9 6.5 6.5 0 0 1 12.4-1.5A5.2 5.2 0 0 1 20 17"/><path d="m10 16 3 3 5-6"/></>,
   offline: <><path d="m3 3 18 18M7 18H6a4.5 4.5 0 0 1-1.6-8.7M9 4a6.5 6.5 0 0 1 9 3.5A5.2 5.2 0 0 1 21 15M9 18h5"/></>,
+  'rotate-left': <path d="M3 4v6h6M3 10a9 9 0 1 1 2 9"/>,
+  'rotate-right': <path d="M21 4v6h-6m6 0a9 9 0 1 0-2 9"/>,
   refresh: <><path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5M4 16a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/></>,
   x: <path d="m6 6 12 12M6 18 18 6"/>,
   trash: <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>,

@@ -1,6 +1,6 @@
 import { openDB } from 'idb';
 import { z } from 'zod';
-import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema, type Note, type NoteAudio, type NoteColor, type NoteImage } from '../shared/contracts';
+import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema, type ImageRotation, type Note, type NoteAudio, type NoteColor, type NoteImage } from '../shared/contracts';
 import { api, ApiError } from './api';
 import { audioMimeType, recordingDuration, validateAudioFile } from './audio';
 
@@ -69,7 +69,7 @@ export async function clearLocalData(): Promise<void> {
 
 export async function saveLocalNote(value: {
   id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
-  retainedImages: LocalImage[]; newImages: File[]; version?: number; createdAt?: string;
+  retainedImages: LocalImage[]; newImages: File[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
   retainedAudio?: LocalAudio[]; newAudio?: File[];
 }): Promise<LocalNote> {
   for (const file of value.newAudio ?? []) validateAudioFile(file);
@@ -77,13 +77,13 @@ export async function saveLocalNote(value: {
   const id = value.id ?? crypto.randomUUID();
   const images = [...value.retainedImages];
   const blobs: { id: string; file: File }[] = [];
-  for (const file of value.newImages) {
+  for (const [index, file] of value.newImages.entries()) {
     const dimensions = await imageDimensions(file);
     if (dimensions.width * dimensions.height > 40_000_000) throw new Error('Images may contain up to 40 megapixels.');
     const imageId = crypto.randomUUID();
     const blobId = `blob:${imageId}`;
     blobs.push({ id: blobId, file });
-    images.push({ id: imageId, blobId, url: '', alt: file.name, mimeType: file.type as LocalImage['mimeType'], size: file.size, ...dimensions });
+    images.push({ id: imageId, blobId, url: '', alt: file.name, mimeType: file.type as LocalImage['mimeType'], size: file.size, ...dimensions, rotation: value.newImageRotations?.[index] ?? 0 });
   }
   const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'meta', 'blobs'], 'readwrite');
@@ -92,7 +92,8 @@ export async function saveLocalNote(value: {
   const current = parseOptionalNote(await notes.get(id));
   const existingOperation = parseOptionalOperation(await outbox.get(id));
   const currentImages = new Map(current?.images.map(image => [image.id, image]));
-  const reconciledImages = images.map(image => currentImages.get(image.id) ?? image);
+  // Reconcile upload metadata without discarding the editor's orientation.
+  const reconciledImages = images.map(image => ({ ...(currentImages.get(image.id) ?? image), rotation: image.rotation }));
   const currentAudio = new Map(current?.audio.map(attachment => [attachment.id, attachment]));
   const audio = (value.retainedAudio ?? current?.audio ?? []).map(attachment => currentAudio.get(attachment.id) ?? attachment);
   for (const file of value.newAudio ?? []) {
@@ -174,6 +175,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
           expectedVersion: entry.expectedVersion,
           retainedImageIds,
           newImageIds: localImages.map(image => image.id),
+          imageRotations: note.images.map(image => ({ id: image.id, rotation: image.rotation })),
           retainedAudioIds: note.audio.filter(audio => !audio.blobId).map(audio => audio.id),
           newAudio: localAudio.map(audio => ({ id: audio.id, duration: audio.duration && audio.duration <= MAX_RECORDING_SECONDS ? audio.duration : null })),
         }, files, await Promise.all(localAudio.map(async audio => {
@@ -202,7 +204,8 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
         } else if (latestOperation) {
           if (latestOperation.type === 'save') {
             const latest = parseNote(await notes.get(entry.noteId));
-            latest.images = reconcileAttachments(latest.images, result.note.images);
+            // The acknowledgement supplies URLs, not the newer edit's orientation.
+            latest.images = reconcileAttachments(latest.images, result.note.images).map((image, index) => ({ ...image, rotation: latest.images[index].rotation }));
             latest.audio = reconcileAttachments(latest.audio, result.note.audio);
             await notes.put({ ...latest, version: result.note.version });
           }

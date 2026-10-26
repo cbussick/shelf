@@ -3,6 +3,9 @@ import { z } from 'zod';
 export const noteColorSchema = z.enum(['paper', 'butter', 'mint', 'lilac', 'peach', 'blue', 'orange', 'rose']);
 export type NoteColor = z.infer<typeof noteColorSchema>;
 
+export const imageRotationSchema = z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]);
+export type ImageRotation = z.infer<typeof imageRotationSchema>;
+
 export const imageSchema = z.object({
   id: z.uuid(),
   url: z.string().startsWith('/api/images/'),
@@ -11,6 +14,7 @@ export const imageSchema = z.object({
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   size: z.number().int().nonnegative(),
+  rotation: imageRotationSchema.default(0),
 });
 export type NoteImage = z.infer<typeof imageSchema>;
 
@@ -55,6 +59,9 @@ export const noteWriteSchema = z.object({
   expectedVersion: z.number().int().nonnegative(),
   retainedImageIds: z.array(z.uuid()).max(6),
   newImageIds: z.array(z.uuid()).max(6).refine(ids => new Set(ids).size === ids.length).optional(),
+  // Omitted by older clients: keep existing orientations unchanged.
+  imageRotations: z.array(z.object({ id: z.uuid(), rotation: imageRotationSchema })).max(6)
+    .refine(images => new Set(images.map(image => image.id)).size === images.length).optional(),
   // Older clients omit this field; preserve their note's existing audio.
   retainedAudioIds: z.array(z.uuid()).refine(ids => new Set(ids).size === ids.length).optional(),
   // Stable IDs reconcile editors opened during upload; browser recordings

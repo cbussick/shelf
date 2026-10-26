@@ -144,6 +144,11 @@ export function createApp(database: AppDatabase, environment: Environment) {
       return response.status(400).json({ error: 'An attached image does not belong to this note.' });
     }
 
+    const imageIds = new Set([...input.retainedImageIds, ...(input.newImageIds ?? [])]);
+    if (input.imageRotations?.some(image => !imageIds.has(image.id))) {
+      return response.status(400).json({ error: 'A rotated image does not belong to this note.' });
+    }
+
     const retainedAudio = new Set(retainedAudioIds);
     if ([...retainedAudio].some(audioId => !current?.audio.some(audio => audio.id === audioId))) {
       return response.status(400).json({ error: 'An audio attachment does not belong to this note.' });
@@ -222,6 +227,7 @@ export function createApp(database: AppDatabase, environment: Environment) {
           database.prepare('INSERT INTO images (id,note_id,filename,alt,mime_type,width,height,size,position) VALUES (?,?,?,?,?,?,?,?,?)')
             .run(image.id, id, image.filename, image.alt, image.mimeType, image.width, image.height, image.size, position++);
         }
+        for (const image of input.imageRotations ?? []) database.prepare('UPDATE images SET rotation=? WHERE id=? AND note_id=?').run(image.rotation, image.id, id);
         const oldAudio = database.prepare('SELECT id, filename FROM audio WHERE note_id=?').all(id) as { id: string; filename: string }[];
         const removedAudio = oldAudio.filter(audio => !retainedAudio.has(audio.id));
         for (const audio of removedAudio) database.prepare('DELETE FROM audio WHERE id=?').run(audio.id);

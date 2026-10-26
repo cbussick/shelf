@@ -113,6 +113,7 @@ export const styles = stylex.create({
   previewStage: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   previewImage: { position: 'relative', maxWidth: '100%', maxHeight: '100%' },
   previewPhoto: { width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: 'calc(min(860px, 90dvh) - 48px)', objectFit: 'contain', display: 'block', '@media (max-width: 700px)': { maxHeight: 'calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom))' } },
+  previewRotationActions: { position: 'absolute', bottom: 'calc(32px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 },
   previewImageActions: { position: 'absolute', top: 8, right: 8, display: 'flex', gap: 8 },
   previewImageAction: { width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: 8, backgroundColor: '#1d2823cc', color: '#fff', ':hover': { backgroundColor: '#1d2823' } },
   previewPrevious: { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: 8, backgroundColor: '#ffffff24', color: '#fff', ':hover': { backgroundColor: '#ffffff40' } },
