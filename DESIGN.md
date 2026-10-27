@@ -7,7 +7,7 @@ Shelf is a single-owner, self-hosted home for text, image, and audio notes. It s
 ## Visual direction
 
 - Canvas `#F7F8FA`; ink `#263630`; evergreen `#285B48`; butter `#F8EBAD`; mint `#DBEBE1`; lilac `#EAE4F3`; peach `#F6DFD2`; blue `#D9E8F8`; orange `#F8D2A8`; rose `#F3DCE5`.
-- Manrope throughout.
+- Manrope throughout. UI icons use Lucide React components with a shared size/stroke treatment; the custom Shelf brand mark is unchanged. Lucide/Feather notices ship with the app.
 - Four masonry-style columns on desktop, three on tablet, and two on phones.
 - Pinned notes form a separate section above other notes. Empty sections disappear.
 - Images retain their proportions. The image preview offers clockwise and counterclockwise quarter-turns; orientation saves with the note and syncs without rewriting the original image bytes. Color remains a lightweight visual preference rather than a taxonomy.
@@ -20,7 +20,7 @@ Shelf is a single-owner, self-hosted home for text, image, and audio notes. It s
 - Desktop and tablet use a capture bar and modal editor.
 - Phones use a fixed bottom capture dock and full-screen editor.
 - Unpinned card controls appear on desktop hover/focus and remain visible on touch-oriented layouts.
-- Note bodies use a bounded, internally scrolling rich-text surface. The formatting controls wrap on phones; Tab moves focus normally, and list nesting uses buttons or Ctrl/Cmd+[ and Ctrl/Cmd+].
+- Note bodies use a bounded, internally scrolling rich-text surface. A stationary padded focus frame surrounds the clipping viewport so partially visible text cannot intersect the focus ring. The formatting controls wrap on phones; Tab moves focus normally, and list nesting uses buttons or Ctrl/Cmd+[ and Ctrl/Cmd+].
 
 ## Note bodies
 

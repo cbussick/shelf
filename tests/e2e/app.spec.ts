@@ -14,9 +14,9 @@ test('creates, edits, pins, searches, and deletes a note', async ({ page }) => {
   await page.getByRole('button', { name: 'Note color' }).click();
   await page.getByRole('radio', { name: 'Mint' }).click();
   const editorPin = page.getByRole('button', { name: 'Pin note' });
-  await expect(editorPin.locator('svg path').first()).not.toHaveAttribute('fill', 'currentColor');
+  await expect(editorPin.locator('svg')).not.toHaveAttribute('fill', 'currentColor');
   await editorPin.click();
-  await expect(page.getByRole('button', { name: 'Unpin note' }).locator('svg path').first()).toHaveAttribute('fill', 'currentColor');
+  await expect(page.getByRole('button', { name: 'Unpin note' }).locator('svg')).toHaveAttribute('fill', 'currentColor');
   await expect(page.getByRole('button', { name: 'Save note' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close note' }).click();
   const card = page.getByRole('button', { name: 'Open note: Keep this close' });
@@ -64,7 +64,8 @@ test('note editor uses available desktop space and stays usable on small screens
   const editor = page.getByRole('dialog', { name: 'Add note' });
   const body = editor.getByRole('textbox', { name: 'Note', exact: true });
   const desktop = await editor.boundingBox();
-  const desktopBody = await body.boundingBox();
+  // Available editing area includes the stationary focus frame's padding.
+  const desktopBody = await editor.locator('.note-rich-host').boundingBox();
   expect(desktop?.width).toBeGreaterThanOrEqual(900);
   expect(desktop?.height).toBeGreaterThanOrEqual(750);
   expect(desktopBody?.height).toBeGreaterThanOrEqual(550);
@@ -297,7 +298,7 @@ test('pins from the board and shows pin controls on hover for both groups', asyn
   const pin = page.getByRole('button', { name: 'Pin note: Board pin test' });
   await page.mouse.move(0, 0);
   await expect(pin).toHaveCSS('opacity', '0');
-  await expect(pin.locator('svg path').first()).not.toHaveAttribute('fill', 'currentColor');
+  await expect(pin.locator('svg')).not.toHaveAttribute('fill', 'currentColor');
   await card.hover();
   await expect(pin).toHaveCSS('opacity', '1');
   await pin.hover();
@@ -309,7 +310,7 @@ test('pins from the board and shows pin controls on hover for both groups', asyn
 
   await pin.click();
   const unpin = page.getByRole('button', { name: 'Unpin note: Board pin test' });
-  await expect(unpin.locator('svg path').first()).toHaveAttribute('fill', 'currentColor');
+  await expect(unpin.locator('svg')).toHaveAttribute('fill', 'currentColor');
   await page.getByRole('heading', { name: 'Pinned', exact: true }).click();
   await page.mouse.move(0, 0);
   await expect(unpin).toHaveCSS('opacity', '0');
@@ -325,7 +326,7 @@ test('pins from the board and shows pin controls on hover for both groups', asyn
   await page.getByRole('heading', { name: 'Your notes' }).click();
   await page.mouse.move(0, 0);
   await expect(pin).toHaveCSS('opacity', '0');
-  await expect(pin.locator('svg path').first()).not.toHaveAttribute('fill', 'currentColor');
+  await expect(pin.locator('svg')).not.toHaveAttribute('fill', 'currentColor');
   await expect(page.getByRole('dialog', { name: 'Edit note' })).not.toBeVisible();
 });
 
@@ -382,7 +383,7 @@ test('right-click note actions open, pin, and confirm deletion', async ({ page }
   await expect(page.getByRole('list', { name: 'Pinned notes' }).getByRole('button', { name: 'Open note: Context actions test' })).toBeVisible();
   await card.click({ button: 'right' });
   await expect(menu.getByRole('menuitem', { name: 'Unpin' })).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: 'Unpin' }).locator('svg path').first()).toHaveAttribute('fill', 'currentColor');
+  await expect(menu.getByRole('menuitem', { name: 'Unpin' }).locator('svg')).toHaveAttribute('fill', 'currentColor');
   await menu.getByRole('menuitem', { name: 'Delete' }).click();
   const confirmation = page.getByRole('dialog', { name: 'Delete this note?' });
   await expect(confirmation).toBeVisible();

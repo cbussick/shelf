@@ -168,6 +168,10 @@ Edits are committed to IndexedDB first and sent to the server immediately when p
 
 Mobile operating systems can suspend web apps after they are backgrounded. An edit made offline may therefore remain only on its original device until Shelf is opened again with connectivity. Incoming shares are temporary on-device drafts (not notes) until saved, and expire after 24 hours.
 
+## Icon licenses
+
+UI icons use explicitly imported components from `lucide-react`. Lucide's ISC license and the MIT notice for Feather-derived icons are preserved verbatim from the installed package in [public/THIRD_PARTY_NOTICES.txt](public/THIRD_PARTY_NOTICES.txt). The notices ship with the app at `/THIRD_PARTY_NOTICES.txt` and are precached for offline access. When upgrading Lucide, update that file from the package's `LICENSE` (the browser test checks they match). Shelf's custom brand mark is unchanged.
+
 ## Security notes
 
 - Keep the app restricted to the Tailnet.

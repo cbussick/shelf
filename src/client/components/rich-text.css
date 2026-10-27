@@ -3,11 +3,10 @@
 .note-formatting button{display:inline-flex;align-items:center;justify-content:center;min-width:36px;min-height:40px;padding:4px 9px;border-radius:6px;font-size:14px;font-weight:700}
 .note-formatting button:hover{background:#2636300c}
 .note-formatting button[aria-pressed="true"]{background:#285b481c;color:#285b48}
-.note-formatting button[aria-label="Bold"]{font-weight:800}
-.note-formatting button[aria-label="Italic"]{font-style:italic}
 .note-rich-host,.note-rich-host>div,.note-rich-host .milkdown{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0}
-.note-rich-host .ProseMirror{flex:1;min-height:160px;overflow:auto;overflow-wrap:anywhere;white-space:pre-wrap;padding:12px 6px 16px;position:relative;outline-offset:-3px}
-.note-rich-host .ProseMirror:focus-visible{outline:2px solid #527cb8;border-radius:4px}
+.note-rich-host{padding:6px;border-radius:4px}
+.note-rich-host:focus-within{outline:2px solid #527cb8;outline-offset:-2px}
+.note-rich-host .ProseMirror{flex:1;min-height:160px;overflow:auto;overflow-wrap:anywhere;white-space:pre-wrap;padding:6px 6px 10px;position:relative;outline:none}
 .note-rich-host .ProseMirror p{margin:0 0 .65em}
 .note-rich-host .ProseMirror:has(>p:only-child>br:only-child)::before{content:"Start anywhere…";color:#67766e;position:absolute;pointer-events:none}
 .note-rich-host h1,.note-rich-host h2,.note-rich-host h3,.note-rich-host h4,.note-rich-host h5,.note-rich-host h6{line-height:1.4;margin:.8em 0 .4em;font-weight:800}
