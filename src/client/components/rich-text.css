@@ -1,0 +1,33 @@
+.note-rich-text{display:flex;flex-direction:column;flex:1;min-height:200px;min-width:0;margin-top:12px;font-size:16px;line-height:1.9}
+.note-formatting{display:flex;flex-wrap:wrap;gap:2px;padding:4px 0 8px;border-bottom:1px solid #26363020;flex-shrink:0}
+.note-formatting button{display:inline-flex;align-items:center;justify-content:center;min-width:36px;min-height:40px;padding:4px 9px;border-radius:6px;font-size:14px;font-weight:700}
+.note-formatting button:hover{background:#2636300c}
+.note-formatting button[aria-pressed="true"]{background:#285b481c;color:#285b48}
+.note-formatting button[aria-label="Bold"]{font-weight:800}
+.note-formatting button[aria-label="Italic"]{font-style:italic}
+.note-rich-host,.note-rich-host>div,.note-rich-host .milkdown{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0}
+.note-rich-host .ProseMirror{flex:1;min-height:160px;overflow:auto;overflow-wrap:anywhere;white-space:pre-wrap;padding:12px 6px 16px;position:relative;outline-offset:-3px}
+.note-rich-host .ProseMirror:focus-visible{outline:2px solid #527cb8;border-radius:4px}
+.note-rich-host .ProseMirror p{margin:0 0 .65em}
+.note-rich-host .ProseMirror:has(>p:only-child>br:only-child)::before{content:"Start anywhere…";color:#67766e;position:absolute;pointer-events:none}
+.note-rich-host h1,.note-rich-host h2,.note-rich-host h3,.note-rich-host h4,.note-rich-host h5,.note-rich-host h6{line-height:1.4;margin:.8em 0 .4em;font-weight:800}
+.note-rich-host h1{font-size:1.65em}.note-rich-host h2{font-size:1.4em}.note-rich-host h3{font-size:1.2em}
+.note-rich-host ul,.note-rich-host ol{padding-left:1.65em;margin:.4em 0}
+.note-rich-host li>input[type="checkbox"]{accent-color:#285b48;width:20px;height:20px;margin:6px 8px 0 -28px;float:left;cursor:pointer}
+.note-rich-host li[data-task="true"]{list-style:none}
+.note-list-content{min-width:0}.note-list-content>p{margin-bottom:.15em}
+.note-rich-host li[data-checked="true"]>.note-list-content>p{color:#546358;text-decoration:line-through}
+.note-rich-host blockquote{border-left:3px solid #285b48;margin:1em 0;padding-left:16px;color:#546358}
+.note-rich-host code{font-family:ui-monospace,monospace;background:#2636300c;border-radius:4px;padding:2px 4px}
+.note-rich-host pre{overflow:auto;background:#2636300c;border-radius:8px;padding:12px;white-space:pre}
+.note-rich-host pre code{background:none;padding:0}
+.note-rich-host a{color:#285b48;text-decoration:underline}
+.note-rich-host table{border-collapse:collapse;max-width:100%}.note-rich-host td,.note-rich-host th{border:1px solid #26363030;padding:6px 10px}
+.note-inline-image{color:#546358;font-style:italic}
+.note-rich-text textarea{font:inherit;color:inherit;background:transparent;border:0;flex:1;min-height:160px;resize:none}
+.note-link-form{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;font-size:14px}
+.note-link-form input{min-width:0;flex:1;border:1px solid #26363040;border-radius:5px;padding:6px;background:#ffffff80}
+.note-link-form button{min-height:40px;padding:6px;border-radius:5px;background:#ffffff60}
+.note-rich-host .ProseMirror-selectednode{outline:2px solid #527cb8}
+.note-rich-host .ProseMirror-hideselection *::selection{background:transparent}
+@media(max-width:700px){.note-rich-text{min-height:160px}.note-formatting button{min-height:44px;min-width:40px}.note-rich-host .ProseMirror{min-height:120px}}

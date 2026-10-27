@@ -53,7 +53,7 @@ export const errorResponseSchema = z.object({ error: z.string(), issues: z.unkno
 export const noteWriteSchema = z.object({
   id: z.uuid(),
   title: z.string().trim().max(160),
-  body: z.string().trim().max(20_000),
+  body: z.string().max(20_000),
   color: noteColorSchema,
   pinned: z.boolean(),
   expectedVersion: z.number().int().nonnegative(),
