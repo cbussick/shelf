@@ -7,10 +7,10 @@ import './rich-text.css';
 type NoteEditor = ReturnType<typeof createNoteEditor>;
 export type RichTextHandle = { read: () => string };
 
-const tools: { format: Format; label: string; text?: string; icon?: Parameters<typeof Icon>[0]['name'] }[] = [
-  { format: 'heading', label: 'Heading', text: 'H' },
-  { format: 'bold', label: 'Bold', text: 'B' },
-  { format: 'italic', label: 'Italic', text: 'I' },
+const tools: { format: Format; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+  { format: 'heading', label: 'Heading', icon: 'heading' },
+  { format: 'bold', label: 'Bold', icon: 'bold' },
+  { format: 'italic', label: 'Italic', icon: 'italic' },
   { format: 'bullet', label: 'Bullet list', icon: 'list-bullet' },
   { format: 'ordered', label: 'Numbered list', icon: 'list-ordered' },
   { format: 'task', label: 'Checklist', icon: 'checklist' },
@@ -119,7 +119,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   return <div className="note-rich-text">
     {!failed && <div role="group" aria-label="Text formatting" className="note-formatting">
       {tools.map(tool => <button key={tool.format} type="button" title={tool.label} aria-label={tool.label} aria-pressed={['heading', 'bold', 'italic', 'bullet', 'ordered', 'task', 'quote', 'code'].includes(tool.format) ? active.includes(tool.format) : undefined} disabled={!ready || disabled}
-        onMouseDown={event => event.preventDefault()} onClick={() => run(tool.format)}>{tool.icon ? <Icon name={tool.icon}/> : tool.text}</button>)}
+        onMouseDown={event => event.preventDefault()} onClick={() => run(tool.format)}><Icon name={tool.icon}/></button>)}
       <button type="button" disabled={!ready || disabled} onMouseDown={event => event.preventDefault()} onClick={() => {
         setLinkOpen(value => !value);
         const state = instance.current?.view().state;

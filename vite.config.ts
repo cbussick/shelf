@@ -13,7 +13,7 @@ export default defineConfig({
       filename: 'sw.ts',
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['assets/favicon.svg', 'assets/*.ttf', 'icons/apple-touch-icon.png'],
+      includeAssets: ['assets/favicon.svg', 'assets/*.ttf', 'icons/apple-touch-icon.png', 'THIRD_PARTY_NOTICES.txt'],
       manifest: {
         name: 'Shelf', short_name: 'Shelf', description: 'A private place for little notes.',
         start_url: '/', scope: '/', display: 'standalone',
