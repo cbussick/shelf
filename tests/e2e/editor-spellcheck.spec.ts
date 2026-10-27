@@ -15,16 +15,13 @@ test('new and existing note bodies disable browser spellcheck and remain editabl
     await expect(body).toHaveAttribute('spellcheck', 'false');
     await expect(body).toHaveJSProperty('spellcheck', false);
     await body.tap();
-    await body.evaluate(element => {
-      const textarea = element as HTMLTextAreaElement;
-      const caret = textarea.value.indexOf('speling') + 3;
-      textarea.setSelectionRange(caret, caret);
-    });
+    await body.press('Home');
+    for (let index = 0; index < text.indexOf('speling') + 3; index++) await body.press('ArrowRight');
     await page.keyboard.type('l');
-    await expect(body).toHaveValue('A spelling mistake.');
+    await expect(body).toHaveText('A spelling mistake.');
     await expect(body).toBeFocused();
     await page.keyboard.press('Backspace');
-    await expect(body).toHaveValue(text);
+    await expect(body).toHaveText(text);
     await expect(body).toBeFocused();
     await page.getByRole('button', { name: 'Close note' }).click();
     if (state === 'new') {

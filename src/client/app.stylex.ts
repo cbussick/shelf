@@ -78,7 +78,6 @@ export const styles = stylex.create({
   iconButton: { width: 44, height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, ':hover': { backgroundColor: '#2636300c' } },
   editorFields: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: '8px 30px 12px', overflow: 'auto', '@media (max-width: 700px)': { padding: '8px 24px 16px' } },
   titleInput: { borderWidth: 0, backgroundColor: 'transparent', width: '100%', color: colors.ink, fontSize: 25, fontWeight: 700, lineHeight: 1.6 },
-  bodyInput: { borderWidth: 0, backgroundColor: 'transparent', width: '100%', color: colors.ink, flex: 1, minHeight: 200, fontSize: 16, lineHeight: 1.9, marginTop: 16, resize: 'none', overflow: 'auto', '@media (max-width: 700px)': { minHeight: 160 } },
   editorAttachments: { overflowY: 'auto', flexShrink: 0, maxHeight: 'min(440px, 45dvh)' },
   audioList: { display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 30px', '@media (max-width: 700px)': { paddingInline: 24 } },
   audioListHeading: { margin: 0, fontSize: 12, fontWeight: 700, color: colors.muted },

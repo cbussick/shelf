@@ -9,6 +9,7 @@ import { Photo } from './Photo';
 import { AudioPlayer } from './AudioPlayer';
 import { LinkedText } from './LinkedText';
 import { linkParts } from './link-parts';
+import { noteExcerpt } from '../note-excerpt';
 
 export function NoteBoard({ notes, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
   notes: LocalNote[]; heading?: string; label: string;
@@ -173,14 +174,15 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
 }) {
   const image = note.images[0];
   const titleParts = linkParts(note.title);
-  const bodyParts = linkParts(note.body);
+  const excerpt = useMemo(() => noteExcerpt(note.body), [note.body]);
+  const bodyParts = linkParts(excerpt);
   const hasLinks = [...titleParts, ...bodyParts].some(part => part.href);
   const content = <>
     {note.images.length === 1 && <LocalPhoto image={image}/>}
     {note.images.length > 1 && <ImageMosaic images={note.images.map(item => <LocalPhoto key={item.id} image={item} crop className={stylex.props(styles.mosaicPhoto).className}/>)}/>}
     {(note.title || note.body) && <span {...stylex.props(styles.noteContent, image && styles.imageContent, hasLinks && styles.linkedContent)}>
       {note.title && <span {...stylex.props(styles.noteTitle)}>{hasLinks ? <LinkedText parts={titleParts}/> : note.title}</span>}
-      {note.body && <span {...stylex.props(styles.noteBody)}>{hasLinks ? <LinkedText parts={bodyParts}/> : note.body}</span>}
+      {note.body && <span {...stylex.props(styles.noteBody)}>{hasLinks ? <LinkedText parts={bodyParts}/> : excerpt}</span>}
     </span>}
     {note.audio.length > 0 && <div {...stylex.props(styles.cardAudio)}>
       <AudioPlayer key={note.audio[0].id} audio={note.audio[0]} compact/>

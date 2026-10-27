@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-Shelf is a single-owner, self-hosted home for text, image, and audio notes. It intentionally excludes checklists, drawings, labels, archive, reminders, sharing, and a persistent trash folder.
+Shelf is a single-owner, self-hosted home for text, image, and audio notes. It supports Markdown task lists within note bodies, not a separate checklist note type. It intentionally excludes drawings, labels, archive, reminders, sharing, and a persistent trash folder.
 
 ## Visual direction
 
@@ -20,7 +20,17 @@ Shelf is a single-owner, self-hosted home for text, image, and audio notes. It i
 - Desktop and tablet use a capture bar and modal editor.
 - Phones use a fixed bottom capture dock and full-screen editor.
 - Unpinned card controls appear on desktop hover/focus and remain visible on touch-oriented layouts.
-- Textareas have fixed responsive dimensions and scroll internally.
+- Note bodies use a bounded, internally scrolling rich-text surface. The formatting controls wrap on phones; Tab moves focus normally, and list nesting uses buttons or Ctrl/Cmd+[ and Ctrl/Cmd+].
+
+## Note bodies
+
+Milkdown provides one directly editable, formatted body, with CommonMark/GFM input shortcuts, headings, emphasis, links, lists, native task checkboxes, quotes, code and undo/redo. There is no separate Read/Edit switch or text highlighting. The body remains a Markdown string; cards display non-interactive text excerpts with task state.
+
+Closing a note saves on this device, as before; neither typing nor ticking a task is advertised as an autosave. Merely opening a note does not rewrite its source. After editing, Markdown serialization can normalize spacing, bullets and delimiters; byte-for-byte preservation of edited source is not promised. Body whitespace is no longer globally trimmed. The serialized body retains the 20,000-character limit.
+
+Markdown images are shown as placeholders without loading remote resources. Use Shelf attachments for images. Raw HTML is not executed, and links are sanitized. If editor initialization fails, the body falls back to Markdown text editing. All editor assets are bundled and precached for offline startup.
+
+This is a prototype for evaluation: automated Chromium/mobile-viewport coverage is not a substitute for real iOS/Android keyboard, IME, or screen-reader testing. Arbitrary Markdown extensions and exact source round-tripping are not supported guarantees.
 
 ## Persistence and sync
 

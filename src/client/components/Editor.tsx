@@ -11,7 +11,7 @@ import { audioFileKey, validateAudioFile } from '../audio';
 import { AddAudio } from './AddAudio';
 import { AudioPlayer } from './AudioPlayer';
 import { AudioRecorder } from './AudioRecorder';
-
+import { RichTextEditor, type RichTextHandle } from './RichTextEditor';
 const colors = noteColorSchema.options;
 
 export type EditorValue = {
@@ -25,7 +25,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
   onDelete: (note: LocalNote) => Promise<void>; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const bodyInput = useRef<HTMLTextAreaElement>(null);
+  const bodyInput = useRef<RichTextHandle>(null);
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const discardDialog = useRef<HTMLDialogElement>(null);
   const removeImageDialog = useRef<HTMLDialogElement>(null);
@@ -61,7 +61,6 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
 
   useEffect(() => {
     dialog.current?.showModal();
-    if (!note) bodyInput.current?.focus();
     // Mount the recorder only after the editor is in the browser's top layer.
     if (initialRecording) setRecordingOpen(true);
     return () => dialog.current?.close();
@@ -139,7 +138,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
   const save = async () => {
     if (saving) return;
     const cleanTitle = title.trim();
-    const cleanBody = body.trim();
+    const cleanBody = bodyInput.current?.read() ?? body;
     setSaving(true); setError(''); setSaveFailed(false);
     try {
       await onSave({ id: note?.id, title: cleanTitle, body: cleanBody, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio, version: note?.version, createdAt: note?.createdAt });
@@ -154,7 +153,13 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
     }
   };
   return <>
-    <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'} onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onPaste={pasteImages} onClick={event => { if (event.target !== event.currentTarget) return; const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) requestClose(); }} {...stylex.props(styles.dialog, styles.editor, styles[color])}>
+    <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'} onKeyDownCapture={event => {
+      // ProseMirror consumes Escape. Handle it before the editing surface so
+      // Shelf retains its existing save-on-Escape behavior.
+      if (event.key === 'Escape' && !event.defaultPrevented && !event.nativeEvent.isComposing && event.target instanceof HTMLElement && event.target.closest('#note-body')) {
+        event.preventDefault(); requestClose();
+      }
+    }} onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onPasteCapture={pasteImages} onClick={event => { if (event.target !== event.currentTarget) return; const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) requestClose(); }} {...stylex.props(styles.dialog, styles.editor, styles[color])}>
       <div {...stylex.props(styles.editorForm)}>
         <header {...stylex.props(styles.editorHeader)}>
           {note && <div {...stylex.props(styles.noteTimestamps)}>
@@ -180,7 +185,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
         </div>
         <div {...stylex.props(styles.editorFields)}>
           <label className="sr-only" htmlFor="note-title">Title</label><input id="note-title" maxLength={160} placeholder="Title" value={title} onChange={event => setTitle(event.target.value)} {...stylex.props(styles.titleInput)}/>
-          <label className="sr-only" htmlFor="note-body">Note</label><textarea ref={bodyInput} id="note-body" spellCheck={false} maxLength={20_000} placeholder="Start anywhere…" value={body} onChange={event => setBody(event.target.value)} {...stylex.props(styles.bodyInput)}/>
+          <RichTextEditor ref={bodyInput} initialValue={note?.body ?? ''} onChange={setBody} autoFocus={!note} disabled={saving}/>
         </div>
         {(newAudio.length > 0 || (dirty && (retainedAudio.length > 0 || (note?.audio.length ?? 0) > 0))) && !saving && <p role="status" {...stylex.props(styles.audioDraftStatus)}>Audio changes are not saved yet. Close the note to save on this device.</p>}
         <p role="alert" {...stylex.props(styles.error)}>{error}</p>

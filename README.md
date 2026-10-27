@@ -15,6 +15,7 @@ A small, private, self-hosted notes app for text, images, and audio. It is desig
 ## What it supports
 
 - Create, edit, search, pin, color, and permanently delete notes
+- Rich-text note bodies backed by Markdown, including nested lists and clickable task checkboxes
 - Up to six JPG, PNG, WebP, or GIF images per note
 - Audio uploads up to 100 MB each, with no fixed audio count limit per note
 - Microphone recording with preview, keep/discard, and a 30-minute limit
@@ -27,7 +28,7 @@ A small, private, self-hosted notes app for text, images, and audio. It is desig
 - Android share-sheet target for screenshots and other JPG, PNG, WebP, or GIF images
 - One owner password with revocable, server-side sessions
 
-The app deliberately has no labels, checklists, archive, reminders, trash, sharing, or multi-user administration.
+The app deliberately has no labels, archive, reminders, trash, sharing, or multi-user administration. Checklists are Markdown task lists within ordinary notes.
 
 ## Run locally
 

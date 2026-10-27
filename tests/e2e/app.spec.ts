@@ -90,7 +90,7 @@ test('focuses the body when creating a note', async ({ page }) => {
   const body = editor.getByRole('textbox', { name: 'Note', exact: true });
   await expect(body).toBeFocused();
   await page.keyboard.type('Start here');
-  await expect(body).toHaveValue('Start here');
+  await expect(body).toHaveText('Start here');
 });
 
 test('note colors stay in a palette popover that can be dismissed', async ({ page }) => {
@@ -154,7 +154,7 @@ test('overview shortcuts search, create, and confirm deletion only for a focused
   await add.getByRole('textbox', { name: 'Note', exact: true }).focus();
   await page.keyboard.type('find');
   await expect(search).not.toBeFocused();
-  await expect(add.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue('find');
+  await expect(add.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('find');
   await add.getByRole('button', { name: 'Close note' }).click();
 
   const card = page.getByRole('button', { name: 'Open note: Shortcut target' });
@@ -509,7 +509,7 @@ test('closes empty drafts without creating a note', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Open note:', exact: false })).toHaveCount(count);
 });
 
-test('accepts an image and keeps the editor textarea fixed', async ({ page }) => {
+test('accepts an image and keeps the editor body fixed', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page.getByRole('button', { name: 'Add an image' }).click();
@@ -615,8 +615,9 @@ test('pastes clipboard images into new and existing notes without disrupting tex
     clipboard.setData('text/plain', 'Pasted words');
     return element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: clipboard }));
   });
-  expect(textPasteAllowed).toBe(true);
-  // Text-only paste remains the browser's normal behavior (a synthetic event does not insert text).
+  expect(textPasteAllowed).toBe(false);
+  // The rich editor owns text insertion, including synthetic clipboard events.
+  await expect(body).toHaveText('Pasted words');
   await body.fill('A note with a picture');
   const jpeg = await readFile('tests/fixtures/image.jpg');
   const pasteImage = async (type = 'image/jpeg') => body.evaluate((element, { bytes, type }) => {
@@ -640,7 +641,7 @@ test('pastes clipboard images into new and existing notes without disrupting tex
     } finally { URL.revokeObjectURL(url); }
   }, [...jpeg]);
   await body.press('ControlOrMeta+v');
-  await expect(body).toHaveValue('A note with a picture');
+  await expect(body).toHaveText('A note with a picture');
   await expect(page.getByRole('button', { name: 'View image 1' })).toBeVisible();
   await page.getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
@@ -677,7 +678,7 @@ test('closes notes from the footer or backdrop, and keeps destructive actions in
   await expect(saved).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: Dismissible note' }).click();
-  await expect(saved.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue('Saved from backdrop');
+  await expect(saved.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Saved from backdrop');
   await saved.getByRole('button', { name: 'Delete note' }).click();
   await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note' }).click();
 });
@@ -1163,6 +1164,6 @@ for (const width of [390, 1280]) {
     }
     await card.click();
     await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title);
-    await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue(body);
+    await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toHaveText(body);
   });
 }

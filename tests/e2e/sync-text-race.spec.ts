@@ -29,5 +29,5 @@ test('rapid text edits sync without conflict', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole('button', { name: `Open note: ${title} (conflict copy)` })).toHaveCount(0);
   await page.getByRole('button', { name: `Open note: ${title}`, exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue('Changed');
+  await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Changed');
 });

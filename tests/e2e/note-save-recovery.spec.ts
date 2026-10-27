@@ -48,7 +48,7 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
     }, closingError);
     await editor.getByRole('button', { name: 'Close note' }).click();
     await expect(editor.getByRole('alert')).not.toBeEmpty();
-    await expect(editor.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue('Unsaved changes');
+    await expect(editor.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Unsaved changes');
     await expect(editor.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
     const close = async () => {
       if (closeMethod === 'button') await editor.getByRole('button', { name: 'Close', exact: true }).click();
@@ -61,13 +61,13 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
     await expect(confirmation).toBeVisible();
     await expect(confirmation).toHaveCSS('border-width', '0px');
     await confirmation.getByRole('button', { name: 'Keep editing' }).click();
-    await expect(editor.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue('Unsaved changes');
+    await expect(editor.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Unsaved changes');
     await close();
     await confirmation.getByRole('button', { name: 'Close without saving', exact: true }).click();
     await expect(editor).not.toBeVisible();
     await page.evaluate(() => (window as unknown as { restoreTransactions: () => void }).restoreTransactions());
     await page.getByRole('button', { name: 'Open note: Recoverable note' }).click();
-    await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toHaveValue('Original text');
+    await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Original text');
   });
 }
 
