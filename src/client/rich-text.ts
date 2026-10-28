@@ -1,17 +1,40 @@
-import { Editor, defaultValueCtx, editorViewCtx, editorViewOptionsCtx, rootCtx, serializerCtx } from '@milkdown/kit/core';
+import { Editor, defaultValueCtx, editorStateOptionsCtx, editorViewCtx, editorViewOptionsCtx, rootCtx, serializerCtx } from '@milkdown/kit/core';
 import { commonmark, imageSchema, listItemKeymap, listItemSchema } from '@milkdown/kit/preset/commonmark';
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
 import { clipboard } from '@milkdown/kit/plugin/clipboard';
-import { Plugin, type Command, type EditorState } from '@milkdown/kit/prose/state';
+import { EditorState, Plugin, type Command, type Transaction } from '@milkdown/kit/prose/state';
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/kit/prose/commands';
 import { liftListItem, sinkListItem, wrapInList } from '@milkdown/kit/prose/schema-list';
 import { closeHistory, undo, redo } from '@milkdown/kit/prose/history';
+import { canJoin } from '@milkdown/kit/prose/transform';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
 import { $prose, $view } from '@milkdown/kit/utils';
 
 export const MAX_NOTE_BODY = 20_000;
 export type Format = 'heading' | 'bold' | 'italic' | 'bullet' | 'ordered' | 'task' | 'indent' | 'outdent' | 'quote' | 'code' | 'undo' | 'redo';
+
+// Join only neighboring sibling lists, including inside list items and quotes.
+// Working right-to-left keeps earlier boundary positions valid after each join.
+function mergeAdjacentLists(tr: Transaction) {
+  const boundaries: number[] = [];
+  tr.doc.descendants((node, pos) => {
+    if (node.type.name === 'bullet_list' || node.type.name === 'ordered_list') boundaries.push(pos);
+  });
+  for (const pos of boundaries.reverse()) {
+    const { nodeBefore: before, nodeAfter: after } = tr.doc.resolve(pos);
+    if (!before || !after || before.type !== after.type) continue;
+    // A non-default ordered start is intentional unless it continues the list.
+    if (after.type.name === 'ordered_list' && after.attrs.order !== 1 && after.attrs.order !== before.attrs.order + before.childCount) continue;
+    if (!canJoin(tr.doc, pos)) continue;
+    const spread = before.attrs.spread || after.attrs.spread;
+    tr.join(pos);
+    if (spread !== before.attrs.spread) {
+      tr.setNodeMarkup(pos - before.nodeSize, undefined, { ...before.attrs, spread });
+    }
+  }
+  return tr;
+}
 
 function listItem(state: EditorState) {
   const { $from } = state.selection;
@@ -152,6 +175,11 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
   const changes = $prose(ctx => {
     const serialize = (doc: ProseNode) => ctx.get(serializerCtx)(doc);
     return new Plugin({
+      appendTransaction(transactions, _oldState, state) {
+        if (!transactions.some(tr => tr.docChanged)) return null;
+        const tr = mergeAdjacentLists(state.tr);
+        return tr.docChanged ? tr : null;
+      },
       filterTransaction(tr) {
         if (!tr.docChanged) return true;
         const size = initialDoc && tr.doc.eq(initialDoc) ? markdown.length : serialize(tr.doc).length;
@@ -210,6 +238,11 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
     .config(ctx => {
       ctx.set(rootCtx, root);
       ctx.set(defaultValueCtx, markdown);
+      // Normalize the editing structure without rewriting untouched source text.
+      ctx.set(editorStateOptionsCtx, options => ({
+        ...options,
+        doc: mergeAdjacentLists(EditorState.create({ schema: options.schema, doc: options.doc }).tr).doc,
+      }));
       ctx.set(editorViewOptionsCtx, {
         editable,
         transformPastedHTML: inertPastedHTML,
