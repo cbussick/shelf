@@ -7,7 +7,9 @@ import { EditorState, Plugin, type Command, type Transaction } from '@milkdown/k
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/kit/prose/commands';
 import { liftListItem, sinkListItem, wrapInList } from '@milkdown/kit/prose/schema-list';
 import { closeHistory, undo, redo } from '@milkdown/kit/prose/history';
-import { canJoin } from '@milkdown/kit/prose/transform';
+import { canJoin, Mapping, StepMap } from '@milkdown/kit/prose/transform';
+import { keydownHandler } from '@milkdown/kit/prose/keymap';
+import { Fragment } from '@milkdown/kit/prose/model';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
 import { $prose, $view } from '@milkdown/kit/utils';
 
@@ -83,6 +85,42 @@ export function formatCommand(format: Format, state: EditorState): Command {
     case 'undo': return undo;
     case 'redo': return redo;
   }
+}
+
+// Move structural rows, not visual wrapped lines. List items travel with their
+// children; elsewhere a row is a block (paragraph, heading, quote, etc.).
+export function moveRows(direction: -1 | 1): Command {
+  return (state, dispatch, view) => {
+    const { $from, $to } = state.selection;
+    let listDepth = 0;
+    for (let depth = $from.depth; depth > 0; depth--) {
+      if ($from.node(depth).type.name === 'list_item') { listDepth = depth - 1; break; }
+    }
+    const range = $from.blockRange($to, listDepth ? node => node === $from.node(listDepth) : undefined);
+    if (!range) return false;
+    const { parent, startIndex, endIndex, start, end } = range;
+    const siblingIndex = direction < 0 ? startIndex - 1 : endIndex;
+    if (siblingIndex < 0 || siblingIndex >= parent.childCount) return false;
+    const sibling = parent.child(siblingIndex);
+    const rows: ProseNode[] = [];
+    for (let index = startIndex; index < endIndex; index++) rows.push(parent.child(index));
+    const replacement = Fragment.fromArray(direction < 0 ? [...rows, sibling] : [sibling, ...rows]);
+    const from = direction < 0 ? start - sibling.nodeSize : start;
+    const to = direction < 0 ? end : end + sibling.nodeSize;
+    if (!parent.canReplace(direction < 0 ? siblingIndex : startIndex, direction < 0 ? endIndex : siblingIndex + 1, replacement)) return false;
+    if (dispatch) {
+      const tr = closeHistory(state.tr).replaceWith(from, to, replacement);
+      // Map the original selection inside the moved content, not through the
+      // replacement step (which would collapse it onto a replacement boundary).
+      const offset = direction * sibling.nodeSize;
+      const bookmark = state.selection.getBookmark();
+      tr.setSelection(bookmark.map(new Mapping([StepMap.offset(offset)])).resolve(tr.doc));
+      dispatch(tr.scrollIntoView());
+      // Subsequent typing should undo independently from this row move.
+      if (view) dispatch(closeHistory(view.state.tr));
+    }
+    return true;
+  };
 }
 
 export function setNoteLink(href: string | null): Command {
@@ -245,6 +283,10 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       }));
       ctx.set(editorViewOptionsCtx, {
         editable,
+        handleKeyDown: (view, event) => view.editable && keydownHandler({
+          'Alt-ArrowUp': moveRows(-1),
+          'Alt-ArrowDown': moveRows(1),
+        })(view, event),
         transformPastedHTML: inertPastedHTML,
         attributes: { id: 'note-body', role: 'textbox', 'aria-label': 'Note', 'aria-multiline': 'true', spellcheck: 'false', 'data-placeholder': 'Start anywhere…' },
       });
@@ -259,11 +301,12 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
           getAttrs: dom => ({ src: (dom as HTMLElement).dataset.noteImageSrc ?? '', alt: (dom as HTMLElement).dataset.noteImageAlt ?? '', title: (dom as HTMLElement).dataset.noteImageTitle ?? '' }),
         }, ...(original(ctx).parseDOM ?? [])],
       }));
-      // Tab remains normal focus navigation, including inside nested lists.
+      // Keep the existing bracket shortcuts alongside the row shortcuts.
+      // Tab still navigates focus when the list command cannot apply.
       ctx.update(listItemKeymap.key, keys => ({
         ...keys,
-        SinkListItem: { shortcuts: 'Mod-]' },
-        LiftListItem: { shortcuts: 'Mod-[' },
+        SinkListItem: { shortcuts: ['Mod-]', 'Tab', 'Alt-ArrowRight'] },
+        LiftListItem: { shortcuts: ['Mod-[', 'Shift-Tab', 'Alt-ArrowLeft'] },
       }));
     })
     .use(commonmark).use(gfm).use(history).use(clipboard)
