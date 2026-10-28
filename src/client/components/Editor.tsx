@@ -25,6 +25,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
   onDelete: (note: LocalNote) => Promise<void>; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const backdropPress = useRef(false);
   const bodyInput = useRef<RichTextHandle>(null);
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const discardDialog = useRef<HTMLDialogElement>(null);
@@ -159,7 +160,12 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
       if (event.key === 'Escape' && !event.defaultPrevented && !event.nativeEvent.isComposing && event.target instanceof HTMLElement && event.target.closest('#note-body')) {
         event.preventDefault(); requestClose();
       }
-    }} onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onPasteCapture={pasteImages} onClick={event => { if (event.target !== event.currentTarget) return; const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) requestClose(); }} {...stylex.props(styles.dialog, styles.editor, styles[color])}>
+    }} onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onPasteCapture={pasteImages} onPointerDownCapture={event => { backdropPress.current = isDialogBackdrop(event); }} onPointerCancelCapture={() => { backdropPress.current = false; }} onClick={event => {
+      // A selection drag can start inside and produce a click on the backdrop.
+      const startedOnBackdrop = backdropPress.current;
+      backdropPress.current = false;
+      if (startedOnBackdrop && isDialogBackdrop(event)) requestClose();
+    }} {...stylex.props(styles.dialog, styles.editor, styles[color])}>
       <div {...stylex.props(styles.editorForm)}>
         <header {...stylex.props(styles.editorHeader)}>
           {note && <div {...stylex.props(styles.noteTimestamps)}>
@@ -205,6 +211,12 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
     <ConfirmDialog ref={discardDialog} title="Close without saving?" copy="Your latest changes could not be saved. Closing will discard those changes, but will not delete an existing note." cancel="Keep editing" confirm="Close without saving" onConfirm={onClose}/>
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => note && onDelete(note)}/>
   </>;
+}
+
+function isDialogBackdrop(event: React.MouseEvent<HTMLDialogElement>) {
+  if (event.target !== event.currentTarget) return false;
+  const rect = event.currentTarget.getBoundingClientRect();
+  return event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
 }
 
 function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: NoteColor) => void }) {
