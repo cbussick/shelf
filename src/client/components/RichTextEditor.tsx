@@ -147,6 +147,6 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     </> : <div ref={root} className="note-rich-host"/>}
     {!ready && !failed && <span role="status">Opening editor…</span>}
     {limit && <p role="alert">Notes can contain up to 20,000 Markdown characters. That change was not added.</p>}
-    <span className="sr-only">Formatting shortcuts: Control or Command B for bold, I for italic, right bracket to indent a list, left bracket to outdent. Tab moves to the next control.</span>
+    <span className="sr-only">Formatting shortcuts: Control or Command B for bold, I for italic. Tab or Alt Right Arrow indents a list; Shift Tab or Alt Left Arrow outdents. Control or Command right and left brackets also indent and outdent. Alt Up Arrow and Alt Down Arrow move rows. Tab moves to the next control when indentation is not available.</span>
   </div>;
 }

@@ -59,6 +59,69 @@ test('adjacent lists created one row at a time merge and allow indentation', asy
   await expect(noteBody(page).locator('li li')).toHaveText('Second');
 });
 
+for (const marker of ['-', '1.', '- [ ]']) {
+  test(`list indentation shortcuts work for ${marker}`, async ({ page }) => {
+    await seed(page, `${marker} First\n${marker} Second\n${marker} Third`);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
+    const body = noteBody(page);
+    await body.locator('p').filter({ hasText: 'Second' }).click();
+    for (const [indent, outdent] of [['Tab', 'Shift+Tab'], ['Alt+ArrowRight', 'Alt+ArrowLeft']]) {
+      await page.keyboard.press(indent!);
+      await expect(body.locator('li li')).toHaveText('Second');
+      await expect(body).toBeFocused();
+      await page.keyboard.press(outdent!);
+      await expect(body.locator('li li')).toHaveCount(0);
+      await expect(body.locator('li > .note-list-content > p')).toHaveText(['First', 'Second', 'Third']);
+    }
+  });
+}
+
+test('row movement keeps nested tasks, selection, undo and saved Markdown', async ({ page }) => {
+  await seed(page, '- [ ] First\n- [x] Second\n  - [ ] Child\n- [ ] Third');
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
+  const body = noteBody(page);
+  await body.locator('p').filter({ hasText: /^Second$/ }).click();
+  await page.keyboard.press('Home');
+  // Deliver the browser's selection update before the next synthetic keydown.
+  await page.evaluate(() => document.dispatchEvent(new Event('selectionchange')));
+  expect(await page.evaluate(() => window.getSelection()?.anchorOffset)).toBe(0);
+  await page.keyboard.press('Alt+ArrowUp');
+  await expect(body.locator(':scope > ul > li > .note-list-content > p')).toHaveText(['Second', 'First', 'Third']);
+  await expect(body.locator('li li p')).toHaveText('Child');
+  await expect(page.getByRole('checkbox', { name: 'Second', exact: true })).toBeChecked();
+  await page.keyboard.type('Moved ');
+  await expect(body.locator('p').first()).toHaveText('Moved Second');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(body.locator(':scope > ul > li > .note-list-content > p')).toHaveText(['First', 'Second', 'Third']);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await page.keyboard.press('Alt+ArrowDown');
+  await page.keyboard.press('Alt+ArrowDown');
+  await page.keyboard.press('Alt+ArrowDown'); // Last row cannot move farther.
+  await expect(body.locator(':scope > ul > li > .note-list-content > p')).toHaveText(['First', 'Third', 'Second']);
+  await page.getByRole('button', { name: 'Close note', exact: true }).click();
+  expect(await savedBody(page)).toMatch(/Third[\s\S]*\[x\] Second[\s\S]*Child/);
+});
+
+test('Alt arrows move selected text blocks and preserve the selection', async ({ page }) => {
+  await seed(page, 'First\n\n## Second\n\nThird');
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
+  const body = noteBody(page);
+  await body.locator('h2').click();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+End');
+  await page.evaluate(() => document.dispatchEvent(new Event('selectionchange')));
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('Second');
+  await page.keyboard.press('Alt+ArrowDown');
+  await expect(body.locator(':scope > *')).toHaveText(['First', 'Third', 'Second']);
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('Second');
+  await page.keyboard.press('Alt+ArrowUp');
+  await expect(body.locator(':scope > *')).toHaveText(['First', 'Second', 'Third']);
+});
+
 test('existing adjacent lists normalize without changing untouched Markdown', async ({ page }) => {
   const markdown = '- First\n\n* Second\n\n+ Third\n';
   await seed(page, markdown);
