@@ -206,7 +206,25 @@ test('opening existing Markdown is not a mutation and remote images never load',
   expect(remoteRequests).toEqual([]);
 });
 
-test('rich editor is usable on mobile and keyboard focus can leave a list', async ({ page }) => {
+for (const markdown of ['', 'A paragraph', '- First\n- Second', '- Parent\n  - Child', '```\ncode\n```']) {
+  test(`Tab never leaves the editor when indentation cannot apply: ${JSON.stringify(markdown)}`, async ({ page }) => {
+    await seed(page, markdown);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
+    const body = noteBody(page);
+    if (markdown.includes('Child')) await body.locator('p').last().click();
+    else await body.click();
+    for (const key of ['Tab', 'Tab', 'Shift+Tab', 'Shift+Tab']) {
+      await page.keyboard.press(key);
+      await expect(body).toBeFocused();
+      if (key === 'Tab') await expect(body.locator('li li li')).toHaveCount(0);
+    }
+    await page.keyboard.type('Still editing');
+    await expect(body).toContainText('Still editing');
+  });
+}
+
+test('rich editor is usable on mobile and Tab keeps focus in a list', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page.getByRole('button', { name: 'New note' }).click();
@@ -214,7 +232,7 @@ test('rich editor is usable on mobile and keyboard focus can leave a list', asyn
   await page.getByRole('button', { name: 'Checklist', exact: true }).click();
   await expect(noteBody(page)).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(noteBody(page)).not.toBeFocused();
+  await expect(noteBody(page)).toBeFocused();
   await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const accessibility = await new AxeBuilder({ page }).include('dialog[open]').analyze();

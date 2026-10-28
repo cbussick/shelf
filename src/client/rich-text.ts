@@ -283,10 +283,17 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       }));
       ctx.set(editorViewOptionsCtx, {
         editable,
-        handleKeyDown: (view, event) => view.editable && keydownHandler({
-          'Alt-ArrowUp': moveRows(-1),
-          'Alt-ArrowDown': moveRows(1),
-        })(view, event),
+        handleKeyDown: (view, event) => {
+          if (event.key === 'Tab') {
+            if (view.editable) formatCommand(event.shiftKey ? 'outdent' : 'indent', view.state)(view.state, view.dispatch, view);
+            // Always consume Tab, even when the list command cannot apply.
+            return true;
+          }
+          return view.editable && keydownHandler({
+            'Alt-ArrowUp': moveRows(-1),
+            'Alt-ArrowDown': moveRows(1),
+          })(view, event);
+        },
         transformPastedHTML: inertPastedHTML,
         attributes: { id: 'note-body', role: 'textbox', 'aria-label': 'Note', 'aria-multiline': 'true', spellcheck: 'false', 'data-placeholder': 'Start anywhere…' },
       });
@@ -301,12 +308,11 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
           getAttrs: dom => ({ src: (dom as HTMLElement).dataset.noteImageSrc ?? '', alt: (dom as HTMLElement).dataset.noteImageAlt ?? '', title: (dom as HTMLElement).dataset.noteImageTitle ?? '' }),
         }, ...(original(ctx).parseDOM ?? [])],
       }));
-      // Keep the existing bracket shortcuts alongside the row shortcuts.
-      // Tab still navigates focus when the list command cannot apply.
+      // Tab is handled above so failed list commands never navigate focus.
       ctx.update(listItemKeymap.key, keys => ({
         ...keys,
-        SinkListItem: { shortcuts: ['Mod-]', 'Tab', 'Alt-ArrowRight'] },
-        LiftListItem: { shortcuts: ['Mod-[', 'Shift-Tab', 'Alt-ArrowLeft'] },
+        SinkListItem: { shortcuts: ['Mod-]', 'Alt-ArrowRight'] },
+        LiftListItem: { shortcuts: ['Mod-[', 'Alt-ArrowLeft'] },
       }));
     })
     .use(commonmark).use(gfm).use(history).use(clipboard)

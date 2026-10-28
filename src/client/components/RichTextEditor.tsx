@@ -143,10 +143,10 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     </div>}
     {failed ? <>
       <p role="status">Rich-text editing could not load. You can still edit the Markdown below.</p>
-      <textarea ref={fallback} id="note-body" aria-label="Note" spellCheck={false} disabled={disabled} defaultValue={initialValue} maxLength={MAX_NOTE_BODY} onChange={event => onChange(event.target.value)}/>
+      <textarea ref={fallback} id="note-body" aria-label="Note" spellCheck={false} disabled={disabled} defaultValue={initialValue} maxLength={MAX_NOTE_BODY} onKeyDown={event => { if (event.key === 'Tab') event.preventDefault(); }} onChange={event => onChange(event.target.value)}/>
     </> : <div ref={root} className="note-rich-host"/>}
     {!ready && !failed && <span role="status">Opening editor…</span>}
     {limit && <p role="alert">Notes can contain up to 20,000 Markdown characters. That change was not added.</p>}
-    <span className="sr-only">Formatting shortcuts: Control or Command B for bold, I for italic. Tab or Alt Right Arrow indents a list; Shift Tab or Alt Left Arrow outdents. Control or Command right and left brackets also indent and outdent. Alt Up Arrow and Alt Down Arrow move rows. Tab moves to the next control when indentation is not available.</span>
+    <span className="sr-only">Formatting shortcuts: Control or Command B for bold, I for italic. Tab or Alt Right Arrow indents a list; Shift Tab or Alt Left Arrow outdents. Control or Command right and left brackets also indent and outdent. Alt Up Arrow and Alt Down Arrow move rows. Tab and Shift Tab always keep focus in the editor, even when indentation cannot change. Press Escape to save and close the note.</span>
   </div>;
 }
