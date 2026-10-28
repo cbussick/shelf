@@ -35,6 +35,68 @@ test('rich text formats and saves the latest keystroke without a debounce race',
   await expect(noteBody(page).locator('h2')).toHaveText('A heading!');
 });
 
+test('adjacent lists created one row at a time merge and allow indentation', async ({ page }) => {
+  await seed(page, 'First\n\nSecond\n\nThird');
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
+  const body = noteBody(page);
+  for (const text of ['First', 'Second', 'Third']) {
+    await body.locator('p').filter({ hasText: text }).click();
+    await page.getByRole('button', { name: 'Bullet list', exact: true }).click();
+  }
+  await expect(body.locator(':scope > ul')).toHaveCount(1);
+  await body.locator('p').filter({ hasText: 'Second' }).click();
+  await page.getByRole('button', { name: 'Indent list', exact: true }).click();
+  await expect(body.locator('li li')).toHaveText('Second');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(body.locator('li li')).toHaveCount(0);
+  await expect(body.locator(':scope > ul')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(body.locator('li li')).toHaveText('Second');
+  await page.getByRole('button', { name: 'Close note', exact: true }).click();
+  expect(await savedBody(page)).toMatch(/\n\s+[-*] Second/);
+  await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
+  await expect(noteBody(page).locator('li li')).toHaveText('Second');
+});
+
+test('existing adjacent lists normalize without changing untouched Markdown', async ({ page }) => {
+  const markdown = '- First\n\n* Second\n\n+ Third\n';
+  await seed(page, markdown);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
+  await expect(noteBody(page).locator(':scope > ul')).toHaveCount(1);
+  await expect(noteBody(page).locator('li')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Close note', exact: true }).click();
+  expect(await savedBody(page)).toBe(markdown);
+  await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
+  await noteBody(page).locator('p').filter({ hasText: 'Second' }).click();
+  await page.getByRole('button', { name: 'Indent list', exact: true }).click();
+  await expect(noteBody(page).locator('li li')).toHaveText('Second');
+});
+
+test('pasted lists merge recursively but preserve paragraphs, types, and explicit numbering', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New note' }).click();
+  const body = noteBody(page);
+  await body.evaluate(element => {
+    const data = new DataTransfer();
+    data.setData('text/html', '<ul><li>First<ul><li>Child one</li></ul><ul><li>Child two</li></ul></li></ul><ul><li>Second</li></ul><p>Separator</p><ul><li>Separate</li></ul><ol><li>Number one</li></ol><ol><li>Number two</li></ol><ol start="10"><li>Restart</li></ol>');
+    element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+  });
+  await expect(body.locator(':scope > ul')).toHaveCount(2);
+  await expect(body.locator(':scope > ul').first().locator(':scope > li')).toHaveCount(2);
+  await expect(body.locator('li ul')).toHaveCount(1);
+  await expect(body.locator('li li')).toHaveText(['Child one', 'Child two']);
+  await expect(body.locator(':scope > p')).toHaveText('Separator');
+  await expect(body.locator(':scope > ol')).toHaveCount(2);
+  await expect(body.locator(':scope > ol').first().locator('li')).toHaveText(['Number one', 'Number two']);
+  await expect(body.locator(':scope > ol').last()).toHaveAttribute('start', '10');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(body).toHaveText('');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(body.locator(':scope > ul')).toHaveCount(2);
+});
+
 test('checklists toggle, nest, undo and persist as Markdown', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'New note' }).click();
