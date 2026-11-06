@@ -273,6 +273,21 @@ describe('notes API', () => {
     expect((await agent.get('/api/notes')).body.notes).toEqual([]);
   });
 
+  it('accepts a version-zero deletion for an unsynced note without deleting a saved note', async () => {
+    await setup();
+    const id = crypto.randomUUID();
+    expect((await agent.delete(`/api/notes/${id}`).send({ expectedVersion: 0 })).status).toBe(204);
+    const payload = { id, title: 'Keep me', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [] };
+    expect((await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(payload))).status).toBe(201);
+    const conflict = await agent.delete(`/api/notes/${id}`).send({ expectedVersion: 0 });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.note).toMatchObject({ id, title: 'Keep me', version: 1 });
+    expect((await agent.get('/api/notes')).body.notes).toHaveLength(1);
+    for (const expectedVersion of [-1, 0.5, '0', null]) {
+      expect((await agent.delete(`/api/notes/${id}`).send({ expectedVersion })).status).toBe(400);
+    }
+  });
+
   it('reorders notes without changing their edit versions, and keeps that order after edits', async () => {
     await setup();
     const ids = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];

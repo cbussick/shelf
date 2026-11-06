@@ -1,5 +1,25 @@
 import { test, expect } from '../fixtures/isolated-test';
 
+test('sync recovers after creating and deleting a note offline', async ({ page, context }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'New note' }).click();
+  await page.getByRole('textbox', { name: 'Title' }).fill('Offline throwaway');
+  await page.getByRole('button', { name: 'Close note' }).click();
+  await page.getByRole('button', { name: 'Open note: Offline throwaway', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete note', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note' }).click();
+  await expect(page.getByRole('button', { name: 'Open note: Offline throwaway', exact: true })).toHaveCount(0);
+  const deletion = page.waitForResponse(response => response.request().method() === 'DELETE');
+  await context.setOffline(false);
+  expect((await deletion).status()).toBe(204);
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open note: Offline throwaway', exact: true })).toHaveCount(0);
+});
+
 test('deleting a newly saved note during sync does not resurrect it', async ({ page }) => {
   const title = `Delete race ${crypto.randomUUID()}`;
   let releaseFirstSave!: () => void;
