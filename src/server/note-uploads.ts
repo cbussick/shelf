@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { Request, Response } from 'express';
 import multer from 'multer';
 import { MAX_AUDIO_BYTES } from '../shared/contracts.js';
+import { requestLogger, safeError } from './logging.js';
 
 // Stream every attachment to a private, per-request directory. No audio file
 // count limit: only the six-image limit and per-file byte limits apply.
@@ -20,7 +21,7 @@ export function withNoteUploads(directory: string, handler: (request: Request, r
       for (const group of Object.values(files)) for (const file of group) await chmod(file.path, 0o600);
       return await handler(request, response);
     } finally {
-      await rm(temporary, { recursive: true, force: true }).catch(error => console.error('Could not remove temporary upload files.', error));
+      await rm(temporary, { recursive: true, force: true }).catch(error => requestLogger(response).error({ error: safeError(error) }, 'Could not remove temporary upload files.'));
     }
   };
 }

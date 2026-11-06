@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { environmentSchema } from '../shared/contracts.js';
 import { createApp } from './app.js';
 import { openDatabase } from './database.js';
+import { logger } from './logging.js';
 
 const environment = environmentSchema.parse(process.env);
 const database = openDatabase(environment);
@@ -26,10 +27,11 @@ if (existsSync(clientDirectory)) {
 }
 
 const server = app.listen(environment.PORT, '0.0.0.0', () => {
-  console.log(`Shelf listening on http://0.0.0.0:${environment.PORT}`);
+  logger.info({ port: environment.PORT }, 'Shelf listening');
 });
 
 function shutdown() {
+  logger.info('Shelf shutting down');
   server.close(() => {
     database.close();
     process.exit(0);

@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { fileTypeFromBuffer } from 'file-type';
 import helmet from 'helmet';
 import multer from 'multer';
+import type { Logger } from 'pino';
 import sharp from 'sharp';
 import { ZodError } from 'zod';
 import {
@@ -17,13 +18,15 @@ import { createOwner, createSession, destroySession, hasOwner, isAuthenticated, 
 import { type AppDatabase, readNote, readNotes } from './database.js';
 import { inspectAudio } from './audio-files.js';
 import { withNoteUploads } from './note-uploads.js';
+import { logger, recordRequestError, requestLogger, requestLogging, safeError } from './logging.js';
 
 const acceptedTypes = new Map([
   ['image/jpeg', 'jpg'], ['image/png', 'png'], ['image/webp', 'webp'], ['image/gif', 'gif'],
 ]);
 
-export function createApp(database: AppDatabase, environment: Environment) {
+export function createApp(database: AppDatabase, environment: Environment, log: Logger = logger) {
   const app = express();
+  app.use(requestLogging(log));
   const imageDirectory = join(environment.DATA_DIR, 'images');
   const audioDirectory = join(environment.DATA_DIR, 'audio');
   const uploadDirectory = join(environment.DATA_DIR, 'uploads');
@@ -237,7 +240,7 @@ export function createApp(database: AppDatabase, environment: Environment) {
           .run(audio.id, id, audio.filename, audio.name, audio.mimeType, audio.size, audio.duration, audioPosition++);
         return [...removed.map(image => join(imageDirectory, image.filename)), ...removedAudio.map(audio => join(audioDirectory, audio.filename))];
       })();
-      await Promise.all(removedFiles.map(path => rm(path, { force: true }))).catch(error => console.error('Could not remove replaced attachment files.', error));
+      await Promise.all(removedFiles.map(path => rm(path, { force: true }))).catch(error => requestLogger(response).error({ error: safeError(error) }, 'Could not remove replaced attachment files.'));
       response.status(current ? 200 : 201).json({ note: readNote(database, id) });
     } catch (error) {
       await Promise.all(writtenPaths.map(path => rm(path, { force: true })));
@@ -255,7 +258,7 @@ export function createApp(database: AppDatabase, environment: Environment) {
     const audioFilenames = database.prepare('SELECT filename FROM audio WHERE note_id=?').all(id) as { filename: string }[];
     database.prepare('DELETE FROM notes WHERE id=?').run(id);
     void Promise.all([...filenames.map(file => join(imageDirectory, file.filename)), ...audioFilenames.map(file => join(audioDirectory, file.filename))].map(path => rm(path, { force: true })))
-      .catch(error => console.error('Could not remove deleted attachment files.', error));
+      .catch(error => requestLogger(response).error({ error: safeError(error) }, 'Could not remove deleted attachment files.'));
     response.status(204).end();
   });
 
@@ -263,9 +266,9 @@ export function createApp(database: AppDatabase, environment: Environment) {
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
     if (error instanceof NoteConflict) return response.status(409).json({ error: 'This note changed on another device.', note: error.note });
     if (error instanceof ClientError) return response.status(400).json({ error: error.message });
+    recordRequestError(response, error);
     if (error instanceof ZodError) return response.status(400).json({ error: 'Invalid request.', issues: error.issues });
     if (error instanceof multer.MulterError) return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Audio must be under 100 MB; images must be under 20 MB.' : error.message });
-    console.error(error);
     response.status(500).json({ error: 'Something went wrong.' });
   });
   return app;
