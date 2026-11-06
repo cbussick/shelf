@@ -74,7 +74,9 @@ export const noteWriteSchema = z.object({
 export type NoteWrite = z.infer<typeof noteWriteSchema>;
 
 export const reorderNotesSchema = z.object({ ids: z.array(z.uuid()).max(10000).refine(ids => new Set(ids).size === ids.length) });
-export const deleteNoteSchema = z.object({ expectedVersion: z.number().int().positive() });
+// Offline notes can be deleted before their first save reaches the server.
+// Version zero is a no-op for a missing note; existing notes still conflict.
+export const deleteNoteSchema = z.object({ expectedVersion: z.number().int().nonnegative() });
 export const noteIdParamsSchema = z.object({ id: z.uuid() });
 
 export const passwordSchema = z.string().min(12, 'Use at least 12 characters.').max(256);
