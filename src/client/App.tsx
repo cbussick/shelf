@@ -2,7 +2,8 @@ import * as stylex from '@stylexjs/stylex';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast, Toaster } from 'sonner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { NoteColor } from '../shared/contracts';
+import { isVideo, VISUAL_ACCEPT, type NoteColor } from '../shared/contracts';
+import { validateVisualFile } from './visual-media';
 import { api, ApiError } from './api';
 import { colors, styles } from './app.stylex';
 import { Auth, Brand } from './components/Auth';
@@ -132,14 +133,14 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     const paste = (event: ClipboardEvent) => {
       if (event.defaultPrevented || editor || document.querySelector('dialog[open]')) return;
       const files = [...(event.clipboardData?.items ?? [])]
-        .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+        .filter(item => item.kind === 'file' && (item.type.startsWith('image/') || isVideo(item.type)))
         .flatMap(item => { const file = item.getAsFile(); return file ? [file] : []; });
       if (!files.length) return; // Keep normal text paste untouched.
       event.preventDefault();
-      if (files.length > 6 || files.some(file => !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 20 * 1024 * 1024)) {
-        notify('Choose up to 6 JPG, PNG, WebP or GIF images under 20 MB.');
-        return;
-      }
+      try {
+        if (files.length > 6) throw new Error('Up to 6 images or videos per note.');
+        files.forEach(validateVisualFile);
+      } catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach these files.'); return; }
       setEditor({ files });
     };
     document.addEventListener('paste', paste);
@@ -194,7 +195,11 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   };
   const chooseImages = (files: FileList | null) => {
     if (!files?.length) return;
-    setEditor({ files: [...files] });
+    try {
+      if (files.length > 6) throw new Error('Up to 6 images or videos per note.');
+      [...files].forEach(validateVisualFile);
+      setEditor({ files: [...files] });
+    } catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach these files.'); }
   };
   const chooseAudio = (files: File[]) => {
     try { files.forEach(validateAudioFile); setEditor({ audio: files }); }
@@ -221,12 +226,12 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
       <div {...stylex.props(styles.accountActions)}><button type="button" aria-label={status.label} onClick={() => syncDialog.current?.showModal()} {...stylex.props(styles.syncButton)}><Icon name={status.icon}/><span>{status.label}</span></button><button type="button" onClick={() => void logout()} {...stylex.props(styles.signOutButton)}>Sign out</button></div>
     </header>
     <main id="main" {...stylex.props(styles.workspace)}><section {...stylex.props(styles.pageHeading)}><h1 {...stylex.props(styles.h1)}>Your notes</h1></section>
-      <nav aria-label="Create a note" {...stylex.props(styles.floatingCapture)}><button type="button" aria-label="Add an image" onClick={() => imageInput.current?.click()} {...stylex.props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => setEditor({ recording: true })}/><span {...stylex.props(styles.mobileDivider)}/><button type="button" onClick={() => setEditor({})} {...stylex.props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
+      <nav aria-label="Create a note" {...stylex.props(styles.floatingCapture)}><button type="button" aria-label="Add an image or video" onClick={() => imageInput.current?.click()} {...stylex.props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => setEditor({ recording: true })}/><span {...stylex.props(styles.mobileDivider)}/><button type="button" onClick={() => setEditor({})} {...stylex.props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
       {pinned.length > 0 && <NoteBoard notes={pinned} heading="Pinned" label="Pinned notes" onOpen={note => setEditor({ note })} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/>}
       {others.length > 0 && <div {...stylex.props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={note => setEditor({ note })} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
       {filtered.length === 0 && <section {...stylex.props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...stylex.props(styles.secondary)}>Clear search</button>}</section>}
     </main>
-    <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
+    <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={note => setEditor({ note })} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
     {editor && <Editor note={editor.note} initialImages={editor.files} initialAudio={editor.audio} initialRecording={editor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}

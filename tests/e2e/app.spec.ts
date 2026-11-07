@@ -653,7 +653,7 @@ test('pastes clipboard images into new and existing notes without disrupting tex
   for (let index = 3; index <= 6; index++) expect(await pasteImage()).toBe(false);
   await expect(page.getByText('2 more images')).toBeVisible();
   expect(await pasteImage()).toBe(false);
-  await expect(page.getByRole('alert')).toContainText('Up to 6 images per note.');
+  await expect(page.getByRole('alert')).toContainText('Up to 6 images or videos per note.');
   await page.getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: A note with a picture' }).click();

@@ -1,13 +1,13 @@
 # Shelf
 
-A small, private, self-hosted notes app for text, images, and audio. It is designed for one owner and works across desktop, tablet, and phone.
+A small, private, self-hosted notes app for text, images, videos, and audio. It is designed for one owner and works across desktop, tablet, and phone.
 
 ## Stack
 
 - React, TypeScript, Vite, StyleX, and TanStack Query
 - Express and TypeScript
 - SQLite for notes, sessions, and attachment metadata
-- Filesystem storage for image and audio bytes
+- Filesystem storage for image, video, and audio bytes
 - Zod parsing at environment, HTTP, browser-storage, and API boundaries
 - IndexedDB and a service worker for local-first editing and offline startup
 - Docker Compose for deployment
@@ -16,7 +16,8 @@ A small, private, self-hosted notes app for text, images, and audio. It is desig
 
 - Create, edit, search, pin, color, and permanently delete notes
 - Rich-text note bodies backed by Markdown, including nested lists and clickable task checkboxes
-- Up to six JPG, PNG, WebP, or GIF images per note
+- Up to six photos/videos combined per note: JPG, PNG, WebP, or GIF images (20 MB each) and MP4, WebM, or MOV videos (100 MB each)
+- Videos use the image attachment picker and gallery, with inline playback controls in the preview; no autoplay or video rotation
 - Audio uploads up to 100 MB each, with no fixed audio count limit per note
 - Microphone recording with preview, keep/discard, and a 30-minute limit
 - Audio playback on note cards and an audio list alongside images in the editor
@@ -27,6 +28,8 @@ A small, private, self-hosted notes app for text, images, and audio. It is desig
 - Installable PWA on supported browsers and operating systems
 - Android share-sheet target for screenshots and other JPG, PNG, WebP, or GIF images
 - One owner password with revocable, server-side sessions
+
+Videos are stored unchanged (no transcoding); playback depends on the browser's codec support. If a preview cannot play, download it from the preview to open in another app. Pending video uploads are saved on-device and sync after reconnecting, but synced videos are streamed on demand, not automatically cached for offline playback. Images and videos share `/data/images/` and the existing attachment URLs. The Android share-sheet target remains image-only.
 
 The app deliberately has no labels, archive, reminders, trash, sharing, or multi-user administration. Checklists are Markdown task lists within ordinary notes.
 

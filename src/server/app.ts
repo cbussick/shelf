@@ -4,7 +4,7 @@ import { link, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { fileTypeFromBuffer } from 'file-type';
+import { fileTypeFromFile } from 'file-type';
 import helmet from 'helmet';
 import multer from 'multer';
 import type { Logger } from 'pino';
@@ -12,11 +12,12 @@ import sharp from 'sharp';
 import { ZodError } from 'zod';
 import {
   authStatusSchema, credentialsSchema, deleteNoteSchema, noteIdParamsSchema, noteWriteSchema, reorderNotesSchema,
-  type Environment, type Note,
+  isVideo, MAX_VIDEO_BYTES, type Environment, type Note,
 } from '../shared/contracts.js';
 import { createOwner, createSession, destroySession, hasOwner, isAuthenticated, requireAuthentication, verifyOwner } from './auth.js';
 import { type AppDatabase, readNote, readNotes } from './database.js';
 import { inspectAudio } from './audio-files.js';
+import { inspectVideo } from './video-files.js';
 import { withNoteUploads } from './note-uploads.js';
 import { logger, recordRequestError, requestLogger, requestLogging, safeError } from './logging.js';
 
@@ -108,6 +109,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     const { id } = noteIdParamsSchema.parse(request.params);
     const image = database.prepare('SELECT filename, mime_type FROM images WHERE id = ?').get(id) as { filename: string; mime_type: string } | undefined;
     if (!image) return response.status(404).json({ error: 'Image not found.' });
+    if (isVideo(image.mime_type)) response.setHeader('Cache-Control', 'private, no-store');
     response.type(image.mime_type).sendFile(image.filename, { root: imageDirectory, dotfiles: 'deny' });
   });
 
@@ -132,12 +134,12 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     if (input.newImageIds && input.newImageIds.length !== files.length) return response.status(400).json({ error: 'Image IDs do not match the uploaded files.' });
     if (input.newAudio && input.newAudio.length !== audioFiles.length) return response.status(400).json({ error: 'Audio metadata does not match the uploaded files.' });
     if (input.id !== id) return response.status(400).json({ error: 'Note ID does not match the URL.' });
-    if (input.retainedImageIds.length + files.length > 6) return response.status(400).json({ error: 'Up to 6 images per note.' });
+    if (input.retainedImageIds.length + files.length > 6) return response.status(400).json({ error: 'Up to 6 images or videos per note.' });
 
     const current = readNote(database, id);
     const retainedAudioIds = input.retainedAudioIds ?? current?.audio.map(audio => audio.id) ?? [];
     if (!current && !input.title && !input.body && input.retainedImageIds.length + files.length + retainedAudioIds.length + audioFiles.length === 0) {
-      return response.status(400).json({ error: 'Add some text, an image or audio first.' });
+      return response.status(400).json({ error: 'Add some text, an image, video or audio first.' });
     }
     if ((current?.version ?? 0) !== input.expectedVersion) {
       return response.status(409).json({ error: 'This note changed on another device.', note: current });
@@ -150,6 +152,10 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     const imageIds = new Set([...input.retainedImageIds, ...(input.newImageIds ?? [])]);
     if (input.imageRotations?.some(image => !imageIds.has(image.id))) {
       return response.status(400).json({ error: 'A rotated image does not belong to this note.' });
+    }
+
+    if (input.imageRotations?.some(image => image.rotation !== 0 && current?.images.some(item => item.id === image.id && isVideo(item.mimeType)))) {
+      return response.status(400).json({ error: 'Videos cannot be rotated.' });
     }
 
     const retainedAudio = new Set(retainedAudioIds);
@@ -169,16 +175,28 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     const writtenPaths: string[] = [];
     try {
       for (const [index, file] of files.entries()) {
-        if (file.size > 20 * 1024 * 1024) throw new ClientError('Images must be under 20 MB.');
-        const buffer = await readFile(file.path);
-        const detected = await fileTypeFromBuffer(buffer);
-        const extension = detected && acceptedTypes.get(detected.mime);
-        if (!extension) throw new ClientError('Choose a JPG, PNG, WebP or GIF image.');
-        const metadata = await sharp(buffer, { animated: true, limitInputPixels: 40_000_000 }).metadata();
-        const width = metadata.width ?? 0;
-        const height = metadata.height ?? 0;
-        if (!width || !height || width * height * (metadata.pages ?? 1) > 40_000_000) throw new ClientError('Images may contain up to 40 megapixels.');
+        const detected = await fileTypeFromFile(file.path);
+        if (!detected) throw new ClientError('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');
+        let extension = acceptedTypes.get(detected.mime);
+        let width: number;
+        let height: number;
+        if (isVideo(detected.mime)) {
+          if (file.size > MAX_VIDEO_BYTES) throw new ClientError('Videos must be under 100 MB.');
+          let metadata: Awaited<ReturnType<typeof inspectVideo>>;
+          try { metadata = await inspectVideo(file.path); }
+          catch { throw new ClientError('Choose a valid MP4, WebM or MOV video up to 40 megapixels.'); }
+          ({ extension, width, height } = metadata);
+        } else {
+          if (file.size > 20 * 1024 * 1024) throw new ClientError('Images must be under 20 MB.');
+          if (!extension) throw new ClientError('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');
+          const buffer = await readFile(file.path);
+          const metadata = await sharp(buffer, { animated: true, limitInputPixels: 40_000_000 }).metadata();
+          width = metadata.width ?? 0;
+          height = metadata.height ?? 0;
+          if (!width || !height || width * height * (metadata.pages ?? 1) > 40_000_000) throw new ClientError('Images may contain up to 40 megapixels.');
+        }
         const imageId = input.newImageIds?.[index] ?? randomUUID();
+        if (isVideo(detected.mime) && input.imageRotations?.some(image => image.id === imageId && image.rotation !== 0)) throw new ClientError('Videos cannot be rotated.');
         const filename = `${imageId}.${extension}`;
         const path = join(imageDirectory, filename);
         try { await link(file.path, path); }
@@ -268,7 +286,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     if (error instanceof ClientError) return response.status(400).json({ error: error.message });
     recordRequestError(response, error);
     if (error instanceof ZodError) return response.status(400).json({ error: 'Invalid request.', issues: error.issues });
-    if (error instanceof multer.MulterError) return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Audio must be under 100 MB; images must be under 20 MB.' : error.message });
+    if (error instanceof multer.MulterError) return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Audio and videos must be under 100 MB; images must be under 20 MB.' : error.message });
     response.status(500).json({ error: 'Something went wrong.' });
   });
   return app;

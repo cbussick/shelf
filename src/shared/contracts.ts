@@ -6,11 +6,18 @@ export type NoteColor = z.infer<typeof noteColorSchema>;
 export const imageRotationSchema = z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]);
 export type ImageRotation = z.infer<typeof imageRotationSchema>;
 
+export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+export const visualMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'] as const;
+export const VISUAL_ACCEPT = visualMimeTypes.join(',');
+export const isVideo = (mimeType: string) => mimeType.startsWith('video/');
+
+// Keep the existing images collection/URLs for both photos and videos so ordering,
+// offline blobs, conflict copies and attachment removal share one lifecycle.
 export const imageSchema = z.object({
   id: z.uuid(),
   url: z.string().startsWith('/api/images/'),
   alt: z.string().max(500),
-  mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']),
+  mimeType: z.enum(visualMimeTypes),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   size: z.number().int().nonnegative(),
