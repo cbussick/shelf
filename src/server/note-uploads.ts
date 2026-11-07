@@ -7,7 +7,7 @@ import { MAX_AUDIO_BYTES } from '../shared/contracts.js';
 import { requestLogger, safeError } from './logging.js';
 
 // Stream every attachment to a private, per-request directory. No audio file
-// count limit: only the six-image limit and per-file byte limits apply.
+// count limit: only the six-photo/video limit and per-file byte limits apply.
 export function withNoteUploads(directory: string, handler: (request: Request, response: Response) => Promise<unknown>) {
   return async (request: Request, response: Response) => {
     const temporary = await mkdtemp(join(directory, 'note-'));

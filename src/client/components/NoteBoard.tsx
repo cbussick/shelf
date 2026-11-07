@@ -205,7 +205,7 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
   </li>;
 }
 
-export function LocalPhoto({ image, className, crop }: { image: LocalImage; className?: string; crop?: boolean }) {
+export function LocalPhoto({ image, className, crop, controls }: { image: LocalImage; className?: string; crop?: boolean; controls?: boolean }) {
   const [source, setSource] = useState(image.url);
   useEffect(() => {
     let objectUrl = '';
@@ -217,7 +217,7 @@ export function LocalPhoto({ image, className, crop }: { image: LocalImage; clas
     });
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [image]);
-  return <Photo src={source} alt={image.alt} width={image.width} height={image.height} rotation={image.rotation} crop={crop} className={className ?? stylex.props(styles.photo).className}/>;
+  return <Photo src={source} alt={image.alt} mimeType={image.mimeType} controls={controls} width={image.width} height={image.height} rotation={image.rotation} crop={crop} className={className ?? stylex.props(styles.photo).className}/>;
 }
 
 function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: LocalNote[]) {

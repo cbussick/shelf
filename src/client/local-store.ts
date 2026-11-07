@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema, type ImageRotation, type Note, type NoteAudio, type NoteColor, type NoteImage } from '../shared/contracts';
 import { api, ApiError } from './api';
 import { audioMimeType, recordingDuration, validateAudioFile } from './audio';
+import { visualDimensions } from './visual-media';
 
 export type LocalImage = NoteImage & { blobId?: string };
 export type LocalAudio = NoteAudio & { blobId?: string };
@@ -72,14 +73,15 @@ export async function saveLocalNote(value: {
   retainedImages: LocalImage[]; newImages: File[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
   retainedAudio?: LocalAudio[]; newAudio?: File[];
 }): Promise<LocalNote> {
+  if (value.retainedImages.length + value.newImages.length > 6) throw new Error('Up to 6 images or videos per note.');
   for (const file of value.newAudio ?? []) validateAudioFile(file);
   const now = new Date().toISOString();
   const id = value.id ?? crypto.randomUUID();
   const images = [...value.retainedImages];
   const blobs: { id: string; file: File }[] = [];
   for (const [index, file] of value.newImages.entries()) {
-    const dimensions = await imageDimensions(file);
-    if (dimensions.width * dimensions.height > 40_000_000) throw new Error('Images may contain up to 40 megapixels.');
+    const dimensions = await visualDimensions(file);
+    if (dimensions.width * dimensions.height > 40_000_000) throw new Error('Images and videos may contain up to 40 megapixels.');
     const imageId = crypto.randomUUID();
     const blobId = `blob:${imageId}`;
     blobs.push({ id: blobId, file });
@@ -399,11 +401,4 @@ async function attachmentBlob(url: string): Promise<Blob> {
   catch { throw new ApiError('Could not download the attachment to preserve this conflict.', 0); }
   if (!response.ok) throw new ApiError('Could not download the attachment to preserve this conflict.', response.status);
   return response.blob();
-}
-
-async function imageDimensions(file: File): Promise<{ width: number; height: number }> {
-  const bitmap = await createImageBitmap(file);
-  const dimensions = { width: bitmap.width, height: bitmap.height };
-  bitmap.close();
-  return dimensions;
 }

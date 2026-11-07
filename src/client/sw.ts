@@ -14,12 +14,15 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
   denylist: [/^\/api\//, /^\/share-target$/],
 }));
 registerRoute(
-  ({ url }) => url.origin === worker.location.origin && url.pathname.startsWith('/api/images/'),
+  ({ url, request }) => url.origin === worker.location.origin && url.pathname.startsWith('/api/images/') && !request.headers.has('range'),
   new CacheFirst({
     cacheName: 'shelf-images',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 }),
       new CacheableResponsePlugin({ statuses: [200] }),
+      // Videos share attachment URLs, but must not fill the image cache or serve
+      // a cached full response to a native player's byte-range request.
+      { cacheWillUpdate: async ({ response }) => response.status === 200 && response.headers.get('content-type')?.startsWith('image/') ? response : null },
+      new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 }),
     ],
   }),
 );
