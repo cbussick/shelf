@@ -14,7 +14,7 @@ export async function visualDimensions(file: File): Promise<{ width: number; hei
     bitmap.close();
     return dimensions;
   }
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     const video = document.createElement('video');
     const url = URL.createObjectURL(file);
     const cleanup = () => {
@@ -25,7 +25,9 @@ export async function visualDimensions(file: File): Promise<{ width: number; hei
       video.load();
       URL.revokeObjectURL(url);
     };
-    const fail = () => { cleanup(); reject(new Error('This browser could not read the video. Try an MP4 or WebM with a supported codec.')); };
+    // Browser decoding is only a preview capability, not an upload requirement.
+    // Use provisional bounds until server inspection supplies authoritative ones.
+    const fail = () => { cleanup(); resolve({ width: 640, height: 360 }); };
     const timeout = setTimeout(fail, 15_000);
     video.preload = 'metadata';
     video.onloadedmetadata = () => {

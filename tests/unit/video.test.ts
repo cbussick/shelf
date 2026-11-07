@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,7 +7,7 @@ import type { Express } from 'express';
 import { createApp } from '../../src/server/app';
 import { openDatabase, type AppDatabase } from '../../src/server/database';
 import { MAX_VIDEO_BYTES, noteResponseSchema } from '../../src/shared/contracts';
-import { validateVisualFile } from '../../src/client/visual-media';
+import { validateVisualFile, visualDimensions } from '../../src/client/visual-media';
 import { wavAudio } from '../fixtures/audio';
 
 let directory: string;
@@ -125,6 +125,26 @@ describe('shared photo/video attachments', () => {
     expect((await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, expectedVersion: 1, retainedImageIds: [imageId], imageRotations: [rotation] }))).status).toBe(400);
     const other = payload();
     expect((await agent.put(`/api/notes/${other.id}`).field('payload', JSON.stringify(other)).attach('audio', 'tests/fixtures/video.webm')).status).toBe(400);
+  });
+
+  it('keeps unsupported-codec video attachments saveable while server inspection supplies their dimensions', async () => {
+    const video = {
+      onerror: null as (() => void) | null,
+      onloadedmetadata: null,
+      preload: '',
+      set src(_value: string) { queueMicrotask(() => this.onerror?.()); },
+      removeAttribute: vi.fn(),
+      load: vi.fn(),
+    };
+    vi.stubGlobal('document', { createElement: () => video });
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:unsupported-video');
+    try {
+      const bytes = await readFile('tests/fixtures/video.mp4');
+      await expect(visualDimensions(new File([bytes], 'unsupported.mp4', { type: 'video/mp4' }))).resolves.toEqual({ width: 640, height: 360 });
+      expect(revoke).toHaveBeenCalledWith('blob:unsupported-video');
+      expect(video.removeAttribute).toHaveBeenCalledWith('src');
+    } finally { vi.unstubAllGlobals(); vi.restoreAllMocks(); }
   });
 
   it('validates video and image size limits independently on the client', () => {
