@@ -68,6 +68,22 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
     if (initialRecording) setRecordingOpen(true);
     return () => dialog.current?.close();
   }, [note, initialRecording]);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const element = dialog.current;
+    if (!viewport || !element) return;
+    const update = () => {
+      element.style.setProperty('--editor-viewport-height', `${viewport.height}px`);
+      element.style.setProperty('--editor-viewport-top', `${viewport.offsetTop}px`);
+    };
+    update();
+    viewport.addEventListener('resize', update);
+    viewport.addEventListener('scroll', update);
+    return () => {
+      viewport.removeEventListener('resize', update);
+      viewport.removeEventListener('scroll', update);
+    };
+  }, []);
   const requestClose = () => {
     if (saving || recordingOpen) return;
     if (!dirty && note) return onClose();
@@ -225,26 +241,50 @@ function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: 
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const editingFocus = useRef<HTMLElement | null>(null);
+  const touchPress = useRef(false);
+  const close = () => {
+    setOpen(false);
+    (editingFocus.current ?? trigger.current)?.focus({ preventScroll: true });
+    editingFocus.current = null;
+  };
   useEffect(() => {
     if (!open) return;
-    container.current?.querySelector<HTMLInputElement>('input:checked')?.focus();
+    if (!editingFocus.current) container.current?.querySelector<HTMLInputElement>('input:checked')?.focus();
     const dismiss = (event: PointerEvent) => {
-      if (!container.current?.contains(event.target as Node)) setOpen(false);
+      if (!container.current?.contains(event.target as Node)) { setOpen(false); editingFocus.current = null; }
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !editingFocus.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      close();
     };
     document.addEventListener('pointerdown', dismiss);
-    return () => document.removeEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', escape, true);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      document.removeEventListener('keydown', escape, true);
+    };
   }, [open]);
-  return <div ref={container} onKeyDown={event => {
+  return <div ref={container} onPointerDownCapture={event => { touchPress.current = event.pointerType !== 'mouse'; }} onMouseDownCapture={event => {
+    const active = document.activeElement;
+    if (touchPress.current && active instanceof HTMLElement && active.closest('#note-body')) {
+      editingFocus.current = active;
+      // Cancel compatibility mousedown, not pointerdown: WebKit suppresses
+      // the touch click if pointerdown is cancelled. Keep desktop focus behavior.
+      event.preventDefault();
+    } else if (!open) editingFocus.current = null;
+  }} onKeyDown={event => {
     if (event.key === 'Escape' && open) {
       event.preventDefault();
       event.stopPropagation();
-      setOpen(false);
-      trigger.current?.focus();
+      close();
     }
   }} {...stylex.props(styles.colorPickerAnchor)}>
-    <button ref={trigger} type="button" aria-label="Note color" aria-expanded={open} aria-controls="note-color-choices" onClick={() => setOpen(value => !value)} {...stylex.props(styles.iconButton)}><Icon name="palette"/></button>
+    <button ref={trigger} type="button" aria-label="Note color" aria-expanded={open} aria-controls="note-color-choices" onClick={() => { if (open) close(); else setOpen(true); }} {...stylex.props(styles.iconButton)}><Icon name="palette"/></button>
     {open && <div id="note-color-choices" {...stylex.props(styles.colorPopover)}>
-      <fieldset {...stylex.props(styles.colorPicker)}><legend className="sr-only">Note color</legend>{colors.map(option => <label key={option} {...stylex.props(styles.swatch, styles[option], option === 'paper' && styles.paperSwatch, option === color && styles.swatchSelected)}><input type="radio" name="color" value={option} checked={option === color} onClick={() => { if (option === color) { setOpen(false); trigger.current?.focus(); } }} onChange={() => { onChange(option); setOpen(false); trigger.current?.focus(); }} aria-label={option[0].toUpperCase() + option.slice(1)} {...stylex.props(styles.radio)}/></label>)}</fieldset>
+      <fieldset {...stylex.props(styles.colorPicker)}><legend className="sr-only">Note color</legend>{colors.map(option => <label key={option} {...stylex.props(styles.swatch, styles[option], option === 'paper' && styles.paperSwatch, option === color && styles.swatchSelected)}><input type="radio" name="color" value={option} checked={option === color} onClick={() => { if (option === color) close(); }} onChange={() => { onChange(option); close(); }} aria-label={option[0].toUpperCase() + option.slice(1)} {...stylex.props(styles.radio)}/></label>)}</fieldset>
     </div>}
   </div>;
 }

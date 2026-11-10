@@ -29,4 +29,12 @@
 .note-link-form button{min-height:40px;padding:6px;border-radius:5px;background:#ffffff60}
 .note-rich-host .ProseMirror-selectednode{outline:2px solid #527cb8}
 .note-rich-host .ProseMirror-hideselection *::selection{background:transparent}
-@media(max-width:700px){.note-rich-text{min-height:160px}.note-formatting button{min-height:44px;min-width:40px}.note-rich-host .ProseMirror{min-height:120px}}
+@media(max-width:700px){
+  .note-rich-text{min-height:0;margin-top:4px;overflow:hidden}
+  .note-rich-host{min-height:0}
+  .note-rich-host .ProseMirror{min-height:0;overscroll-behavior:contain}
+  .note-formatting{order:2;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 0;border-top:1px solid #26363020;border-bottom:0}
+  .note-formatting button{min-height:44px;min-width:40px;flex-shrink:0}
+  .note-link-form{order:1;flex-shrink:0}
+  .note-rich-text textarea{min-height:0}
+}
