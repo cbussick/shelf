@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
-import { link, readFile, rm } from 'node:fs/promises';
+import { link, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -8,7 +8,7 @@ import { fileTypeFromFile } from 'file-type';
 import helmet from 'helmet';
 import multer from 'multer';
 import type { Logger } from 'pino';
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 import { ZodError } from 'zod';
 import {
   authStatusSchema, credentialsSchema, deleteNoteSchema, noteIdParamsSchema, noteWriteSchema, reorderNotesSchema,
@@ -97,10 +97,11 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
   app.get('/api/notes', (_request, response) => response.json({ notes: readNotes(database) }));
   app.put('/api/notes/order', (request, response) => {
     const { ids } = reorderNotesSchema.parse(request.body);
-    const existing = readNotes(database).map(note => note.id);
-    const known = new Set(existing);
+    const existing = database.prepare('SELECT id FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all() as { id: string }[];
+    const known = new Set(existing.map(note => note.id));
     if (ids.some(id => !known.has(id))) return response.status(409).json({ error: 'The notes changed. Try reordering again.' });
-    const ordered = [...ids, ...existing.filter(id => !ids.includes(id))];
+    const requested = new Set(ids);
+    const ordered = [...ids, ...existing.filter(note => !requested.has(note.id)).map(note => note.id)];
     const update = database.prepare('UPDATE notes SET position = ? WHERE id = ?');
     database.transaction(() => ordered.forEach((id, index) => update.run(index, id)))();
     response.json({ ok: true });
@@ -189,8 +190,9 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
         } else {
           if (file.size > 20 * 1024 * 1024) throw new ClientError('Images must be under 20 MB.');
           if (!extension) throw new ClientError('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');
-          const buffer = await readFile(file.path);
-          const metadata = await sharp(buffer, { animated: true, limitInputPixels: 40_000_000 }).metadata();
+          let metadata: Metadata;
+          try { metadata = await sharp(file.path, { animated: true, limitInputPixels: 40_000_000 }).metadata(); }
+          catch { throw new ClientError('Choose a valid JPG, PNG, WebP or GIF image up to 40 megapixels.'); }
           width = metadata.width ?? 0;
           height = metadata.height ?? 0;
           if (!width || !height || width * height * (metadata.pages ?? 1) > 40_000_000) throw new ClientError('Images may contain up to 40 megapixels.');
