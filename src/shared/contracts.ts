@@ -64,7 +64,7 @@ export const noteWriteSchema = z.object({
   color: noteColorSchema,
   pinned: z.boolean(),
   expectedVersion: z.number().int().nonnegative(),
-  retainedImageIds: z.array(z.uuid()).max(6),
+  retainedImageIds: z.array(z.uuid()).max(6).refine(ids => new Set(ids).size === ids.length),
   newImageIds: z.array(z.uuid()).max(6).refine(ids => new Set(ids).size === ids.length).optional(),
   // Omitted by older clients: keep existing orientations unchanged.
   imageRotations: z.array(z.object({ id: z.uuid(), rotation: imageRotationSchema })).max(6)

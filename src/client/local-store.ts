@@ -126,19 +126,19 @@ export async function saveLocalNote(value: {
 }
 
 export async function reorderLocalNotes(ids: string[]): Promise<void> {
-  const current = await localNotes();
   const database = await getDatabase();
+  const transaction = database.transaction(['notes', 'meta'], 'readwrite');
+  const current = z.array(localNoteSchema).parse(await transaction.objectStore('notes').getAll());
   const byId = new Map(current.map(note => [note.id, note]));
   if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some(id => !byId.has(id))) throw new Error('Invalid note order.');
-  const transaction = database.transaction(['notes', 'meta'], 'readwrite');
   for (const [position, id] of ids.entries()) await transaction.objectStore('notes').put({ ...byId.get(id)!, position });
-  await transaction.objectStore('meta').put({ ids, token: crypto.randomUUID() }, 'pendingOrder');
+  await transaction.objectStore('meta').put({ token: crypto.randomUUID() }, 'pendingOrder');
   await transaction.done;
 }
 
 export async function deleteLocalNote(note: LocalNote): Promise<void> {
   const database = await getDatabase();
-  const transaction = database.transaction(['notes', 'outbox'], 'readwrite');
+  const transaction = database.transaction(['notes', 'outbox', 'blobs'], 'readwrite');
   const notes = transaction.objectStore('notes');
   const outbox = transaction.objectStore('outbox');
   const current = parseOptionalNote(await notes.get(note.id));
@@ -148,9 +148,9 @@ export async function deleteLocalNote(note: LocalNote): Promise<void> {
   // the server acknowledgement can advance the expected version before deleting.
   if (!current?.version && !operation) await outbox.delete(note.id);
   else await outbox.put({ noteId: note.id, type: 'delete', expectedVersion: operation?.expectedVersion ?? current?.version ?? note.version, mutationId: crypto.randomUUID() });
+  for (const image of (current ?? note).images) if (image.blobId) await transaction.objectStore('blobs').delete(image.blobId);
+  for (const audio of (current ?? note).audio) for (const key of audioBlobKeys(audio)) await transaction.objectStore('blobs').delete(key);
   await transaction.done;
-  await removeBlobs(note);
-  await Promise.all(note.audio.flatMap(audio => audioBlobKeys(audio).map(key => database.delete('blobs', key))));
 }
 
 export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number; conflict: boolean; missingAttachments: string[]; connection: 'connected' | 'offline' | 'unauthorized' }> {
@@ -276,7 +276,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
     }
   }
 
-  const order = await database.get('meta', 'pendingOrder') as { ids: string[]; token: string } | undefined;
+  const order = await database.get('meta', 'pendingOrder') as { token: string } | undefined;
   if (order) {
     try {
       // Include newly created notes, but leave notes added on another device for the server to append.
@@ -292,10 +292,12 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
   try {
     const remote = await api.notes();
     database = await getDatabase();
-    const pendingOrder = await database.get('meta', 'pendingOrder');
-    const pending = new Set(z.array(outboxSchema).parse(await database.getAll('outbox')).map(item => item.noteId));
     const remoteIds = new Set(remote.notes.map(note => note.id));
-    const transaction = database.transaction(['notes', 'meta', 'blobs'], 'readwrite');
+    // Read pending edits in the same transaction that merges remote notes.
+    // Otherwise another tab can save between the check and the overwrite.
+    const transaction = database.transaction(['notes', 'outbox', 'meta', 'blobs'], 'readwrite');
+    const pendingOrder = await transaction.objectStore('meta').get('pendingOrder');
+    const pending = new Set(z.array(outboxSchema).parse(await transaction.objectStore('outbox').getAll()).map(item => item.noteId));
     for (const note of remote.notes) if (!pending.has(note.id)) {
       const local = parseOptionalNote(await transaction.objectStore('notes').get(note.id));
       for (const audio of local?.audio ?? []) if (!note.audio.some(attachment => attachment.id === audio.id)) {
