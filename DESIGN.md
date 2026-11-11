@@ -14,6 +14,7 @@ Shelf is a single-owner, self-hosted home for text, image, and audio notes. It s
 - Images and audio share an attachment area, with an image gallery followed by a scrollable audio list. Cards show one compact player and a count for additional audio files.
 - A waveform Add audio action sits beside image capture in the bottom toolbar and inside the editor. It offers upload or microphone recording; capture is explicitly previewed and kept/discarded.
 - Dates are plain text. The interface avoids decorative navigation, metrics, and feature advertising.
+- Initial startup uses the folded-note SVG with a gentle lift/tilt and left-to-right shimmer across “Opening Shelf…”. Reduced motion keeps it static. There is no minimum splash time or exit animation, and background sync never reopens it. Offline startup opens downloaded notes when available, otherwise shows an explanation and retry; reconnect retries automatically. Header branding remains static.
 
 ## Responsive behavior
 
