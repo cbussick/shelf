@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import { webkit } from '@playwright/test';
 import { test, expect } from '../fixtures/isolated-test';
 
 for (const width of [390, 1280]) {
@@ -46,6 +47,28 @@ for (const width of [390, 1280]) {
   }
 }
 
+test('renders the loading artwork and reduced-motion state in WebKit', async ({ isolatedServer }) => {
+  const browser = await webkit.launch();
+  let finish!: () => void;
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, storageState: isolatedServer.storageState });
+    await page.route('**/api/auth/status', async route => { await pending; await route.continue(); });
+    await page.goto(isolatedServer.url);
+    const loader = page.getByRole('status');
+    await expect(loader).toHaveAttribute('aria-busy', 'true');
+    expect(await loader.evaluate(el => el.getAnimations({ subtree: true }).length)).toBe(4);
+    await page.screenshot({ path: 'test-results/loading-webkit.png' });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    expect(await loader.evaluate(el => el.getAnimations({ subtree: true }).length)).toBe(0);
+    finish();
+    await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible({ timeout: 1500 });
+  } finally {
+    finish();
+    await browser.close();
+  }
+});
+
 test('removes the loader on auth failure instead of looping indefinitely', async ({ page }) => {
   await page.route('**/api/auth/status', route => route.fulfill({ status: 503, json: { error: 'Unavailable' } }));
   await page.goto('/');
@@ -79,6 +102,37 @@ test('opens downloaded notes rather than leaving a paused offline splash', async
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Offline', exact: true })).toBeVisible();
+  await expect(page.getByText('Opening Shelf…', { exact: true })).toHaveCount(0);
+});
+
+test('keeps an unsaved editor mounted when background auth fails', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'New note' }).click();
+  const title = page.getByRole('textbox', { name: 'Title' });
+  const body = page.getByRole('textbox', { name: 'Note', exact: true });
+  await title.fill('Keep this unsaved title');
+  await body.fill('Keep these unsaved words.');
+  const editor = page.getByRole('dialog', { name: 'Add note' });
+  const originalEditor = await editor.elementHandle();
+  // Auth has a 30-second freshness window; returning after that triggers refetch.
+  await page.clock.install();
+  await page.clock.fastForward(31_000);
+  await page.route('**/api/auth/status', route => route.abort('internetdisconnected'));
+  const failed = page.waitForEvent('requestfailed', request => request.url().endsWith('/api/auth/status'));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+  });
+  await failed;
+  // Allow the failed background query and any local-access update to render.
+  await page.waitForTimeout(250);
+  expect(await originalEditor!.evaluate(element => element.isConnected)).toBe(true);
+  await expect(editor).toBeVisible();
+  await expect(title).toHaveValue('Keep this unsaved title');
+  await expect(body).toHaveText('Keep these unsaved words.');
   await expect(page.getByText('Opening Shelf…', { exact: true })).toHaveCount(0);
 });
 

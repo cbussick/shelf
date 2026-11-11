@@ -24,8 +24,11 @@ export function App() {
   // Attempt auth even offline so a paused query cannot trap startup on the splash.
   const auth = useQuery({ queryKey: ['auth'], queryFn: api.authStatus, retry: false, networkMode: 'always', refetchOnReconnect: true });
   const unreachable = auth.error instanceof ApiError && auth.error.status === 0;
-  const offlineAccess = useQuery({ queryKey: ['offline-access'], queryFn: hasLocalData, enabled: unreachable, retry: false, networkMode: 'always' });
-  if (auth.isPending || (unreachable && offlineAccess.isPending)) return <Loading/>;
+  const needsOfflineAccess = unreachable && !auth.data?.authenticated;
+  const offlineAccess = useQuery({ queryKey: ['offline-access'], queryFn: hasLocalData, enabled: needsOfflineAccess, retry: false, networkMode: 'always' });
+  // Cached authenticated access must keep the workspace/editor mounted even if
+  // a background auth refetch fails while returning to an offline tab.
+  if (auth.isPending || (needsOfflineAccess && offlineAccess.isPending)) return <Loading/>;
   if (auth.data?.authenticated || (unreachable && offlineAccess.data)) return <NotesApp offlineEntry={!auth.data?.authenticated} onLogout={() => { queryClient.setQueryData(['offline-access'], false); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>;
   if (unreachable) return <main {...stylex.props(styles.loginPage)}><section role="alert" {...stylex.props(styles.loginCard)}><Brand/><h1 {...stylex.props(styles.loginTitle)}>Shelf is offline</h1><p {...stylex.props(styles.loginCopy)}>Connect to your server to open Shelf. Your notes could not be opened on this device.</p><button type="button" disabled={auth.isFetching} onClick={() => void auth.refetch()} {...stylex.props(styles.primary)}>Try again</button></section></main>;
   if (auth.error) return <Auth setupRequired={false} onAuthenticated={() => void queryClient.invalidateQueries({ queryKey: ['auth'] })}/>;
