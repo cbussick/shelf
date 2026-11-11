@@ -183,6 +183,32 @@ for (const markdown of ['---\n\nText\n\n---', 'Text ![Photo](https://tracker.exa
   });
 }
 
+for (const leading of [true, false]) {
+  test(`mixed partial block selection stays intact until explicitly cleared (${leading ? 'leading' : 'trailing'})`, async ({ page }) => {
+    await seedAndWarm(page, leading ? '---\n\nText\n\nMore' : 'More\n\nText\n\n---');
+    await pauseOpening(page);
+    const preview = page.getByRole('region', { name: 'Note preview', exact: true });
+    await preview.evaluate((element, leading) => {
+      const text = [...element.querySelectorAll('[data-note-position]')].find(span => span.textContent === 'Text')!.firstChild!;
+      const range = document.createRange();
+      if (leading) { range.setStart(element, 0); range.setEnd(text, 2); }
+      else { range.setStart(text, 2); range.setEnd(element, element.childNodes.length); }
+      window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+    }, leading);
+    const selected = await page.evaluate(() => window.getSelection()?.toString());
+    await page.clock.resume();
+    await page.getByRole('button', { name: 'Edit text', exact: true }).click();
+    await expect(preview).toBeVisible();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(selected);
+    await expect(page.getByText('This selection crosses a block boundary. Clear it to edit.', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Clear selection and edit', exact: true }).click();
+    await expect(body(page)).toBeVisible();
+    await expect(body(page).locator('hr')).toHaveCount(1);
+    await expect(body(page)).toContainText('Text');
+    await expect(body(page)).toContainText('More');
+  });
+}
+
 test('structural commands read native selection before selectionchange is delivered', async ({ page }) => {
   await seedAndWarm(page, '- First\n- Second\n- Third');
   await page.getByRole('button', { name: 'Open note: Prepared note', exact: true }).click();

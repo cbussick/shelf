@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react';
 import { AllSelection, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
+import type { Node as ProseNode } from '@milkdown/kit/prose/model';
 import { getPreparedDocument } from '../prepared-documents';
 import { afterNotePaint } from '../note-scheduling';
 import { NoteReading } from './NoteReading';
@@ -34,6 +35,18 @@ function readingPosition(root: HTMLElement, node: Node | null, offset: number, b
     previous = end;
   }
   return previous;
+}
+
+function previewSelection(doc: ProseNode, anchor: number, head: number) {
+  const from = Math.min(anchor, head), to = Math.max(anchor, head);
+  if (from < 0 || to > doc.content.size) return;
+  if (from === 0 && to === doc.content.size) return new AllSelection(doc);
+  const node = doc.nodeAt(from);
+  if (node?.isAtom && NodeSelection.isSelectable(node) && to === from + node.nodeSize) return NodeSelection.create(doc, from);
+  const selection = TextSelection.between(doc.resolve(anchor), doc.resolve(head));
+  // ProseMirror cannot express every native range (for example, from before a
+  // block rule into half a paragraph). Never silently shrink such a selection.
+  if (selection.anchor === anchor && selection.head === head) return selection;
 }
 
 type NoteEditor = ReturnType<typeof createNoteEditor>;
@@ -73,6 +86,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const userInteracted = useRef(false);
   const stopInteraction = useRef<() => void>(() => {});
   const restore = useRef<{ scroll: number; selection?: { anchor: number; head: number }; point?: { left: number; top: number } }>({ scroll: 0 });
+  const [blockedSelection, setBlockedSelection] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [ready, setReady] = useState(false);
   const [active, setActive] = useState<Format[]>([]);
@@ -94,8 +108,13 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       const forward = range.startContainer === selection.anchorNode && range.startOffset === selection.anchorOffset;
       const anchor = readingPosition(reading.current!, selection.anchorNode, selection.anchorOffset, forward ? 1 : -1);
       const head = readingPosition(reading.current!, selection.focusNode, selection.focusOffset, forward ? -1 : 1);
-      if (anchor !== undefined && head !== undefined) restore.current.selection = { anchor, head };
+      if (anchor === undefined || head === undefined || !previewSelection(instance.current.view().state.doc, anchor, head)) {
+        setBlockedSelection(true);
+        return;
+      }
+      restore.current.selection = { anchor, head };
     }
+    setBlockedSelection(false);
     if (explicit || document.activeElement === reading.current) focusOnReveal.current = true;
     visible.current = true;
     setReady(true);
@@ -189,7 +208,9 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       document.removeEventListener('touchcancel', endGesture);
       instance.current = null;
       host.remove();
-      if (noteEditor && mounting) void mounting.then(() => noteEditor!.editor.destroy(), () => noteEditor!.editor.destroy()).catch(() => {});
+      // Milkdown 7.23 leaves a rejected create() in OnCreate; destroy() would
+      // poll forever in that state. Destroy only successfully mounted editors.
+      if (noteEditor && mounting) void mounting.then(() => noteEditor!.editor.destroy()).catch(() => {});
     };
   }, []);
 
@@ -201,12 +222,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     view.dom.scrollTop = restore.current.scroll;
     const selection = restore.current.selection;
     if (selection && selection.anchor <= view.state.doc.content.size && selection.head <= view.state.doc.content.size) {
-      const from = Math.min(selection.anchor, selection.head), to = Math.max(selection.anchor, selection.head);
-      const node = view.state.doc.nodeAt(from);
-      const transferred = from === 0 && to === view.state.doc.content.size ? new AllSelection(view.state.doc)
-        : node?.isAtom && NodeSelection.isSelectable(node) && to === from + node.nodeSize ? NodeSelection.create(view.state.doc, from)
-        : TextSelection.between(view.state.doc.resolve(selection.anchor), view.state.doc.resolve(selection.head));
-      view.dispatch(view.state.tr.setSelection(transferred));
+      const transferred = previewSelection(view.state.doc, selection.anchor, selection.head);
+      if (transferred) view.dispatch(view.state.tr.setSelection(transferred));
     } else if (restore.current.point) {
       const position = view.posAtCoords(restore.current.point)?.pos;
       if (position !== undefined) view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(position))));
@@ -289,8 +306,20 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       <div ref={root} className="note-rich-host" hidden={!ready} aria-hidden={!ready} inert={!ready}/>
     </div>}
     {!ready && !failed && <div className="note-opening-status"><span role="status">Preparing editing…</span>
-      {mounted && prepared && <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => reveal(true)}>Edit text</button>}
+      {mounted && prepared && <button type="button" onMouseDown={event => event.preventDefault()} onClick={() => {
+        if (blockedSelection && instance.current && reading.current) {
+          const selected = window.getSelection();
+          const head = readingPosition(reading.current, selected?.focusNode ?? null, selected?.focusOffset ?? 0, -1);
+          const doc = instance.current.view().state.doc;
+          const point = doc.resolve(head ?? 0);
+          const caret = TextSelection.findFrom(point, -1, true) ?? TextSelection.findFrom(point, 1, true);
+          restore.current.selection = caret ? { anchor: caret.anchor, head: caret.head } : undefined;
+          selected?.removeAllRanges();
+        }
+        reveal(true);
+      }}>{blockedSelection ? 'Clear selection and edit' : 'Edit text'}</button>}
     </div>}
+    {blockedSelection && !ready && <p role="status">This selection crosses a block boundary. Clear it to edit.</p>}
     {limit && <p role="alert">Notes can contain up to 20,000 Markdown characters. That change was not added.</p>}
     <span className="sr-only">Formatting shortcuts: Control or Command B for bold, I for italic. Tab or Alt Right Arrow indents a list; Shift Tab or Alt Left Arrow outdents. Control or Command right and left brackets also indent and outdent. Alt Up Arrow and Alt Down Arrow move rows. Tab and Shift Tab always keep focus in the editor, even when indentation cannot change. Press Escape to save and close the note.</span>
   </div>;

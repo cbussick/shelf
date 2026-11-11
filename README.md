@@ -32,7 +32,7 @@ A small, private, self-hosted notes app for text, images, videos, and audio. It 
 
 Videos are stored unchanged (no transcoding); playback depends on the browser's codec support. If a preview cannot play, download it from the preview to open in another app. Pending video uploads are saved on-device and sync after reconnecting, but synced videos are streamed on demand, not automatically cached for offline playback. Images and videos share `/data/images/` and the existing attachment URLs. The Android share-sheet target remains image-only.
 
-Prepared document data stays in a bounded in-memory cache (24 entries, approximately 1 MB), cleared on sign-out. It never shares undo history between notes or changes saved Markdown. During opening, selecting text keeps the read-only preview stable; **Edit text** transfers that selection into editing. Notes not yet prepared show a loading state first.
+Prepared document data stays in a bounded in-memory cache (24 entries, approximately 1 MB), cleared on sign-out. It never shares undo history between notes or changes saved Markdown. During opening, selecting text keeps the read-only preview stable; **Edit text** transfers supported text, node, and whole-document selections into editing. A mixed block/text range that the editor cannot represent is kept intact until you explicitly choose **Clear selection and edit**. Notes not yet prepared show a loading state first.
 
 The app deliberately has no labels, archive, reminders, trash, sharing, or multi-user administration. Checklists are Markdown task lists within ordinary notes.
 
