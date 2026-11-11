@@ -57,6 +57,7 @@ test('Chrome can run the real API, with no sampling until explicit opt-in', asyn
   await expect.poll(async () => (await report(page)).samples[0].cpu.status).toBe('ready');
   const result = await report(page);
   expect(result.samples[0].cpu.sampleCount).toBeLessThanOrEqual(256);
+  expect(result.samples[0].cpu.appSamples).toBeGreaterThan(0);
   expect(JSON.stringify(result)).not.toMatch(/PRIVATE|https?:\/\//);
   await page.getByRole('checkbox', { name: 'Enable opening timings' }).uncheck();
   expect(await report(page)).toMatchObject({ enabled: false, cpu: { enabled: false }, samples: [] });
