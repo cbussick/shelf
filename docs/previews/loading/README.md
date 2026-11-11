@@ -32,8 +32,13 @@ ordinary note interactions. CSS only; no new runtime dependency.
 - Movement and opacity use `cubic-bezier(0.77, 0, 0.175, 1)`.
 - Animate only transform/opacity. The long duration is a quiet repeating loading
   indicator, not a delayed UI entrance or exit.
-- OS reduced-motion preference, or the preview toggle, leaves the mark and text
-  completely static. The label is steady in both modes.
+- The visible label is replaced with a 128×12-pixel rounded skeleton bar. A soft
+  highlight sweeps left to right using a translated gradient layer, linearly over
+  2.56 seconds, then rests offscreen for 0.64 seconds before repeating. This is an
+  indeterminate loading indicator, not a progress estimate.
+- “Opening Shelf…” remains available to screen readers; the skeleton is decorative.
+- OS reduced-motion preference, or the preview toggle, leaves both the mark and
+  skeleton completely static.
 - No spinner, fake percentage, growing dots, or full-screen zoom/fly-away exit.
 
 Feel-check: watch the live preview on a phone, including fast completion. The GIF
@@ -67,8 +72,9 @@ The standalone preview’s timers only simulate request durations.
 No application code, installed icons, service worker, or dependencies changed.
 This is an approval artifact, not an integrated loading component.
 
-`verify.mjs` checks mobile/desktop overflow, active animations, 250 ms simulated
-completion, immediate interruption, replay, both reduced-motion modes, and browser
+`verify.mjs` checks mobile/desktop overflow, active animations, left-to-right
+shimmer direction, accessible loading text, 250 ms simulated completion, immediate
+interruption, replay, both reduced-motion modes (including shimmer), and browser
 errors. It can render the checked-in GIF from the exact preview CSS. Real-device
 motion feel and the eventual app’s auth/offline lifecycle still require testing
 when integrated.

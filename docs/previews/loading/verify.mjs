@@ -29,7 +29,23 @@ try {
   await page.evaluate(() => document.fonts.ready);
   assert.equal(await page.locator('#loading').isVisible(), true);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  assert.equal(await page.locator('.mark').evaluate(el => el.getAnimations({ subtree: true }).length), 3);
+  assert.equal(await page.locator('#loading').evaluate(el => el.getAnimations({ subtree: true }).length), 4);
+  assert.equal(await page.locator('.sr-only').textContent(), 'Opening Shelf…');
+  assert.equal(await page.locator('.skeleton').getAttribute('aria-hidden'), 'true');
+  const sweep = await page.locator('.shimmer').evaluate(el => {
+    const animation = el.getAnimations()[0];
+    animation.pause();
+    animation.currentTime = 0;
+    const start = new DOMMatrix(getComputedStyle(el).transform).m41;
+    animation.currentTime = 1280;
+    const middle = new DOMMatrix(getComputedStyle(el).transform).m41;
+    animation.currentTime = 2560;
+    const end = new DOMMatrix(getComputedStyle(el).transform).m41;
+    animation.currentTime = 0;
+    animation.play();
+    return { start, middle, end };
+  });
+  assert.ok(sweep.start < sweep.middle && sweep.middle < sweep.end, 'Shimmer sweeps left to right');
   await page.getByRole('button', { name: 'Fast load' }).click();
   await page.locator('#destination').waitFor({ state: 'visible', timeout: 1500 });
   assert.equal(await page.locator('#loading').isVisible(), false);
@@ -39,10 +55,10 @@ try {
   assert.equal(await page.locator('#destination').isVisible(), true);
   await page.getByRole('button', { name: 'Replay loop' }).click();
   await page.getByRole('button', { name: 'Reduced motion' }).click();
-  assert.equal(await page.locator('.mark').evaluate(el => el.getAnimations({ subtree: true }).length), 0);
+  assert.equal(await page.locator('#loading').evaluate(el => el.getAnimations({ subtree: true }).length), 0);
   await page.getByRole('button', { name: 'Reduced motion' }).click();
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  assert.equal(await page.locator('.mark').evaluate(el => el.getAnimations({ subtree: true }).length), 0);
+  assert.equal(await page.locator('#loading').evaluate(el => el.getAnimations({ subtree: true }).length), 0);
   await page.setViewportSize({ width: 1280, height: 800 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);
