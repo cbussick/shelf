@@ -58,6 +58,18 @@ test('renders the loading artwork and reduced-motion state in WebKit', async ({ 
     const loader = page.getByRole('status');
     await expect(loader).toHaveAttribute('aria-busy', 'true');
     expect(await loader.evaluate(el => el.getAnimations({ subtree: true }).length)).toBe(4);
+    const sweep = await loader.locator('svg').last().locator('rect').evaluate(el => {
+      const animation = el.getAnimations()[0];
+      animation.pause();
+      animation.currentTime = 0;
+      const left = new DOMMatrix(getComputedStyle(el).transform).m41;
+      animation.currentTime = 2560;
+      const right = new DOMMatrix(getComputedStyle(el).transform).m41;
+      animation.currentTime = 1280;
+      return { left, right };
+    });
+    expect(sweep.left).toBeLessThan(0);
+    expect(sweep.right).toBeGreaterThan(0);
     await page.screenshot({ path: 'test-results/loading-webkit.png' });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     expect(await loader.evaluate(el => el.getAnimations({ subtree: true }).length)).toBe(0);
