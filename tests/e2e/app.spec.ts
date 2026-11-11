@@ -63,6 +63,7 @@ test('note editor uses available desktop space and stays usable on small screens
   await page.getByRole('button', { name: 'New note' }).click();
   const editor = page.getByRole('dialog', { name: 'Add note' });
   const body = editor.getByRole('textbox', { name: 'Note', exact: true });
+  await expect(body).toBeVisible();
   const desktop = await editor.boundingBox();
   // Available editing area includes the stationary focus frame's padding.
   const desktopBody = await editor.locator('.note-rich-host').boundingBox();
@@ -77,9 +78,10 @@ test('note editor uses available desktop space and stays usable on small screens
   await expect(editor.getByRole('button', { name: 'Close', exact: true })).toBeInViewport();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  const mobile = await editor.boundingBox();
-  expect(mobile?.width).toBe(390);
-  expect(mobile?.height).toBe(844);
+  // visualViewport resize is delivered asynchronously; wait for the final
+  // geometry instead of depending on editor initialization blocking a frame.
+  await expect.poll(async () => (await editor.boundingBox())?.height).toBe(844);
+  expect((await editor.boundingBox())?.width).toBe(390);
   await expect(body).toBeInViewport();
   await expect(editor.getByRole('button', { name: 'Close', exact: true })).toBeInViewport();
 });

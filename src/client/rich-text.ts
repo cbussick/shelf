@@ -1,9 +1,10 @@
-import { Editor, defaultValueCtx, editorStateOptionsCtx, editorViewCtx, editorViewOptionsCtx, rootCtx, serializerCtx } from '@milkdown/kit/core';
+import { Editor, defaultValueCtx, editorStateOptionsCtx, editorViewCtx, editorViewOptionsCtx, rootCtx, serializerCtx, parserCtx } from '@milkdown/kit/core';
 import { commonmark, imageSchema, listItemKeymap, listItemSchema } from '@milkdown/kit/preset/commonmark';
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
 import { clipboard } from '@milkdown/kit/plugin/clipboard';
-import { EditorState, Plugin, type Command, type Transaction } from '@milkdown/kit/prose/state';
+import { EditorState, Plugin, TextSelection, type Command, type Transaction } from '@milkdown/kit/prose/state';
+import type { EditorView } from '@milkdown/kit/prose/view';
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/kit/prose/commands';
 import { liftListItem, sinkListItem, wrapInList } from '@milkdown/kit/prose/schema-list';
 import { closeHistory, undo, redo } from '@milkdown/kit/prose/history';
@@ -12,6 +13,8 @@ import { keydownHandler } from '@milkdown/kit/prose/keymap';
 import { Fragment } from '@milkdown/kit/prose/model';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
 import { $prose, $view } from '@milkdown/kit/utils';
+
+import { documentGeneration, getPreparedDocument, installDocumentParser, rememberDocument } from './prepared-documents';
 
 export const MAX_NOTE_BODY = 20_000;
 export type Format = 'heading' | 'bold' | 'italic' | 'bullet' | 'ordered' | 'task' | 'indent' | 'outdent' | 'quote' | 'code' | 'undo' | 'redo';
@@ -66,6 +69,19 @@ function checklist(): Command {
     }
     return wrapInList(state.schema.nodes.bullet_list!)(state, dispatch && apply);
   };
+}
+
+// A click's DOM selection can precede the browser's selectionchange event.
+// Read it before structural commands so a rapid click-then-Tab formats the
+// clicked row, not the editor's initial selection after a deferred mount.
+export function syncNoteSelection(view: EditorView) {
+  const selection = view.dom.ownerDocument.getSelection();
+  if (view.composing || !selection?.anchorNode || !selection.focusNode ||
+    !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) return;
+  const anchor = view.posAtDOM(selection.anchorNode, selection.anchorOffset);
+  const head = view.posAtDOM(selection.focusNode, selection.focusOffset);
+  if (anchor === view.state.selection.anchor && head === view.state.selection.head) return;
+  view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head))).setMeta('addToHistory', false));
 }
 
 export function formatCommand(format: Format, state: EditorState): Command {
@@ -208,6 +224,7 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
   root: HTMLElement; markdown: string; onChange: (value: string) => void;
   onLimit: () => void; onSelection: (formats: Format[]) => void; editable: () => boolean;
 }) {
+  const generation = documentGeneration();
   let initialDoc: ProseNode | undefined;
   let read = () => markdown;
   const changes = $prose(ctx => {
@@ -227,6 +244,14 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       },
       view(view) {
         initialDoc = view.state.doc;
+        rememberDocument(markdown, initialDoc.toJSON(), generation);
+        // Capture the pure parser, not the editor/context being destroyed. This
+        // lets idle preparation reuse its schema without retaining a live view.
+        const parse = ctx.get(parserCtx);
+        installDocumentParser(source => {
+          const doc = parse(source);
+          return mergeAdjacentLists(EditorState.create({ schema: doc.type.schema, doc }).tr).doc.toJSON();
+        }, generation);
         onSelection(activeFormats(view.state));
         read = () => view.state.doc.eq(initialDoc!) ? markdown : serialize(view.state.doc);
         return {
@@ -275,7 +300,8 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
   const editor = Editor.make()
     .config(ctx => {
       ctx.set(rootCtx, root);
-      ctx.set(defaultValueCtx, markdown);
+      const prepared = getPreparedDocument(markdown);
+      ctx.set(defaultValueCtx, prepared ? { type: 'json', value: prepared } : markdown);
       // Normalize the editing structure without rewriting untouched source text.
       ctx.set(editorStateOptionsCtx, options => ({
         ...options,
@@ -284,6 +310,10 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       ctx.set(editorViewOptionsCtx, {
         editable,
         handleKeyDown: (view, event) => {
+          const structural = event.key === 'Tab' ||
+            (event.altKey && ['ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft'].includes(event.key)) ||
+            ((event.ctrlKey || event.metaKey) && ['[', ']'].includes(event.key));
+          if (view.editable && structural) syncNoteSelection(view);
           if (event.key === 'Tab') {
             if (view.editable) formatCommand(event.shiftKey ? 'outdent' : 'indent', view.state)(view.state, view.dispatch, view);
             // Always consume Tab, even when the list command cannot apply.

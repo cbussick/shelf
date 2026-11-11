@@ -16,6 +16,7 @@ A small, private, self-hosted notes app for text, images, videos, and audio. It 
 
 - Create, edit, search, pin, color, and permanently delete notes
 - Rich-text note bodies backed by Markdown, including nested lists and clickable task checkboxes
+- Prepared notes appear immediately while editing initializes; nearby visible cards are prepared during idle time
 - Up to six photos/videos combined per note: JPG, PNG, WebP, or GIF images (20 MB each) and MP4, WebM, or MOV videos (100 MB each)
 - Videos use the image attachment picker and gallery, with inline playback controls in the preview; no autoplay or video rotation
 - Audio uploads up to 100 MB each, with no fixed audio count limit per note
@@ -30,6 +31,8 @@ A small, private, self-hosted notes app for text, images, videos, and audio. It 
 - One owner password with revocable, server-side sessions
 
 Videos are stored unchanged (no transcoding); playback depends on the browser's codec support. If a preview cannot play, download it from the preview to open in another app. Pending video uploads are saved on-device and sync after reconnecting, but synced videos are streamed on demand, not automatically cached for offline playback. Images and videos share `/data/images/` and the existing attachment URLs. The Android share-sheet target remains image-only.
+
+Prepared document data stays in a bounded in-memory cache (24 entries, approximately 1 MB), cleared on sign-out. It never shares undo history between notes or changes saved Markdown. During opening, selecting text keeps the read-only preview stable; **Edit text** transfers supported text, node, and whole-document selections into editing. A mixed block/text range that the editor cannot represent is kept intact until you explicitly choose **Clear selection and edit**. Notes not yet prepared show a loading state first.
 
 The app deliberately has no labels, archive, reminders, trash, sharing, or multi-user administration. Checklists are Markdown task lists within ordinary notes.
 
