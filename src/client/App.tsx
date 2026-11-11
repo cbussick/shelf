@@ -13,6 +13,8 @@ import { LoadingBrand } from './components/LoadingBrand';
 import { AddAudio } from './components/AddAudio';
 import { validateAudioFile } from './audio';
 import { NoteBoard } from './components/NoteBoard';
+import { OpeningReport } from './components/OpeningReport';
+import { OpeningDiagnostics } from './opening-diagnostics';
 import { useNotePreparation } from './note-preparation';
 import { clearPreparedDocuments } from './prepared-documents';
 import { NoteContextMenu, type MenuTarget } from './components/NoteContextMenu';
@@ -48,6 +50,8 @@ export function App() {
 
 function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout: () => void }) {
   const [notes, setNotes] = useState<LocalNote[]>([]);
+  const [openingDiagnostics] = useState(() => new OpeningDiagnostics());
+  useEffect(() => () => openingDiagnostics.dispose(), [openingDiagnostics]);
   const [query, setQuery] = useState('');
   const [editor, setEditor] = useState<EditorSession>();
   const [parkedEditor, setParkedEditor] = useState<{ value: EditorSession & { note: LocalNote }; read: boolean }>();
@@ -75,7 +79,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const noteToDelete = useRef<LocalNote | null>(null);
   const closeMenu = useCallback(() => setMenu(undefined), []);
-  const openNote = useCallback((note: LocalNote) => { preferredReadyNote.current = note.id; setEditor({ note }); }, []);
+  const openNote = useCallback((note: LocalNote) => { openingDiagnostics.begin(); preferredReadyNote.current = note.id; setEditor({ note }); }, [openingDiagnostics]);
   const showMenu = useCallback((note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => {
     setMenu({ note, x: event.clientX, y: event.clientY, origin: event.currentTarget });
   }, []);
@@ -255,7 +259,9 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
       catch { notify('Could not remove the temporary shared image from this device.'); }
       history.replaceState(null, '', '/');
     }
-    setParkedEditor(retainReady && editor?.note && !editor.note.images.length && !editor.note.audio.length ? { value: { note: editor.note }, read: true } : undefined);
+    const retain = Boolean(retainReady && editor?.note && !editor.note.images.length && !editor.note.audio.length);
+    openingDiagnostics.closed(retain);
+    setParkedEditor(retain && editor?.note ? { value: { note: editor.note }, read: true } : undefined);
     setEditor(undefined);
   };
   const logout = async () => {
@@ -279,8 +285,8 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
-    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
-    <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
+    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} openingDiagnostics={openingDiagnostics} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
+    <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<OpeningReport diagnostics={openingDiagnostics} onOpen={() => syncDialog.current?.close()}/><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
     <Toaster theme="dark" position="bottom-center" offset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }} mobileOffset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))', left: 16, right: 16 }} style={{ fontFamily: 'inherit' }} toastOptions={{ style: { background: colors.ink, borderColor: colors.ink, borderRadius: 10 }, cancelButtonStyle: { minHeight: 44 } }}/>
   </>;
 }

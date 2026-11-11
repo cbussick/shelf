@@ -176,6 +176,8 @@ git pull
 docker compose up -d --build
 ```
 
+Temporary opening diagnostics are available under the sync-status button → **Opening diagnostics**. Enable timings, return to the board, open/close the same note with X three times, then return and **Copy report**. The opt-in report identifies the loaded asset build, installed/browser mode, actual ready-dialog reuse, close eligibility, and approximate activation-to-readable/editable frame timings. Only the last six openings are kept in memory; reload, sign-out, or disabling clears them. No note text, titles, identifiers, credentials, network logs, or diagnostic requests are collected or sent. Frame timings are observations, not exact screen-paint measurements; this is temporary instrumentation, not another performance fix.
+
 The PWA downloads frontend updates in the background and offers a **Refresh app** button when one is ready. Finish editing before refreshing; updates never force a reload mid-note. If an older installed version does not show the prompt, open `/share-target` in the browser (GET is a read-only page load). This URL bypasses the old worker's cached navigation and loads the latest page; you can then use **Refresh app** if offered. Close and reopen the installed app afterwards. Do not clear browser site data to update the app: that data may include unsynced notes.
 
 Shelf keeps its page light and uses a dark green installed-app manifest theme. Android can cache installed-app metadata independently of frontend updates; see [Chrome's manifest-update guidance](https://web.dev/articles/manifest-updates#updates_on_chrome_for_android). Avoid uninstalling or clearing app data when there may be unsynced notes.
