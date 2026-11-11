@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react';
-import { TextSelection } from '@milkdown/kit/prose/state';
+import { AllSelection, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
 import { getPreparedDocument } from '../prepared-documents';
 import { afterNotePaint } from '../note-scheduling';
 import { NoteReading } from './NoteReading';
@@ -12,18 +12,26 @@ import './rich-text.css';
 // DOM references never survive the handoff; only logical positions do.
 function readingPosition(root: HTMLElement, node: Node | null, offset: number, bias: number): number | undefined {
   if (!node) return;
+  const documentRoot = root.querySelector<HTMLElement>('[data-note-document-size]');
+  if (node === root || node === documentRoot) {
+    if (offset === 0) return 0;
+    if (offset === node.childNodes.length) return Number(documentRoot?.dataset.noteDocumentSize);
+  }
   let previous: number | undefined;
-  for (const span of root.querySelectorAll<HTMLElement>('[data-note-position]')) {
+  for (const span of root.querySelectorAll<HTMLElement>('[data-note-position],[data-note-atom-start]')) {
     const range = document.createRange();
     range.selectNodeContents(span);
     const comparison = range.comparePoint(node, offset);
-    const start = Number(span.dataset.notePosition);
+    const isAtom = span.dataset.noteAtomStart !== undefined;
+    const start = Number(isAtom ? span.dataset.noteAtomStart : span.dataset.notePosition);
+    const end = isAtom ? Number(span.dataset.noteAtomEnd) : start + (span.textContent?.length ?? 0);
     if (comparison < 0) return bias < 0 && previous !== undefined ? previous : start;
     if (comparison === 0) {
+      if (isAtom) return bias > 0 ? start : end;
       range.setEnd(node, offset);
       return start + range.toString().length;
     }
-    previous = start + (span.textContent?.length ?? 0);
+    previous = end;
   }
   return previous;
 }
@@ -59,6 +67,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const [prepared] = useState(() => getPreparedDocument(initialValue));
   const reading = useRef<HTMLDivElement>(null);
   const gesture = useRef(false);
+  const touching = useRef(false);
   const visible = useRef(false);
   const focusOnReveal = useRef(false);
   const userInteracted = useRef(false);
@@ -150,7 +159,15 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     const selectionChanged = () => reveal();
     document.addEventListener('selectionchange', selectionChanged);
     let endTask = 0;
-    const endGesture = () => {
+    const endGesture = (event: Event) => {
+      if (event.type.startsWith('touch')) {
+        if ((event as TouchEvent).touches?.length) return;
+        touching.current = false;
+      } else if ((event as PointerEvent).pointerType === 'touch' && touching.current) {
+        // Pointer cancellation starts native panning; touchend, not that
+        // cancellation, tells us the finger has actually left the document.
+        return;
+      }
       gesture.current = false;
       // Let the click handler record caret intent before an automatic reveal.
       clearTimeout(endTask);
@@ -158,6 +175,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     };
     document.addEventListener('pointerup', endGesture);
     document.addEventListener('pointercancel', endGesture);
+    document.addEventListener('touchend', endGesture);
+    document.addEventListener('touchcancel', endGesture);
     return () => {
       cancelled = true;
       cancelStart();
@@ -166,6 +185,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       document.removeEventListener('selectionchange', selectionChanged);
       document.removeEventListener('pointerup', endGesture);
       document.removeEventListener('pointercancel', endGesture);
+      document.removeEventListener('touchend', endGesture);
+      document.removeEventListener('touchcancel', endGesture);
       instance.current = null;
       host.remove();
       if (noteEditor && mounting) void mounting.then(() => noteEditor!.editor.destroy(), () => noteEditor!.editor.destroy()).catch(() => {});
@@ -180,7 +201,12 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     view.dom.scrollTop = restore.current.scroll;
     const selection = restore.current.selection;
     if (selection && selection.anchor <= view.state.doc.content.size && selection.head <= view.state.doc.content.size) {
-      view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(selection.anchor), view.state.doc.resolve(selection.head))));
+      const from = Math.min(selection.anchor, selection.head), to = Math.max(selection.anchor, selection.head);
+      const node = view.state.doc.nodeAt(from);
+      const transferred = from === 0 && to === view.state.doc.content.size ? new AllSelection(view.state.doc)
+        : node?.isAtom && NodeSelection.isSelectable(node) && to === from + node.nodeSize ? NodeSelection.create(view.state.doc, from)
+        : TextSelection.between(view.state.doc.resolve(selection.anchor), view.state.doc.resolve(selection.head));
+      view.dispatch(view.state.tr.setSelection(transferred));
     } else if (restore.current.point) {
       const position = view.posAtCoords(restore.current.point)?.pos;
       if (position !== undefined) view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(position))));
@@ -250,6 +276,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       {!ready && prepared && <div className="note-rich-host note-reading-host">
         <div ref={reading} className="note-reading" role="region" aria-label="Note preview" tabIndex={0}
           onPointerDown={() => { gesture.current = true; }}
+          onTouchStart={() => { gesture.current = true; touching.current = true; }}
           onKeyDown={event => { if (event.key === 'Enter' && mounted) { event.preventDefault(); reveal(true); } }}
           onClick={event => {
             if ((event.target as HTMLElement).closest('a')) return;

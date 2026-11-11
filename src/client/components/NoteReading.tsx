@@ -11,6 +11,7 @@ export function NoteReading({ document }: { document: PreparedNode }) {
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const element = root.current!;
+    element.dataset.noteDocumentSize = String(nodeSize(document));
     element.replaceChildren(renderNode(element.ownerDocument, document));
     return () => element.replaceChildren();
   }, [document]);
@@ -24,7 +25,7 @@ function text(node: PreparedNode): string {
 function nodeSize(node: PreparedNode): number {
   if (node.type === 'text') return node.text?.length ?? 0;
   if (['hardbreak', 'hr', 'image', 'html', 'footnote_reference'].includes(node.type)) return 1;
-  return 2 + (node.content?.reduce((size, child) => size + nodeSize(child), 0) ?? 0);
+  return (node.type === 'doc' ? 0 : 2) + (node.content?.reduce((size, child) => size + nodeSize(child), 0) ?? 0);
 }
 
 function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
@@ -38,6 +39,11 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
   const wrap = (tag: string, content: Node = fragment) => {
     const element = dom.createElement(tag);
     element.append(content);
+    return element;
+  };
+  const atom = (element: HTMLElement) => {
+    element.dataset.noteAtomStart = String(position);
+    element.dataset.noteAtomEnd = String(position + nodeSize(node));
     return element;
   };
   switch (node.type) {
@@ -82,8 +88,8 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     }
     case 'blockquote': return wrap('blockquote');
     case 'code_block': return wrap('pre', wrap('code'));
-    case 'hardbreak': return dom.createElement('br');
-    case 'hr': return dom.createElement('hr');
+    case 'hardbreak': return atom(dom.createElement('br'));
+    case 'hr': return atom(dom.createElement('hr'));
     case 'table': return wrap('table', wrap('tbody'));
     case 'table_row': case 'table_header_row': return wrap('tr');
     case 'table_cell': case 'table_header': {
@@ -94,7 +100,7 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     case 'footnote_reference': {
       const reference = wrap('sup', dom.createTextNode(String(attrs.label ?? '')));
       reference.dataset.type = 'footnote_reference'; reference.dataset.label = String(attrs.label ?? '');
-      return reference;
+      return atom(reference);
     }
     case 'footnote_definition': {
       const definition = dom.createElement('dl');
@@ -105,9 +111,9 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     case 'image': {
       const image = wrap('span', dom.createTextNode(`[Image: ${String(attrs.alt || 'use Attach an image')}]`));
       image.className = 'note-inline-image';
-      return image;
+      return atom(image);
     }
-    case 'html': return dom.createTextNode(typeof attrs.value === 'string' ? attrs.value : text(node));
+    case 'html': return atom(wrap('span', dom.createTextNode(typeof attrs.value === 'string' ? attrs.value : text(node))));
     default: return fragment;
   }
 }

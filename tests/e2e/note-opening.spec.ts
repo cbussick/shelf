@@ -35,6 +35,16 @@ test('visible cards prepare before their first opening without fetching inline r
       callback(deadline);
       (window as Window & { idleCompletions: number }).idleCompletions++;
     }, options);
+    else {
+      const timeout = window.setTimeout.bind(window);
+      window.setTimeout = (handler, delay, ...args) => {
+        if (delay !== 250 || typeof handler !== 'function') return timeout(handler, delay, ...args);
+        return timeout(() => {
+          handler(...args);
+          (window as Window & { idleCompletions: number }).idleCompletions++;
+        }, delay);
+      };
+    }
   });
   const id = await seedNote(page);
   const unsafe = `${source}\n\n![External](https://tracker.example/image.png)\n\n<script>alert(1)</script>\n\n[Unsafe](javascript:alert(1))`;
@@ -44,15 +54,9 @@ test('visible cards prepare before their first opening without fetching inline r
     id, title: 'Prepared note', body: unsafe, color: 'blue', pinned: false, expectedVersion: 1, retainedImageIds: [], retainedAudioIds: [],
   }) } })).ok()).toBe(true);
   await page.reload();
-  // Observe the browser's idle queue, not a production-only test hook. WebKit
-  // uses the timeout fallback; advancing its clock allows that work to finish.
-  if (await page.evaluate(() => typeof window.requestIdleCallback === 'function')) {
-    await expect.poll(() => page.evaluate(() => (window as Window & { idleCompletions: number }).idleCompletions)).toBeGreaterThanOrEqual(2);
-  } else {
-    await page.getByRole('button', { name: 'Open note: Prepared note', exact: true }).waitFor();
-    await page.clock.install();
-    await page.clock.runFor(1500);
-  }
+  // Observe completed browser idle work (including WebKit's timeout fallback),
+  // not a production-only test hook or a fixed sleep before data has arrived.
+  await expect.poll(() => page.evaluate(() => (window as Window & { idleCompletions: number }).idleCompletions)).toBeGreaterThanOrEqual(2);
   await pauseOpening(page);
   const preview = page.getByRole('region', { name: 'Note preview', exact: true });
   await expect(preview.locator('h2')).toHaveText('Prepared heading');
@@ -144,6 +148,52 @@ test('ending a scroll gesture completes the handoff without another click', asyn
   await preview.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'touch' });
   await expect(body(page)).toBeVisible();
   expect(await body(page).evaluate(element => element.scrollTop)).toBeCloseTo(240, -1);
+});
+
+test('native touch panning keeps the preview until the finger is released', async ({ page }) => {
+  await seedAndWarm(page);
+  await pauseOpening(page);
+  const preview = page.getByRole('region', { name: 'Note preview', exact: true });
+  await preview.dispatchEvent('pointerdown', { pointerId: 1, pointerType: 'touch' });
+  await preview.dispatchEvent('touchstart');
+  await page.clock.resume();
+  await expect(page.getByRole('button', { name: 'Edit text', exact: true })).toBeEnabled();
+  await preview.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'touch' });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0))));
+  await expect(preview).toBeVisible();
+  await preview.evaluate(element => { element.scrollTop = 240; });
+  await preview.dispatchEvent('touchend');
+  await expect(body(page)).toBeVisible();
+  expect(await body(page).evaluate(element => element.scrollTop)).toBeCloseTo(240, -1);
+});
+
+for (const markdown of ['---\n\nText\n\n---', 'Text ![Photo](https://tracker.example/photo.png)', '![Only image](https://tracker.example/photo.png)']) {
+  test(`select-all replaces non-text boundaries: ${markdown.split('\n')[0]}`, async ({ page }) => {
+    await seedAndWarm(page, markdown);
+    await pauseOpening(page);
+    await page.getByRole('region', { name: 'Note preview', exact: true }).evaluate(element => {
+      const range = document.createRange(); range.selectNodeContents(element);
+      window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+    });
+    await page.clock.resume();
+    await page.getByRole('button', { name: 'Edit text', exact: true }).click();
+    await page.keyboard.type('Replacement');
+    await expect(body(page)).toHaveText('Replacement');
+    await expect(body(page).locator('hr,.note-inline-image')).toHaveCount(0);
+  });
+}
+
+test('structural commands read native selection before selectionchange is delivered', async ({ page }) => {
+  await seedAndWarm(page, '- First\n- Second\n- Third');
+  await page.getByRole('button', { name: 'Open note: Prepared note', exact: true }).click();
+  await body(page).evaluate(element => {
+    (element as HTMLElement).focus();
+    const text = [...element.querySelectorAll('p')].find(p => p.textContent === 'Second')!.firstChild!;
+    const range = document.createRange(); range.setStart(text, 0); range.collapse(true);
+    window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+    element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', bubbles: true, cancelable: true }));
+  });
+  await expect(body(page).locator('li li')).toHaveText('Second');
 });
 
 test('select-all element boundaries transfer without losing the replacement range', async ({ page }) => {
