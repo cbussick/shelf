@@ -174,15 +174,18 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
 }) {
   const image = note.images[0];
   const titleParts = linkParts(note.title);
-  const excerpt = useMemo(() => noteExcerpt(note.body), [note.body]);
-  const bodyParts = linkParts(excerpt);
+  // CSS line-clamping alone still lays out/exposes the entire document. Keep
+  // compact card DOM and accessible names; opening/search/save use the source.
+  const bodyParts = useMemo(() => linkParts(noteExcerpt(note.body), 512), [note.body]);
+  const caption = note.title || bodyParts.map(part => part.text).join('') || image?.alt || note.audio[0]?.name || 'Image note';
+  const label = linkParts(caption, 512).map(part => part.text).join('');
   const hasLinks = [...titleParts, ...bodyParts].some(part => part.href);
   const content = <>
     {note.images.length === 1 && <LocalPhoto image={image}/>}
     {note.images.length > 1 && <ImageMosaic images={note.images.map(item => <LocalPhoto key={item.id} image={item} crop className={stylex.props(styles.mosaicPhoto).className}/>)}/>}
     {(note.title || note.body) && <span {...stylex.props(styles.noteContent, image && styles.imageContent, hasLinks && styles.linkedContent)}>
       {note.title && <span {...stylex.props(styles.noteTitle)}>{hasLinks ? <LinkedText parts={titleParts}/> : note.title}</span>}
-      {note.body && <span {...stylex.props(styles.noteBody)}>{hasLinks ? <LinkedText parts={bodyParts}/> : excerpt}</span>}
+      {note.body && <span {...stylex.props(styles.noteBody)}><LinkedText parts={bodyParts}/></span>}
     </span>}
     {note.audio.length > 0 && <div {...stylex.props(styles.cardAudio)}>
       <AudioPlayer key={note.audio[0].id} audio={note.audio[0]} compact/>
@@ -191,7 +194,7 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
   </>;
   const buttonProps = {
     type: 'button' as const, 'data-note-id': note.id,
-    'aria-label': `Open note: ${note.title || note.body || image?.alt || note.audio[0]?.name || 'Image note'}`,
+    'aria-label': `Open note: ${label}`,
     title: 'Drag to reorder · arrow keys to move', onClick: onCardClick, onPointerDown,
     onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => { event.preventDefault(); if (navigator.maxTouchPoints === 0) onContextMenu(note, event); },
     onDragStart: (event: React.DragEvent<HTMLButtonElement>) => event.preventDefault(), onKeyDown,
@@ -201,7 +204,7 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
       <button {...buttonProps} {...stylex.props(styles.cardOverlay)}/>
       {content}
     </div> : <button {...buttonProps} {...stylex.props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>{content}</button>}
-    {!dropTarget && <button type="button" data-pin-id={note.id} aria-label={`${note.pinned ? 'Unpin' : 'Pin'} note: ${note.title || note.body || note.audio[0]?.name || 'Image note'}`} aria-pressed={note.pinned} title={note.pinned ? 'Unpin note' : 'Pin note'} onClick={() => onPin(note)} {...stylex.props(styles.pin, styles.pinVisibility, note.pinned && styles.pinned)}><Icon name={note.pinned ? 'pin-filled' : 'pin'} width={18}/></button>}
+    {!dropTarget && <button type="button" data-pin-id={note.id} aria-label={`${note.pinned ? 'Unpin' : 'Pin'} note: ${label}`} aria-pressed={note.pinned} title={note.pinned ? 'Unpin note' : 'Pin note'} onClick={() => onPin(note)} {...stylex.props(styles.pin, styles.pinVisibility, note.pinned && styles.pinned)}><Icon name={note.pinned ? 'pin-filled' : 'pin'} width={18}/></button>}
   </li>;
 }
 
