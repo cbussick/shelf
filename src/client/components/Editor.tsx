@@ -21,12 +21,13 @@ export type EditorValue = {
   retainedAudio: LocalAudio[]; newAudio: File[];
 };
 
-export function Editor({ note, initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose }: {
-  note?: LocalNote; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<void>;
-  onDelete: (note: LocalNote) => Promise<void>; onClose: () => void;
+export function Editor({ note, open = true, initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose }: {
+  note?: LocalNote; open?: boolean; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<void>;
+  onDelete: (note: LocalNote) => Promise<void>; onClose: (retainReady?: boolean) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const backdropPress = useRef(false);
+  const canRetainReady = useRef(true);
   const bodyInput = useRef<RichTextHandle>(null);
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const discardDialog = useRef<HTMLDialogElement>(null);
@@ -63,11 +64,16 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
   const dirty = initial.current !== snapshot({ title, body, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio });
 
   useEffect(() => {
-    dialog.current?.showModal();
-    // Mount the recorder only after the editor is in the browser's top layer.
-    if (initialRecording) setRecordingOpen(true);
-    return () => dialog.current?.close();
-  }, [note, initialRecording]);
+    const element = dialog.current;
+    if (open) {
+      bodyInput.current?.restartReading();
+      element?.showModal();
+      if (element) element.scrollTop = 0;
+      // Mount the recorder only after the editor is in the browser's top layer.
+      if (initialRecording) setRecordingOpen(true);
+    } else element?.close();
+    return () => element?.close();
+  }, [open, note, initialRecording]);
   useEffect(() => {
     const viewport = window.visualViewport;
     const element = dialog.current;
@@ -86,7 +92,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
   }, []);
   const requestClose = () => {
     if (saving || recordingOpen) return;
-    if (!dirty && note) return onClose();
+    if (!dirty && note) return onClose(canRetainReady.current && bodyInput.current?.isReady());
     // An empty draft has nothing to keep; shared images do.
     if (!note && !title.trim() && !body.trim() && retainedImages.length + newImages.length + retainedAudio.length + newAudio.length === 0) return onClose();
     if (saveFailed) return discardDialog.current?.showModal();
@@ -172,13 +178,17 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
     }
   };
   return <>
-    <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'} onKeyDownCapture={event => {
+    <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'}
+      onInputCapture={() => { canRetainReady.current = false; }}
+      onClickCapture={event => {
+        if (event.target instanceof Element && event.target.closest('button:not([data-close-note])')) canRetainReady.current = false;
+      }} onKeyDownCapture={event => {
       // ProseMirror consumes Escape. Handle it before the editing surface so
       // Shelf retains its existing save-on-Escape behavior.
       if (event.key === 'Escape' && !event.defaultPrevented && !event.nativeEvent.isComposing && event.target instanceof HTMLElement && event.target.closest('#note-body')) {
         event.preventDefault(); requestClose();
       }
-    }} onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onPasteCapture={pasteImages} onPointerDownCapture={event => { backdropPress.current = isDialogBackdrop(event); }} onPointerCancelCapture={() => { backdropPress.current = false; }} onClick={event => {
+    }} onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onPasteCapture={event => { canRetainReady.current = false; pasteImages(event); }} onPointerDownCapture={event => { backdropPress.current = isDialogBackdrop(event); }} onPointerCancelCapture={() => { backdropPress.current = false; }} onClick={event => {
       // A selection drag can start inside and produce a click on the backdrop.
       const startedOnBackdrop = backdropPress.current;
       backdropPress.current = false;
@@ -193,7 +203,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
           <div {...stylex.props(styles.headerActions)}>
             {note && <button type="button" aria-label="Delete note" onClick={() => deleteDialog.current?.showModal()} {...stylex.props(styles.iconButton, styles.deleteIcon)}><Icon name="trash"/></button>}
             <button type="button" aria-label={pinned ? 'Unpin note' : 'Pin note'} aria-pressed={pinned} onClick={() => setPinned(value => !value)} {...stylex.props(styles.pinText, pinned && styles.pinned)}><Icon name={pinned ? 'pin-filled' : 'pin'} width={18}/></button>
-            <button type="button" aria-label="Close note" disabled={saving} onClick={requestClose} {...stylex.props(styles.iconButton)}><Icon name="x"/></button>
+            <button type="button" data-close-note aria-label="Close note" disabled={saving} onClick={requestClose} {...stylex.props(styles.iconButton)}><Icon name="x"/></button>
           </div>
         </header>
         <div {...stylex.props(styles.editorAttachments)}>
@@ -209,7 +219,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
         </div>
         <div {...stylex.props(styles.editorFields)}>
           <label className="sr-only" htmlFor="note-title">Title</label><input id="note-title" maxLength={160} placeholder="Title" value={title} onChange={event => setTitle(event.target.value)} {...stylex.props(styles.titleInput)}/>
-          <RichTextEditor ref={bodyInput} initialValue={note?.body ?? ''} onChange={setBody} autoFocus={!note} disabled={saving}/>
+          <RichTextEditor ref={bodyInput} initialValue={note?.body ?? ''} onChange={value => { canRetainReady.current = false; setBody(value); }} autoFocus={!note} disabled={saving}/>
         </div>
         {(newAudio.length > 0 || (dirty && (retainedAudio.length > 0 || (note?.audio.length ?? 0) > 0))) && !saving && <p role="status" {...stylex.props(styles.audioDraftStatus)}>Audio changes are not saved yet. Close the note to save on this device.</p>}
         <p role="alert" {...stylex.props(styles.error)}>{error}</p>
@@ -219,7 +229,7 @@ export function Editor({ note, initialImages = [], initialAudio = [], initialRec
           <button type="button" aria-label="Attach an image or video" onClick={() => input.current?.click()} {...stylex.props(styles.iconButton)}><Icon name="image"/></button>
           <input ref={input} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }}/>
           <ColorPicker color={color} onChange={setColor}/>
-        </div><div {...stylex.props(styles.tools)}>{saveFailed && <button type="button" disabled={saving} onClick={() => void save()} {...stylex.props(styles.primary)}>Try again</button>}<button type="button" disabled={saving} onClick={requestClose} {...stylex.props(styles.secondary)}>Close</button></div></footer>
+        </div><div {...stylex.props(styles.tools)}>{saveFailed && <button type="button" disabled={saving} onClick={() => void save()} {...stylex.props(styles.primary)}>Try again</button>}<button type="button" data-close-note disabled={saving} onClick={requestClose} {...stylex.props(styles.secondary)}>Close</button></div></footer>
       </div>
     </dialog>
     {recordingOpen && <AudioRecorder onKeep={file => { addAudio([file]); setRecordingOpen(false); }} onClose={() => setRecordingOpen(false)}/>}

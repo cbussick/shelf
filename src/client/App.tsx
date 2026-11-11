@@ -20,6 +20,15 @@ import { clearShares, discardShare, getShare } from './incoming-share';
 import { clearLocalData, deleteLocalNote, hasLocalData, localNotes, reorderLocalNotes, saveLocalNote, syncNotes, type LocalNote } from './local-store';
 
 type SyncState = 'connecting' | 'syncing' | 'synced' | 'local' | 'offline' | 'error';
+type EditorSession = { note?: LocalNote; files?: File[]; audio?: File[]; recording?: boolean; shareId?: string };
+
+// Include the full immutable note snapshot, including attachment/local-blob
+// identities. A parked dialog must never reuse stale save versions or content.
+function readyNoteIdentity(note: LocalNote) {
+  return JSON.stringify([note.id, note.title, note.body, note.color, note.pinned, note.position, note.createdAt, note.updatedAt, note.version,
+    note.images.map(image => [image.id, image.url, image.alt, image.mimeType, image.width, image.height, image.size, image.rotation, image.blobId]),
+    note.audio.map(audio => [audio.id, audio.url, audio.name, audio.mimeType, audio.size, audio.duration, audio.blobId])]);
+}
 
 export function App() {
   const queryClient = useQueryClient();
@@ -40,7 +49,20 @@ export function App() {
 function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout: () => void }) {
   const [notes, setNotes] = useState<LocalNote[]>([]);
   const [query, setQuery] = useState('');
-  const [editor, setEditor] = useState<{ note?: LocalNote; files?: File[]; audio?: File[]; recording?: boolean; shareId?: string }>();
+  const [editor, setEditor] = useState<EditorSession>();
+  const [parkedEditor, setParkedEditor] = useState<{ value: EditorSession & { note: LocalNote }; read: boolean }>();
+  const nextDraft = useRef(0);
+  const preferredReadyNote = useRef<string | undefined>(undefined);
+  const activeEditorKey = useMemo(() => editor?.note ? readyNoteIdentity(editor.note) : editor ? `draft:${nextDraft.current++}` : undefined, [editor]);
+  const parkedEditorKey = useMemo(() => parkedEditor ? readyNoteIdentity(parkedEditor.value.note) : undefined, [parkedEditor]);
+  const renderedEditor = editor ?? parkedEditor?.value;
+  useEffect(() => {
+    setParkedEditor(previous => {
+      if (!previous) return previous;
+      const current = notes.find(note => note.id === previous.value.note.id);
+      return current && readyNoteIdentity(current) === readyNoteIdentity(previous.value.note) ? previous : undefined;
+    });
+  }, [notes]);
   const [menu, setMenu] = useState<MenuTarget>();
   useEffect(() => clearPreparedDocuments, []);
   const [syncState, setSyncState] = useState<SyncState>(offlineEntry ? 'offline' : 'connecting');
@@ -53,7 +75,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const noteToDelete = useRef<LocalNote | null>(null);
   const closeMenu = useCallback(() => setMenu(undefined), []);
-  const openNote = useCallback((note: LocalNote) => setEditor({ note }), []);
+  const openNote = useCallback((note: LocalNote) => { preferredReadyNote.current = note.id; setEditor({ note }); }, []);
   const showMenu = useCallback((note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => {
     setMenu({ note, x: event.clientX, y: event.clientY, origin: event.currentTarget });
   }, []);
@@ -159,13 +181,25 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     const normalized = query.trim().toLocaleLowerCase();
     return notes.filter(note => [note.title, note.body, ...note.images.map(image => image.alt), ...note.audio.map(audio => audio.name)].join(' ').toLocaleLowerCase().includes(normalized));
   }, [notes, query]);
-  useNotePreparation(filtered, Boolean(editor));
+  const warmReadyEditor = useCallback((id: string, source: string) => {
+    const note = notes.find(note => note.id === id && note.body === source);
+    if (!note || note.body.length < 500 || note.images.length || note.audio.length) return;
+    setParkedEditor(previous => {
+      // Prefer the last actually read note. Otherwise warm the most expensive
+      // nearby candidate, with a hard limit of one fully initialized dialog.
+      if (previous && previous.value.note.id === note.id) return previous;
+      if (previous && note.id !== preferredReadyNote.current && (previous.read || previous.value.note.body.length >= note.body.length)) return previous;
+      return { value: { note }, read: note.id === preferredReadyNote.current };
+    });
+  }, [notes]);
+  useNotePreparation(filtered, Boolean(editor), warmReadyEditor, preferredReadyNote.current);
   // Opening a dialog must not rebuild every card or rerun masonry layout.
   const pinned = useMemo(() => filtered.filter(note => note.pinned), [filtered]);
   const others = useMemo(() => filtered.filter(note => !note.pinned), [filtered]);
 
   const save = async (value: EditorValue) => {
-    await saveLocalNote(value);
+    const saved = await saveLocalNote(value);
+    if (editor) preferredReadyNote.current = saved.id;
     setNotes(await localNotes()); setPending(count => count + 1);
     notify(value.id ? 'Note updated' : 'Note added');
     void synchronize();
@@ -215,12 +249,13 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     try { files.forEach(validateAudioFile); setEditor({ audio: files }); }
     catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach this audio.'); }
   };
-  const closeEditor = async () => {
+  const closeEditor = async (retainReady = false) => {
     if (editor?.shareId) {
       try { await discardShare(editor.shareId); }
       catch { notify('Could not remove the temporary shared image from this device.'); }
       history.replaceState(null, '', '/');
     }
+    setParkedEditor(retainReady && editor?.note && !editor.note.images.length && !editor.note.audio.length ? { value: { note: editor.note }, read: true } : undefined);
     setEditor(undefined);
   };
   const logout = async () => {
@@ -244,7 +279,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
-    {editor && <Editor note={editor.note} initialImages={editor.files} initialAudio={editor.audio} initialRecording={editor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
+    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
     <Toaster theme="dark" position="bottom-center" offset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }} mobileOffset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))', left: 16, right: 16 }} style={{ fontFamily: 'inherit' }} toastOptions={{ style: { background: colors.ink, borderColor: colors.ink, borderRadius: 10 }, cancelButtonStyle: { minHeight: 44 } }}/>
   </>;

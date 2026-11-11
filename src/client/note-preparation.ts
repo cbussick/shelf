@@ -5,8 +5,9 @@ import { whenNoteIdle } from './note-scheduling';
 
 // Prepare only cards actually near the viewport, one document per idle turn.
 // An empty, detached editor supplies the schema/parser once; its view is then
-// destroyed. No live editor or history is retained for the board's notes.
-export function useNotePreparation(notes: { id: string; body: string }[], paused: boolean) {
+// destroyed. The caller may additionally warm one closed dialog once a nearby
+// document is prepared; all other notes retain only bounded document data.
+export function useNotePreparation(notes: { id: string; body: string }[], paused: boolean, onPrepared?: (id: string, source: string) => void, preferredId?: string) {
   useEffect(() => {
     if (paused || !notes.length || typeof IntersectionObserver === 'undefined') return;
     const owner = documentGeneration();
@@ -21,9 +22,10 @@ export function useNotePreparation(notes: { id: string; body: string }[], paused
       cancelIdle = whenNoteIdle(() => {
         cancelIdle = undefined;
         if (!active() || document.hidden || document.querySelector('dialog[open]')) return;
-        const source = [...visible.values()].find(value => !attempted.has(value) && !getPreparedDocument(value));
-        if (source === undefined) return;
-        if (!hasDocumentParser()) {
+        const candidate = [...visible].filter(([, source]) => !attempted.has(source)).sort((a, b) => Number(b[0] === preferredId) - Number(a[0] === preferredId) || b[1].length - a[1].length)[0];
+        if (!candidate) return;
+        const [id, source] = candidate;
+        if (!getPreparedDocument(source) && !hasDocumentParser()) {
           warming = true;
           const bootstrap = createNoteEditor({ root: document.createElement('div'), markdown: '',
             onChange: () => {}, onLimit: () => {}, onSelection: () => {}, editable: () => false });
@@ -36,7 +38,9 @@ export function useNotePreparation(notes: { id: string; body: string }[], paused
           return;
         }
         attempted.add(source);
-        try { prepareDocument(source); } catch { /* Opening retains its normal fallback. */ }
+        try {
+          if (prepareDocument(source) && active()) onPrepared?.(id, source);
+        } catch { /* Opening retains its normal fallback. */ }
         schedule();
       });
     };
@@ -59,5 +63,5 @@ export function useNotePreparation(notes: { id: string; body: string }[], paused
       observer.disconnect();
       document.removeEventListener('visibilitychange', schedule);
     };
-  }, [notes, paused]);
+  }, [notes, paused, onPrepared, preferredId]);
 }

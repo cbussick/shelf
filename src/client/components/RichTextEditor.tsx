@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react';
-import { AllSelection, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
+import { AllSelection, EditorState, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
+import { editorStateCtx } from '@milkdown/kit/core';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
 import { getPreparedDocument } from '../prepared-documents';
 import { afterNotePaint } from '../note-scheduling';
@@ -50,7 +51,7 @@ function previewSelection(doc: ProseNode, anchor: number, head: number) {
 }
 
 type NoteEditor = ReturnType<typeof createNoteEditor>;
-export type RichTextHandle = { read: () => string };
+export type RichTextHandle = { read: () => string; isReady: () => boolean; restartReading: () => void };
 
 const tools: { format: Format; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
   { format: 'heading', label: 'Heading', icon: 'heading' },
@@ -95,7 +96,23 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const [linkOpen, setLinkOpen] = useState(false);
   const [link, setLink] = useState('');
   const [linkError, setLinkError] = useState('');
-  useImperativeHandle(ref, () => ({ read: () => fallback.current?.value ?? instance.current?.read() ?? initial.current.initialValue }), []);
+  useImperativeHandle(ref, () => ({
+    read: () => fallback.current?.value ?? instance.current?.read() ?? initial.current.initialValue,
+    isReady: () => Boolean(instance.current && visible.current),
+    restartReading: () => {
+      const current = instance.current;
+      if (!current || !visible.current) return;
+      const view = current.view();
+      // Only unchanged, unedited sessions are retained. Keep their DOM, but
+      // start with fresh plugin/history and selection state on every opening.
+      const state = EditorState.create({ doc: view.state.doc, plugins: view.state.plugins });
+      current.editor.ctx.set(editorStateCtx, state);
+      view.updateState(state);
+      const selection = view.dom.ownerDocument.getSelection();
+      if (selection?.anchorNode && view.dom.contains(selection.anchorNode)) selection.removeAllRanges();
+      view.dom.scrollTop = 0;
+    },
+  }), []);
 
   const reveal = (explicit = false) => {
     if (!instance.current || visible.current || gesture.current) return;
