@@ -1,3 +1,5 @@
+import { OpeningCpuSampler, cpuProfileMode, type CpuSummary } from './opening-cpu';
+
 type CloseDetails = { dirty: boolean; interacted: boolean; ready: boolean };
 type Sample = {
   opening: number; activation: 'pointer' | 'other'; requestMs: number; pointerDispatchMs?: number;
@@ -6,7 +8,7 @@ type Sample = {
   dialogEffectMs?: number; readingResetMs?: number; modalReturnMs?: number;
   readableFrameMs?: number; editableFrameMs?: number; nextFrameMs?: number;
   fallback?: boolean; outcome?: 'ready' | 'timeout' | 'closed-early' | 'hidden' | 'superseded';
-  closeAttempt?: CloseDetails; retainedOnClose?: boolean;
+  closeAttempt?: CloseDetails; retainedOnClose?: boolean; cpu?: CpuSummary;
 };
 type Pending = { sample: Sample; start: number; candidate: HTMLDialogElement | null };
 type BrowserTiming = {
@@ -31,6 +33,8 @@ const visible = (element: Element | null | undefined) => Boolean(element?.getCli
 // boolean state and fixed enums; never note data, identities or event payloads.
 export class OpeningDiagnostics {
   enabled = false;
+  cpuEnabled = false;
+  private cpu = new OpeningCpuSampler();
   private samples: Sample[] = [];
   private pending?: Pending;
   private openSample?: Sample;
@@ -79,7 +83,17 @@ export class OpeningDiagnostics {
     }
   }
 
+  setCpuEnabled(enabled: boolean) {
+    this.cpu.clear();
+    for (const sample of this.samples) delete sample.cpu;
+    this.cpuEnabled = enabled && this.enabled && cpuProfileMode();
+  }
+
+  cpuAvailable() { return this.cpu.available(); }
+  settleCpu() { return this.cpu.settle(); }
+
   dispose() {
+    this.cpuEnabled = false;
     document.removeEventListener('pointerdown', this.pointer, true);
     document.removeEventListener('pointerup', this.release, true);
     document.removeEventListener('pointercancel', this.clearPointer, true);
@@ -93,6 +107,7 @@ export class OpeningDiagnostics {
   }
 
   clear() {
+    this.cpu.clear();
     cancelAnimationFrame(this.frame);
     clearTimeout(this.timeout);
     this.pending = undefined;
@@ -127,6 +142,7 @@ export class OpeningDiagnostics {
     this.evidence.set(sample, this.browserTimings.filter(timing => timing.start < now && timing.start + timing.durationMs >= start).slice(-16));
     this.openSample = sample;
     this.pending = { sample, start, candidate };
+    if (this.cpuEnabled) sample.cpu = this.cpu.start();
     this.timeout = window.setTimeout(() => this.finish('timeout'), 12_000);
     this.frame = requestAnimationFrame(this.observe);
   }
@@ -179,6 +195,7 @@ export class OpeningDiagnostics {
   };
 
   private finish(outcome: NonNullable<Sample['outcome']>) {
+    this.cpu.stop();
     if (this.pending) {
       this.pending.sample.outcome = outcome;
       this.ranges.get(this.pending.sample)!.end = performance.now();
@@ -241,11 +258,12 @@ export class OpeningDiagnostics {
     const script = document.querySelector<HTMLScriptElement>('script[type="module"][src]');
     const filename = script?.src.split('/').at(-1) ?? '';
     return JSON.stringify({
-      report: 'Shelf opening diagnostics v2',
+      report: 'Shelf opening diagnostics v3',
       build: /^index-[\w-]+\.js$/.test(filename) ? filename : 'development-or-unknown',
       mode: matchMedia('(display-mode: standalone)').matches ? 'installed' : 'browser',
       pageSession: this.session, enabled: this.enabled,
       timing: 'Milliseconds from pointerdown (or open request for keyboard/menu). pointerUpMs includes finger-down time; releaseToRequestMs isolates release-to-handler delay. Frame observations are not exact screen paint; event presentation timings are browser estimates. Browser entries overlap the measured window and are not additive. Last 6 openings; reset on reload or disable.',
+      cpu: { mode: cpuProfileMode(), enabled: this.cpuEnabled, available: this.cpu.available(), detail: 'Opt-in sampling starts at the open request (not earlier queued input), stops at the following frame or after a 2s stop request, max 256 samples. Only exact app-bundle line/column counts; unattributed samples may be idle, native, GC, missing stacks or unmapped code, not proof of a browser bug. Sampling adds overhead.' },
       browserTimingTypes: this.observedTypes,
       samples: this.samples.map(sample => {
         const range = this.ranges.get(sample);
