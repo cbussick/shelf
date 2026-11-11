@@ -5,9 +5,15 @@
 .note-formatting button[aria-pressed="true"]{background:#285b481c;color:#285b48}
 .note-rich-host,.note-rich-host>div,.note-rich-host .milkdown{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0}
 .note-rich-host{padding:6px;border-radius:4px}
+.note-surfaces{display:flex;flex:1;min-height:0;min-width:0}
+.note-surfaces>.note-rich-host{min-width:0}
+.note-rich-host[hidden]{display:none}
+.note-rich-host>.note-reading{display:block}
+.note-opening-status{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;font-size:14px;color:#546358}
+.note-opening-status button{min-height:40px;padding:4px 8px;text-decoration:underline}
 .note-rich-host:focus-within{outline:2px solid #527cb8;outline-offset:-2px}
-.note-rich-host .ProseMirror{flex:1;min-height:160px;overflow:auto;overflow-wrap:anywhere;white-space:pre-wrap;padding:6px 6px 10px;position:relative;outline:none}
-.note-rich-host .ProseMirror p{margin:0 0 .65em}
+.note-rich-host :is(.ProseMirror,.note-reading){flex:1;min-height:160px;overflow:auto;overflow-wrap:anywhere;white-space:pre-wrap;padding:6px 6px 10px;position:relative;outline:none}
+.note-rich-host :is(.ProseMirror,.note-reading) p{margin:0 0 .65em}
 .note-rich-host .ProseMirror:has(>p:only-child>br:only-child)::before{content:"Start anywhere…";color:#67766e;position:absolute;pointer-events:none}
 .note-rich-host h1,.note-rich-host h2,.note-rich-host h3,.note-rich-host h4,.note-rich-host h5,.note-rich-host h6{line-height:1.4;margin:.8em 0 .4em;font-weight:800}
 .note-rich-host h1{font-size:1.65em}.note-rich-host h2{font-size:1.4em}.note-rich-host h3{font-size:1.2em}
@@ -32,7 +38,7 @@
 @media(max-width:700px){
   .note-rich-text{min-height:0;margin-top:4px;overflow:hidden}
   .note-rich-host{min-height:0}
-  .note-rich-host .ProseMirror{min-height:0;overscroll-behavior:contain}
+  .note-rich-host :is(.ProseMirror,.note-reading){min-height:0;overscroll-behavior:contain}
   .note-formatting{order:2;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 0;border-top:1px solid #26363020;border-bottom:0}
   .note-formatting button{min-height:44px;min-width:40px;flex-shrink:0}
   .note-link-form{order:1;flex-shrink:0}

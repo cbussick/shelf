@@ -1,4 +1,4 @@
-import { Editor, defaultValueCtx, editorStateOptionsCtx, editorViewCtx, editorViewOptionsCtx, rootCtx, serializerCtx } from '@milkdown/kit/core';
+import { Editor, defaultValueCtx, editorStateOptionsCtx, editorViewCtx, editorViewOptionsCtx, rootCtx, serializerCtx, parserCtx } from '@milkdown/kit/core';
 import { commonmark, imageSchema, listItemKeymap, listItemSchema } from '@milkdown/kit/preset/commonmark';
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
@@ -12,6 +12,8 @@ import { keydownHandler } from '@milkdown/kit/prose/keymap';
 import { Fragment } from '@milkdown/kit/prose/model';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
 import { $prose, $view } from '@milkdown/kit/utils';
+
+import { documentGeneration, getPreparedDocument, installDocumentParser, rememberDocument } from './prepared-documents';
 
 export const MAX_NOTE_BODY = 20_000;
 export type Format = 'heading' | 'bold' | 'italic' | 'bullet' | 'ordered' | 'task' | 'indent' | 'outdent' | 'quote' | 'code' | 'undo' | 'redo';
@@ -208,6 +210,7 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
   root: HTMLElement; markdown: string; onChange: (value: string) => void;
   onLimit: () => void; onSelection: (formats: Format[]) => void; editable: () => boolean;
 }) {
+  const generation = documentGeneration();
   let initialDoc: ProseNode | undefined;
   let read = () => markdown;
   const changes = $prose(ctx => {
@@ -227,6 +230,14 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       },
       view(view) {
         initialDoc = view.state.doc;
+        rememberDocument(markdown, initialDoc.toJSON(), generation);
+        // Capture the pure parser, not the editor/context being destroyed. This
+        // lets idle preparation reuse its schema without retaining a live view.
+        const parse = ctx.get(parserCtx);
+        installDocumentParser(source => {
+          const doc = parse(source);
+          return mergeAdjacentLists(EditorState.create({ schema: doc.type.schema, doc }).tr).doc.toJSON();
+        }, generation);
         onSelection(activeFormats(view.state));
         read = () => view.state.doc.eq(initialDoc!) ? markdown : serialize(view.state.doc);
         return {
@@ -275,7 +286,8 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
   const editor = Editor.make()
     .config(ctx => {
       ctx.set(rootCtx, root);
-      ctx.set(defaultValueCtx, markdown);
+      const prepared = getPreparedDocument(markdown);
+      ctx.set(defaultValueCtx, prepared ? { type: 'json', value: prepared } : markdown);
       // Normalize the editing structure without rewriting untouched source text.
       ctx.set(editorStateOptionsCtx, options => ({
         ...options,

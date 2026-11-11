@@ -13,6 +13,8 @@ import { LoadingBrand } from './components/LoadingBrand';
 import { AddAudio } from './components/AddAudio';
 import { validateAudioFile } from './audio';
 import { NoteBoard } from './components/NoteBoard';
+import { useNotePreparation } from './note-preparation';
+import { clearPreparedDocuments } from './prepared-documents';
 import { NoteContextMenu, type MenuTarget } from './components/NoteContextMenu';
 import { clearShares, discardShare, getShare } from './incoming-share';
 import { clearLocalData, deleteLocalNote, hasLocalData, localNotes, reorderLocalNotes, saveLocalNote, syncNotes, type LocalNote } from './local-store';
@@ -40,6 +42,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   const [query, setQuery] = useState('');
   const [editor, setEditor] = useState<{ note?: LocalNote; files?: File[]; audio?: File[]; recording?: boolean; shareId?: string }>();
   const [menu, setMenu] = useState<MenuTarget>();
+  useEffect(() => clearPreparedDocuments, []);
   const [syncState, setSyncState] = useState<SyncState>(offlineEntry ? 'offline' : 'connecting');
   const [syncError, setSyncError] = useState<string>();
   const [pending, setPending] = useState(0);
@@ -155,6 +158,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     const normalized = query.trim().toLocaleLowerCase();
     return notes.filter(note => [note.title, note.body, ...note.images.map(image => image.alt), ...note.audio.map(audio => audio.name)].join(' ').toLocaleLowerCase().includes(normalized));
   }, [notes, query]);
+  useNotePreparation(filtered, Boolean(editor));
   const pinned = filtered.filter(note => note.pinned);
   const others = filtered.filter(note => !note.pinned);
 
@@ -219,7 +223,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   };
   const logout = async () => {
     if (pending) return notify('Wait for your notes to finish syncing before signing out.');
-    await api.logout(); await clearLocalData(); await clearShares(); onLogout();
+    await api.logout(); clearPreparedDocuments(); await clearLocalData(); await clearShares(); onLogout();
   };
 
   const status = syncStatus(syncState, pending);
