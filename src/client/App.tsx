@@ -9,6 +9,7 @@ import { colors, styles } from './app.stylex';
 import { Auth, Brand } from './components/Auth';
 import { ConfirmDialog, Editor, type EditorValue } from './components/Editor';
 import { Icon } from './components/Icon';
+import { LoadingBrand } from './components/LoadingBrand';
 import { AddAudio } from './components/AddAudio';
 import { validateAudioFile } from './audio';
 import { NoteBoard } from './components/NoteBoard';
@@ -20,14 +21,14 @@ type SyncState = 'connecting' | 'syncing' | 'synced' | 'local' | 'offline' | 'er
 
 export function App() {
   const queryClient = useQueryClient();
-  const auth = useQuery({ queryKey: ['auth'], queryFn: api.authStatus, retry: false });
-  const [offlineAccess, setOfflineAccess] = useState(false);
-  useEffect(() => {
-    if (auth.error instanceof ApiError && auth.error.status === 0) void hasLocalData().then(setOfflineAccess);
-  }, [auth.error]);
-  if (auth.isPending) return <Loading/>;
-  if (auth.data?.authenticated || offlineAccess) return <NotesApp offlineEntry={!auth.data?.authenticated} onLogout={() => { setOfflineAccess(false); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>;
-  if (auth.error && !offlineAccess) return <Auth setupRequired={false} onAuthenticated={() => void queryClient.invalidateQueries({ queryKey: ['auth'] })}/>;
+  // Attempt auth even offline so a paused query cannot trap startup on the splash.
+  const auth = useQuery({ queryKey: ['auth'], queryFn: api.authStatus, retry: false, networkMode: 'always', refetchOnReconnect: true });
+  const unreachable = auth.error instanceof ApiError && auth.error.status === 0;
+  const offlineAccess = useQuery({ queryKey: ['offline-access'], queryFn: hasLocalData, enabled: unreachable, retry: false, networkMode: 'always' });
+  if (auth.isPending || (unreachable && offlineAccess.isPending)) return <Loading/>;
+  if (auth.data?.authenticated || (unreachable && offlineAccess.data)) return <NotesApp offlineEntry={!auth.data?.authenticated} onLogout={() => { queryClient.setQueryData(['offline-access'], false); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>;
+  if (unreachable) return <main {...stylex.props(styles.loginPage)}><section role="alert" {...stylex.props(styles.loginCard)}><Brand/><h1 {...stylex.props(styles.loginTitle)}>Shelf is offline</h1><p {...stylex.props(styles.loginCopy)}>Connect to your server to open Shelf. Your notes could not be opened on this device.</p><button type="button" disabled={auth.isFetching} onClick={() => void auth.refetch()} {...stylex.props(styles.primary)}>Try again</button></section></main>;
+  if (auth.error) return <Auth setupRequired={false} onAuthenticated={() => void queryClient.invalidateQueries({ queryKey: ['auth'] })}/>;
   return <Auth setupRequired={auth.data?.setupRequired ?? false} onAuthenticated={() => void queryClient.invalidateQueries({ queryKey: ['auth'] })}/>;
 }
 
@@ -253,4 +254,4 @@ function syncErrorDetails(error: unknown): string {
   return error instanceof ApiError && error.status > 0 ? `${message} (HTTP ${error.status})` : message;
 }
 
-function Loading() { return <main {...stylex.props(styles.loginPage)}><p>Opening Shelf…</p></main>; }
+function Loading() { return <main {...stylex.props(styles.loginPage)}><LoadingBrand/></main>; }

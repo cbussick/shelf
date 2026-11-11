@@ -1,12 +1,14 @@
-# Loading motion concept — preview only
+# Approved loading motion
 
 **Direction:** a little note catching a little air. Use Shelf’s existing folded-note
 mark rather than introducing a new feather identity. The artwork is already real
 SVG in `public/assets/favicon.svg`; the header currently reconstructs it in CSS
 (`Brand` in `src/client/components/Auth.tsx`). This preview copies the SVG geometry
 exactly, splitting the two ink strokes solely to animate their opacity separately.
-If approved, consolidate the artwork in one shared component instead of keeping
-independent inline copies.
+The production implementation is `src/client/components/LoadingBrand.tsx`, using
+StyleX keyframes. The standalone HTML/GIF preserves the approved design reference;
+production behavior is covered by `tests/e2e/loading.spec.ts`. Header branding is
+unchanged and stays static.
 
 Open `index.html` through a local HTTP server; `?clean` hides the preview controls.
 `preview.gif` is a browser-rendered, looping motion sample, not the full-screen
@@ -59,23 +61,25 @@ Read from `/root/cb-coding/herdr-fernblick`:
 - `design/branding/README.md`: **no minimum splash timer**. Loading ends as soon as
   the initial dashboard request settles. Header branding stays static.
 
-Adopt those lifecycle rules, not the mascot motion. Shelf currently shows
-`Loading` during the auth query’s `isPending` branch in `src/client/App.tsx`.
-React Query can be pending *and paused* when offline, so pending alone must not
-mean an endlessly animated splash. On implementation, explicitly handle paused
-startup and retain local-note access, authentication and error recovery. Do not
-expand the splash to cover background note synchronization. No artificial delay,
-no waiting for a loop to finish; remove it immediately on readiness or failure.
-The standalone preview’s timers only simulate request durations.
+Shelf adopts those lifecycle rules, not the mascot motion. `src/client/App.tsx`
+shows loading only while initial auth or the local-access check is pending. Auth
+uses `networkMode: 'always'` so browser-offline startup attempts the request and
+can fall back to local data rather than pausing indefinitely. A failed connection
+opens downloaded notes if available, otherwise it shows an offline explanation
+with retry and automatic reconnection. Auth errors retain the sign-in fallback.
+Background note sync never brings the splash back. There is no artificial delay,
+no waiting for a loop to finish, and no exit animation. The standalone preview’s
+timers only simulate request durations.
 
 ## Scope and verification
 
-No application code, installed icons, service worker, or dependencies changed.
-This is an approval artifact, not an integrated loading component.
+The loading component and startup lifecycle are integrated. Installed icons,
+header branding, service-worker logic and dependencies are unchanged.
 
 `verify.mjs` checks mobile/desktop overflow, active animations, left-to-right
 shimmer direction, accessible loading text, 250 ms simulated completion, immediate
 interruption, replay, both reduced-motion modes (including shimmer), and browser
-errors. It can render the checked-in GIF from the exact preview CSS. Real-device
-motion feel and the eventual app’s auth/offline lifecycle still require testing
-when integrated.
+errors. It can render the checked-in GIF from the exact preview CSS. Production
+E2E tests cover mobile/desktop motion, accessibility, reduced motion, immediate
+completion, auth failure, offline fallback/reconnect and background sync. Real-device
+motion feel and screen-reader checks remain advisable.
