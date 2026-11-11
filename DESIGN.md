@@ -25,7 +25,7 @@ Shelf is a single-owner, self-hosted home for text, image, and audio notes. It s
 
 ## Note bodies
 
-Milkdown provides one directly editable, formatted body, with CommonMark/GFM input shortcuts, headings, emphasis, links, lists, native task checkboxes, quotes, code and undo/redo. There is no separate Read/Edit switch or text highlighting. The body remains a Markdown string; cards display non-interactive text excerpts with task state.
+Milkdown provides one directly editable, formatted body, with CommonMark/GFM input shortcuts, headings, emphasis, links, lists, native task checkboxes, quotes, code and undo/redo. There is no persistent Read/Edit mode or text highlighting. Prepared notes can briefly show matching read-only content while their editor starts; the transition is automatic unless the user is selecting text. In that case a temporary **Edit text** action transfers the selection without interrupting reading. Visible cards are prepared opportunistically, with a bounded session-local cache of parsed document data, never shared undo history. Unprepared notes show an honest loading state. The body remains a Markdown string; cards display non-interactive text excerpts with task state.
 
 Closing a note saves on this device, as before; neither typing nor ticking a task is advertised as an autosave. Merely opening a note does not rewrite its source. After editing, Markdown serialization can normalize spacing, bullets and delimiters; byte-for-byte preservation of edited source is not promised. Body whitespace is no longer globally trimmed. The serialized body retains the 20,000-character limit.
 

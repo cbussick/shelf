@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { LocalImage, LocalNote } from '../local-store';
 import { imageSource } from '../local-store';
 import { styles } from '../app.stylex';
@@ -11,7 +11,7 @@ import { LinkedText } from './LinkedText';
 import { linkParts } from './link-parts';
 import { noteExcerpt } from '../note-excerpt';
 
-export function NoteBoard({ notes, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
+export const NoteBoard = memo(function NoteBoard({ notes, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
   notes: LocalNote[]; heading?: string; label: string;
   onOpen: (note: LocalNote) => void; onPin: (note: LocalNote) => void;
   onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -165,7 +165,7 @@ export function NoteBoard({ notes, heading, label, onOpen, onPin, onContextMenu,
         }}/>) }
     </ul>
   </section>;
-}
+});
 
 function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPointerDown, onKeyDown }: {
   note: LocalNote; onCardClick: () => void; onPin: (note: LocalNote) => void; onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void; dropTarget: boolean;

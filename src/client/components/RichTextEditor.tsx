@@ -4,20 +4,28 @@ import { getPreparedDocument } from '../prepared-documents';
 import { afterNotePaint } from '../note-scheduling';
 import { NoteReading } from './NoteReading';
 import { closeHistory } from '@milkdown/kit/prose/history';
-import { createNoteEditor, formatCommand, MAX_NOTE_BODY, safeNoteLink, setNoteLink, type Format } from '../rich-text';
+import { createNoteEditor, formatCommand, MAX_NOTE_BODY, safeNoteLink, setNoteLink, syncNoteSelection, type Format } from '../rich-text';
 import { Icon } from './Icon';
 import './rich-text.css';
 
 // Text spans carry positions in the same normalized document used for editing.
 // DOM references never survive the handoff; only logical positions do.
-function readingPosition(node: Node | null, offset: number): number | undefined {
-  const element = node instanceof Element ? node : node?.parentElement;
-  const span = element?.closest<HTMLElement>('[data-note-position]');
-  if (!span || !node) return;
-  const range = document.createRange();
-  range.selectNodeContents(span);
-  range.setEnd(node, offset);
-  return Number(span.dataset.notePosition) + range.toString().length;
+function readingPosition(root: HTMLElement, node: Node | null, offset: number, bias: number): number | undefined {
+  if (!node) return;
+  let previous: number | undefined;
+  for (const span of root.querySelectorAll<HTMLElement>('[data-note-position]')) {
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    const comparison = range.comparePoint(node, offset);
+    const start = Number(span.dataset.notePosition);
+    if (comparison < 0) return bias < 0 && previous !== undefined ? previous : start;
+    if (comparison === 0) {
+      range.setEnd(node, offset);
+      return start + range.toString().length;
+    }
+    previous = start + (span.textContent?.length ?? 0);
+  }
+  return previous;
 }
 
 type NoteEditor = ReturnType<typeof createNoteEditor>;
@@ -73,11 +81,13 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     if (selecting && !explicit) return;
     restore.current.scroll = reading.current?.scrollTop ?? 0;
     if (selecting && selection) {
-      const anchor = readingPosition(selection.anchorNode, selection.anchorOffset);
-      const head = readingPosition(selection.focusNode, selection.focusOffset);
+      const range = selection.getRangeAt(0);
+      const forward = range.startContainer === selection.anchorNode && range.startOffset === selection.anchorOffset;
+      const anchor = readingPosition(reading.current!, selection.anchorNode, selection.anchorOffset, forward ? 1 : -1);
+      const head = readingPosition(reading.current!, selection.focusNode, selection.focusOffset, forward ? -1 : 1);
       if (anchor !== undefined && head !== undefined) restore.current.selection = { anchor, head };
     }
-    if (explicit) focusOnReveal.current = true;
+    if (explicit || document.activeElement === reading.current) focusOnReveal.current = true;
     visible.current = true;
     setReady(true);
   };
@@ -86,15 +96,21 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     let cancelled = false, interacted = false;
     const noticeInteraction = (event: Event) => {
       if (event.target instanceof Node && root.current?.closest('dialog')?.contains(event.target)) {
-        interacted = true;
-        userInteracted.current = true;
+        if (event.type !== 'focusin') {
+          interacted = true;
+          userInteracted.current = true;
+        }
+        if (!reading.current?.contains(event.target)) {
+          focusOnReveal.current = false;
+          restore.current.point = undefined;
+        }
       }
     };
     const stopNoticing = () => {
-      for (const type of ['pointerdown', 'keydown', 'input']) document.removeEventListener(type, noticeInteraction, true);
+      for (const type of ['pointerdown', 'keydown', 'input', 'focusin']) document.removeEventListener(type, noticeInteraction, true);
     };
     stopInteraction.current = stopNoticing;
-    for (const type of ['pointerdown', 'keydown', 'input']) document.addEventListener(type, noticeInteraction, true);
+    for (const type of ['pointerdown', 'keydown', 'input', 'focusin']) document.addEventListener(type, noticeInteraction, true);
     // Each effect owns its host. StrictMode's cancelled asynchronous mount can
     // finish safely without ever attaching a second editor to the live host.
     const host = document.createElement('div');
@@ -133,12 +149,19 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     });
     const selectionChanged = () => reveal();
     document.addEventListener('selectionchange', selectionChanged);
-    const endGesture = () => { gesture.current = false; };
+    let endTask = 0;
+    const endGesture = () => {
+      gesture.current = false;
+      // Let the click handler record caret intent before an automatic reveal.
+      clearTimeout(endTask);
+      endTask = window.setTimeout(() => { if (!cancelled) reveal(); }, 0);
+    };
     document.addEventListener('pointerup', endGesture);
     document.addEventListener('pointercancel', endGesture);
     return () => {
       cancelled = true;
       cancelStart();
+      clearTimeout(endTask);
       stopNoticing();
       document.removeEventListener('selectionchange', selectionChanged);
       document.removeEventListener('pointerup', endGesture);
@@ -157,7 +180,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     view.dom.scrollTop = restore.current.scroll;
     const selection = restore.current.selection;
     if (selection && selection.anchor <= view.state.doc.content.size && selection.head <= view.state.doc.content.size) {
-      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, selection.anchor, selection.head)));
+      view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(selection.anchor), view.state.doc.resolve(selection.head))));
     } else if (restore.current.point) {
       const position = view.posAtCoords(restore.current.point)?.pos;
       if (position !== undefined) view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(position))));
@@ -180,6 +203,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const run = (format: Format) => {
     const view = instance.current?.view();
     if (!view || disabled) return;
+    syncNoteSelection(view);
     if (format !== 'undo' && format !== 'redo') view.dispatch(closeHistory(view.state.tr));
     formatCommand(format, view.state)(view.state, view.dispatch, view);
     view.focus();

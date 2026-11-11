@@ -1,11 +1,20 @@
-import { createElement, Fragment, type ReactNode } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { PreparedNode } from '../prepared-documents';
 import { safeNoteLink } from '../rich-text';
 
-// Render only our known document vocabulary, never arbitrary HTML or resources.
-// Lists match the editor's plain-DOM node views so wrapping/scroll stay stable.
+const markTags: Readonly<Record<string, string>> = { strong: 'strong', emphasis: 'em', inlineCode: 'code', strike_through: 'del' };
+
+// This immutable surface needs no React reconciliation per paragraph. Building
+// plain DOM keeps the first frame cheap on phones. Only known tags/attributes
+// are emitted; Markdown HTML and resource URLs are never injected.
 export function NoteReading({ document }: { document: PreparedNode }) {
-  return <>{renderNode(document)}</>;
+  const root = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = root.current!;
+    element.replaceChildren(renderNode(element.ownerDocument, document));
+    return () => element.replaceChildren();
+  }, [document]);
+  return <div ref={root}/>;
 }
 
 function text(node: PreparedNode): string {
@@ -18,47 +27,87 @@ function nodeSize(node: PreparedNode): number {
   return 2 + (node.content?.reduce((size, child) => size + nodeSize(child), 0) ?? 0);
 }
 
-function renderNode(node: PreparedNode, position = 0): ReactNode {
-  let childPosition = position + (node.type === 'doc' ? 0 : 1);
-  const children = node.content?.map((child, index) => {
-    const content = <Fragment key={index}>{renderNode(child, childPosition)}</Fragment>;
-    childPosition += nodeSize(child);
-    return content;
-  });
+function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
   const attrs = node.attrs ?? {};
+  const fragment = dom.createDocumentFragment();
+  let childPosition = position + (node.type === 'doc' ? 0 : 1);
+  for (const child of node.content ?? []) {
+    fragment.append(renderNode(dom, child, childPosition));
+    childPosition += nodeSize(child);
+  }
+  const wrap = (tag: string, content: Node = fragment) => {
+    const element = dom.createElement(tag);
+    element.append(content);
+    return element;
+  };
   switch (node.type) {
-    case 'doc': return children;
-    case 'text': return <span data-note-position={position}>{(node.marks ?? []).reduce<ReactNode>((content, mark) => {
-      switch (mark.type) {
-        case 'strong': return <strong>{content}</strong>;
-        case 'emphasis': return <em>{content}</em>;
-        case 'inlineCode': return <code>{content}</code>;
-        case 'strike_through': return <del>{content}</del>;
-        case 'link': {
-          const href = typeof mark.attrs?.href === 'string' ? safeNoteLink(mark.attrs.href) : null;
-          return href ? <a href={href} target="_blank" rel="noopener noreferrer">{content}</a> : content;
+    case 'doc': return fragment;
+    case 'text': {
+      let content: Node = dom.createTextNode(node.text ?? '');
+      for (const mark of node.marks ?? []) {
+        const tag = markTags[mark.type];
+        if (typeof tag === 'string') content = wrap(tag, content);
+        else if (mark.type === 'link' && typeof mark.attrs?.href === 'string') {
+          const href = safeNoteLink(mark.attrs.href);
+          if (href) {
+            const link = wrap('a', content) as HTMLAnchorElement;
+            link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+            content = link;
+          }
         }
-        default: return content;
       }
-    }, node.text ?? '')}</span>;
-    case 'paragraph': return <p>{children ?? <br/>}</p>;
-    case 'heading': return createElement(`h${Math.min(6, Math.max(1, Number(attrs.level) || 1))}`, null, children);
-    case 'bullet_list': return <ul>{children}</ul>;
-    case 'ordered_list': return <ol start={Number(attrs.order) || 1}>{children}</ol>;
-    case 'list_item': return <li data-task={String(attrs.checked != null)} data-checked={String(attrs.checked === true)}>
-      <input type="checkbox" hidden={attrs.checked == null} checked={attrs.checked === true} disabled aria-label={text(node.content?.[0] ?? node) || 'Task'}/>
-      <div className="note-list-content">{children}</div>
-    </li>;
-    case 'blockquote': return <blockquote>{children}</blockquote>;
-    case 'code_block': return <pre><code>{children}</code></pre>;
-    case 'hardbreak': return <br/>;
-    case 'hr': return <hr/>;
-    case 'table': return <table><tbody>{children}</tbody></table>;
-    case 'table_row': case 'table_header_row': return <tr>{children}</tr>;
-    case 'table_cell': return <td>{children}</td>;
-    case 'table_header': return <th>{children}</th>;
-    case 'image': return <span className="note-inline-image">[Image: {String(attrs.alt || 'use Attach an image')}]</span>;
-    case 'html': return <span>{typeof attrs.value === 'string' ? attrs.value : text(node)}</span>;
-    default: return children ?? node.text ?? null;
+      const span = wrap('span', content);
+      span.dataset.notePosition = String(position);
+      return span;
+    }
+    case 'paragraph': return wrap('p', node.content?.length ? fragment : dom.createElement('br'));
+    case 'heading': return wrap(`h${Math.min(6, Math.max(1, Number(attrs.level) || 1))}`);
+    case 'bullet_list': return wrap('ul');
+    case 'ordered_list': {
+      const list = wrap('ol') as HTMLOListElement;
+      list.start = Number(attrs.order) || 1;
+      return list;
+    }
+    case 'list_item': {
+      const item = dom.createElement('li');
+      item.dataset.task = String(attrs.checked != null);
+      item.dataset.checked = String(attrs.checked === true);
+      const checkbox = dom.createElement('input');
+      checkbox.type = 'checkbox'; checkbox.hidden = attrs.checked == null;
+      checkbox.checked = attrs.checked === true; checkbox.disabled = true;
+      checkbox.setAttribute('aria-label', text(node.content?.[0] ?? node) || 'Task');
+      const content = wrap('div'); content.className = 'note-list-content';
+      item.append(checkbox, content);
+      return item;
+    }
+    case 'blockquote': return wrap('blockquote');
+    case 'code_block': return wrap('pre', wrap('code'));
+    case 'hardbreak': return dom.createElement('br');
+    case 'hr': return dom.createElement('hr');
+    case 'table': return wrap('table', wrap('tbody'));
+    case 'table_row': case 'table_header_row': return wrap('tr');
+    case 'table_cell': case 'table_header': {
+      const cell = wrap(node.type === 'table_cell' ? 'td' : 'th');
+      cell.style.textAlign = attrs.alignment === 'center' || attrs.alignment === 'right' ? attrs.alignment : 'left';
+      return cell;
+    }
+    case 'footnote_reference': {
+      const reference = wrap('sup', dom.createTextNode(String(attrs.label ?? '')));
+      reference.dataset.type = 'footnote_reference'; reference.dataset.label = String(attrs.label ?? '');
+      return reference;
+    }
+    case 'footnote_definition': {
+      const definition = dom.createElement('dl');
+      definition.dataset.type = 'footnote_definition'; definition.dataset.label = String(attrs.label ?? '');
+      definition.append(wrap('dt', dom.createTextNode(String(attrs.label ?? ''))), wrap('dd'));
+      return definition;
+    }
+    case 'image': {
+      const image = wrap('span', dom.createTextNode(`[Image: ${String(attrs.alt || 'use Attach an image')}]`));
+      image.className = 'note-inline-image';
+      return image;
+    }
+    case 'html': return dom.createTextNode(typeof attrs.value === 'string' ? attrs.value : text(node));
+    default: return fragment;
   }
 }

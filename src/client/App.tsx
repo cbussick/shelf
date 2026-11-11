@@ -53,9 +53,10 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const noteToDelete = useRef<LocalNote | null>(null);
   const closeMenu = useCallback(() => setMenu(undefined), []);
-  const showMenu = (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => {
+  const openNote = useCallback((note: LocalNote) => setEditor({ note }), []);
+  const showMenu = useCallback((note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => {
     setMenu({ note, x: event.clientX, y: event.clientY, origin: event.currentTarget });
-  };
+  }, []);
   const confirmDelete = (note: LocalNote) => {
     noteToDelete.current = note;
     deleteDialog.current?.showModal();
@@ -159,8 +160,9 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     return notes.filter(note => [note.title, note.body, ...note.images.map(image => image.alt), ...note.audio.map(audio => audio.name)].join(' ').toLocaleLowerCase().includes(normalized));
   }, [notes, query]);
   useNotePreparation(filtered, Boolean(editor));
-  const pinned = filtered.filter(note => note.pinned);
-  const others = filtered.filter(note => !note.pinned);
+  // Opening a dialog must not rebuild every card or rerun masonry layout.
+  const pinned = useMemo(() => filtered.filter(note => note.pinned), [filtered]);
+  const others = useMemo(() => filtered.filter(note => !note.pinned), [filtered]);
 
   const save = async (value: EditorValue) => {
     await saveLocalNote(value);
@@ -172,11 +174,11 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     await deleteLocalNote(note); setEditor(undefined); setNotes(await localNotes()); setPending(count => count + 1);
     notify('Note permanently deleted'); void synchronize();
   };
-  const pin = async (note: LocalNote) => {
+  const pin = useCallback(async (note: LocalNote) => {
     await saveLocalNote({ ...note, pinned: !note.pinned, retainedImages: note.images, newImages: [], retainedAudio: note.audio, newAudio: [] });
     setNotes(await localNotes()); notify(note.pinned ? 'Note unpinned' : 'Note pinned'); void synchronize();
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-pin-id="${note.id}"]`)?.focus({ preventScroll: true }));
-  };
+  }, [notify, synchronize]);
   const changeColor = async (note: LocalNote, color: NoteColor) => {
     try {
       const current = (await localNotes()).find(item => item.id === note.id);
@@ -184,7 +186,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
       await save({ ...current, color, retainedImages: current.images, newImages: [], retainedAudio: current.audio, newAudio: [] });
     } catch { notify('Could not change note color. Try again.'); }
   };
-  const reorder = async (source: string, target: string) => {
+  const reorder = useCallback(async (source: string, target: string) => {
     const moving = notes.find(note => note.id === source);
     if (!moving || moving.pinned !== notes.find(note => note.id === target)?.pinned) return;
     const group = notes.filter(note => note.pinned === moving.pinned);
@@ -200,7 +202,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
       setPending(count => count + 1);
       void synchronize();
     } catch { setNotes(await localNotes()); notify('Could not reorder notes. Try again.'); }
-  };
+  }, [notes, notify, synchronize]);
   const chooseImages = (files: FileList | null) => {
     if (!files?.length) return;
     try {
@@ -235,12 +237,12 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     </header>
     <main id="main" {...stylex.props(styles.workspace)}><section {...stylex.props(styles.pageHeading)}><h1 {...stylex.props(styles.h1)}>Your notes</h1></section>
       <nav aria-label="Create a note" {...stylex.props(styles.floatingCapture)}><button type="button" aria-label="Add an image or video" onClick={() => imageInput.current?.click()} {...stylex.props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => setEditor({ recording: true })}/><span {...stylex.props(styles.mobileDivider)}/><button type="button" onClick={() => setEditor({})} {...stylex.props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
-      {pinned.length > 0 && <NoteBoard notes={pinned} heading="Pinned" label="Pinned notes" onOpen={note => setEditor({ note })} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/>}
-      {others.length > 0 && <div {...stylex.props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={note => setEditor({ note })} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
+      {pinned.length > 0 && <NoteBoard notes={pinned} heading="Pinned" label="Pinned notes" onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/>}
+      {others.length > 0 && <div {...stylex.props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
       {filtered.length === 0 && <section {...stylex.props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...stylex.props(styles.secondary)}>Clear search</button>}</section>}
     </main>
     <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
-    {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={note => setEditor({ note })} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
+    {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
     {editor && <Editor note={editor.note} initialImages={editor.files} initialAudio={editor.audio} initialRecording={editor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>

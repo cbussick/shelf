@@ -3,7 +3,8 @@ import { commonmark, imageSchema, listItemKeymap, listItemSchema } from '@milkdo
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
 import { clipboard } from '@milkdown/kit/plugin/clipboard';
-import { EditorState, Plugin, type Command, type Transaction } from '@milkdown/kit/prose/state';
+import { EditorState, Plugin, TextSelection, type Command, type Transaction } from '@milkdown/kit/prose/state';
+import type { EditorView } from '@milkdown/kit/prose/view';
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/kit/prose/commands';
 import { liftListItem, sinkListItem, wrapInList } from '@milkdown/kit/prose/schema-list';
 import { closeHistory, undo, redo } from '@milkdown/kit/prose/history';
@@ -68,6 +69,19 @@ function checklist(): Command {
     }
     return wrapInList(state.schema.nodes.bullet_list!)(state, dispatch && apply);
   };
+}
+
+// A click's DOM selection can precede the browser's selectionchange event.
+// Read it before structural commands so a rapid click-then-Tab formats the
+// clicked row, not the editor's initial selection after a deferred mount.
+export function syncNoteSelection(view: EditorView) {
+  const selection = view.dom.ownerDocument.getSelection();
+  if (view.composing || !selection?.anchorNode || !selection.focusNode ||
+    !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) return;
+  const anchor = view.posAtDOM(selection.anchorNode, selection.anchorOffset);
+  const head = view.posAtDOM(selection.focusNode, selection.focusOffset);
+  if (anchor === view.state.selection.anchor && head === view.state.selection.head) return;
+  view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head))).setMeta('addToHistory', false));
 }
 
 export function formatCommand(format: Format, state: EditorState): Command {
@@ -296,6 +310,10 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       ctx.set(editorViewOptionsCtx, {
         editable,
         handleKeyDown: (view, event) => {
+          const structural = event.key === 'Tab' ||
+            (event.altKey && ['ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft'].includes(event.key)) ||
+            ((event.ctrlKey || event.metaKey) && ['[', ']'].includes(event.key));
+          if (view.editable && structural) syncNoteSelection(view);
           if (event.key === 'Tab') {
             if (view.editable) formatCommand(event.shiftKey ? 'outdent' : 'indent', view.state)(view.state, view.dispatch, view);
             // Always consume Tab, even when the list command cannot apply.
