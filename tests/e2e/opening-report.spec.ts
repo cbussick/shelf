@@ -53,7 +53,7 @@ test('opt-in report measures actual cold/warm reuse without private data and sup
   await open(page); await close(page);
   await showReport(page);
   const result = await report(page);
-  expect(result.report).toBe('Shelf opening diagnostics v2');
+  expect(result.report).toBe('Shelf opening diagnostics v3');
   expect(result.browserTimingTypes.every((type: string) => ['event', 'longtask', 'long-animation-frame'].includes(type))).toBe(true);
   expect(result.build).toMatch(/^index-[\w-]+\.js$/);
   expect(result.samples).toHaveLength(2);
