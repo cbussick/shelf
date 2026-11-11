@@ -53,13 +53,24 @@ test('opt-in report measures actual cold/warm reuse without private data and sup
   await open(page); await close(page);
   await showReport(page);
   const result = await report(page);
-  expect(result.report).toBe('Shelf opening diagnostics v1');
+  expect(result.report).toBe('Shelf opening diagnostics v2');
+  expect(result.browserTimingTypes.every((type: string) => ['event', 'longtask', 'long-animation-frame'].includes(type))).toBe(true);
   expect(result.build).toMatch(/^index-[\w-]+\.js$/);
   expect(result.samples).toHaveLength(2);
   expect(result.samples[0]).toMatchObject({ reusedReadyDialog: false, outcome: 'ready', retainedOnClose: true, closeAttempt: { dirty: false, interacted: false, ready: true } });
   expect(result.samples[1]).toMatchObject({ existingReadyDialog: true, previousRetainedDialogPresent: true, reusedReadyDialog: true, outcome: 'ready', retainedOnClose: true });
   for (const sample of result.samples) {
     expect(sample.requestMs).toBeGreaterThanOrEqual(0);
+    expect(sample.pointerUpMs).toBeGreaterThanOrEqual(0);
+    expect(sample.pointerUpDispatchMs).toBeGreaterThanOrEqual(0);
+    expect(sample.releaseToRequestMs).toBeGreaterThanOrEqual(0);
+    expect(Math.abs(sample.requestMs - sample.pointerUpMs - sample.releaseToRequestMs)).toBeLessThanOrEqual(1);
+    expect(Array.isArray(sample.browserTimings)).toBe(true);
+    for (const timing of sample.browserTimings) {
+      expect(['pointerdown', 'pointerup', 'click', 'longtask', 'long-animation-frame']).toContain(timing.kind);
+      expect(timing.durationMs).toBeGreaterThanOrEqual(0);
+      expect(Object.keys(timing).every(key => ['kind', 'startMs', 'durationMs', 'inputDelayMs', 'processingMs', 'presentationMs', 'blockingMs', 'renderingMs', 'styleAndLayoutMs'].includes(key))).toBe(true);
+    }
     expect(sample.modalReturnMs).toBeGreaterThanOrEqual(sample.dialogEffectMs);
     expect(sample.editableFrameMs).toBeGreaterThanOrEqual(sample.readableFrameMs);
     expect(sample.nextFrameMs).toBeGreaterThanOrEqual(sample.editableFrameMs);
@@ -74,6 +85,50 @@ test('opt-in report measures actual cold/warm reuse without private data and sup
   await back(page);
   const note = (await (await page.request.get('/api/notes')).json()).notes[0];
   expect(note.body).toBe(source); expect(note.version).toBe(1);
+});
+
+test('later unrelated browser activity cannot evict captured opening evidence', async ({ page }) => {
+  await page.addInitScript(() => {
+    type Entry = { entryType: string; name: string; startTime: number; duration: number };
+    const state = window as unknown as { emitTiming: (entry: Entry) => void };
+    Object.defineProperty(window, 'PerformanceObserver', { configurable: true, value: class {
+      static supportedEntryTypes = ['longtask'];
+      constructor(private callback: (list: { getEntries: () => Entry[] }) => void) {}
+      observe() { state.emitTiming = entry => this.callback({ getEntries: () => [entry] }); }
+      disconnect() { state.emitTiming = () => {}; }
+    } });
+    document.addEventListener('click', event => {
+      if (event.target instanceof Element && event.target.closest('[data-note-id]')) {
+        const startTime = event.timeStamp;
+        setTimeout(() => state.emitTiming({ entryType: 'longtask', name: 'self', startTime, duration: 71 }), 0);
+      }
+    }, true);
+  });
+  await setup(page); await showReport(page);
+  await page.getByRole('checkbox', { name: 'Enable opening timings' }).check();
+  await back(page); await open(page); await close(page);
+  await page.evaluate(() => {
+    const state = window as unknown as { emitTiming: (entry: { entryType: string; name: string; startTime: number; duration: number }) => void };
+    for (let i = 0; i < 200; i++) state.emitTiming({ entryType: 'longtask', name: 'self', startTime: performance.now() + 1000 + i * 100, duration: 99 });
+  });
+  await showReport(page);
+  const result = await report(page);
+  expect(result.samples[0].browserTimings).toContainEqual(expect.objectContaining({ kind: 'longtask', durationMs: 71 }));
+  expect(result.samples[0].browserTimings.every((entry: { durationMs: number }) => entry.durationMs !== 99)).toBe(true);
+});
+
+test('report still measures release timing when browser PerformanceObserver is unavailable', async ({ page }) => {
+  await page.addInitScript(() => { Object.defineProperty(window, 'PerformanceObserver', { configurable: true, value: undefined }); });
+  await setup(page);
+  await showReport(page);
+  await page.getByRole('checkbox', { name: 'Enable opening timings' }).check();
+  await back(page);
+  await open(page); await close(page);
+  await showReport(page);
+  const result = await report(page);
+  expect(result.browserTimingTypes).toEqual([]);
+  expect(result.samples[0].releaseToRequestMs).toBeGreaterThanOrEqual(0);
+  expect(result.samples[0].browserTimings).toEqual([]);
 });
 
 test('report distinguishes an edited discarded session and bounds retained samples', async ({ page }) => {
