@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shelf · loading motion preview</title>
+  <style>
+    @font-face { font-family: Manrope; src: url('../../../public/assets/manrope-regular.ttf'); font-weight: 400; font-display: swap; }
+    @font-face { font-family: Manrope; src: url('../../../public/assets/manrope-bold.ttf'); font-weight: 700; font-display: swap; }
+    :root { color-scheme: light; --canvas: #f7f8fa; --ink: #263630; --green: #285b48; --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font: 400 15px/1.6 Manrope, sans-serif; }
+    .stage { min-height: 100svh; display: grid; place-items: center; padding: 32px 24px 200px; }
+    .loading { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+    .mark { width: 88px; height: 88px; overflow: visible; }
+    /* Only transform and opacity animate. The complete brand mark stays intact. */
+    .note { transform-origin: 20px 24px; animation: note-float 3.2s var(--ease-in-out) infinite; }
+    .ink-one { animation: ink-breathe 3.2s var(--ease-in-out) infinite; }
+    .ink-two { animation: ink-breathe 3.2s var(--ease-in-out) 160ms infinite; }
+    .loading p { margin: 0; font-size: 16px; }
+    @keyframes note-float {
+      0%, 100% { transform: translateY(0) rotate(-3deg); }
+      50% { transform: translateY(-2px) rotate(3deg); }
+    }
+    @keyframes ink-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+    [data-reduced="true"] .note, [data-reduced="true"] .ink-one, [data-reduced="true"] .ink-two { animation: none; }
+    @media (prefers-reduced-motion: reduce) { .note, .ink-one, .ink-two { animation: none; } }
+    [hidden] { display: none !important; }
+    .destination { max-width: 340px; text-align: center; }
+    .destination h1 { font-size: 26px; letter-spacing: -1px; margin: 0 0 12px; }
+    .destination p { margin: 0; }
+    .panel { position: fixed; bottom: max(16px, env(safe-area-inset-bottom)); left: 16px; right: 16px; margin-inline: auto; max-width: 720px; padding: 18px 20px; border: 1px solid #dce2df; border-radius: 18px; background: #fff; }
+    .panel h2 { font-size: 14px; margin: 0; }
+    .panel p { font-size: 12px; margin: 3px 0 12px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button { min-height: 44px; border: 1px solid #cbd5cf; border-radius: 9px; padding: 8px 12px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; transition: background-color 160ms ease; }
+    button.primary { background: var(--green); color: #fff; border-color: var(--green); }
+    button[aria-pressed="true"] { background: #dbebe1; }
+    button:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+    @media (hover: hover) and (pointer: fine) { button:not(.primary):hover { background: #eef3ef; } .primary:hover { background: #204a3a; } }
+    .hint { display: block; margin-top: 10px; font-size: 11px; color: #52665c; }
+    @media (max-width: 420px) { .panel { padding: 14px; } .stage { padding-bottom: 240px; } }
+    /* Clean mode is the proposed real loading screen, without preview controls. */
+    body.clean .panel { display: none; }
+    body.clean .stage { padding: 24px; }
+  </style>
+</head>
+<body>
+  <main class="stage" id="stage">
+    <div class="loading" id="loading" role="status" aria-live="polite" aria-busy="true">
+      <svg class="mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
+        <g class="note">
+          <rect x="3" y="3" width="34" height="34" rx="9" fill="#f4d467"/>
+          <path d="M25 37V30q0-5 5-5h7" fill="#d6b650"/>
+          <path class="ink-one" d="M12 15h15" fill="none" stroke="#786523" stroke-width="2.5" stroke-linecap="round"/>
+          <path class="ink-two" d="M12 22h10" fill="none" stroke="#786523" stroke-width="2.5" stroke-linecap="round"/>
+        </g>
+      </svg>
+      <p>Opening Shelf…</p>
+    </div>
+    <section class="destination" id="destination" hidden aria-labelledby="destination-title">
+      <h1 id="destination-title">Your notes</h1>
+      <p>The app takes over immediately.<br>No minimum splash time. No waiting for the loop.</p>
+    </section>
+  </main>
+  <aside class="panel" aria-label="Animation preview controls">
+    <h2>A little note, catching a little air.</h2>
+    <p>Shelf’s existing SVG mark. A quiet lift and tilt, with softly breathing ink.</p>
+    <div class="controls">
+      <button class="primary" type="button" id="replay">Replay loop</button>
+      <button type="button" id="fast">Fast load · 250 ms</button>
+      <button type="button" id="slow">Slow load · 5 s</button>
+      <button type="button" id="finish">Ready now</button>
+      <button type="button" id="reduce" aria-pressed="false">Reduced motion</button>
+    </div>
+    <span class="hint" id="hint" role="status">Looping for review only. Production would stop as soon as startup settles.</span>
+  </aside>
+  <script>
+    const loading = document.getElementById('loading');
+    const destination = document.getElementById('destination');
+    const hint = document.getElementById('hint');
+    const reduce = document.getElementById('reduce');
+    let timer;
+    if (new URLSearchParams(location.search).has('clean')) document.body.classList.add('clean');
+    function ready() {
+      clearTimeout(timer);
+      loading.hidden = true;
+      loading.setAttribute('aria-busy', 'false');
+      destination.hidden = false;
+      hint.textContent = 'Ready. The loader was removed immediately, even mid-motion.';
+    }
+    function replay(duration) {
+      clearTimeout(timer);
+      destination.hidden = true;
+      loading.hidden = false;
+      loading.setAttribute('aria-busy', 'true');
+      loading.getAnimations({ subtree: true }).forEach(animation => { animation.currentTime = 0; });
+      hint.textContent = duration ? `Simulated request: ${duration} ms. No extra delay when it finishes.` : 'Looping for review only. Production would stop as soon as startup settles.';
+      if (duration) timer = setTimeout(ready, duration);
+    }
+    document.getElementById('replay').addEventListener('click', () => replay());
+    document.getElementById('fast').addEventListener('click', () => replay(250));
+    document.getElementById('slow').addEventListener('click', () => replay(5000));
+    document.getElementById('finish').addEventListener('click', ready);
+    reduce.addEventListener('click', () => {
+      const reduced = reduce.getAttribute('aria-pressed') !== 'true';
+      reduce.setAttribute('aria-pressed', String(reduced));
+      document.body.dataset.reduced = String(reduced);
+    });
+  </script>
+</body>
+</html>
