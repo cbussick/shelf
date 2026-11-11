@@ -32,13 +32,14 @@ ordinary note interactions. CSS only; no new runtime dependency.
 - Movement and opacity use `cubic-bezier(0.77, 0, 0.175, 1)`.
 - Animate only transform/opacity. The long duration is a quiet repeating loading
   indicator, not a delayed UI entrance or exit.
-- The visible label is replaced with a 128×12-pixel rounded skeleton bar. A soft
-  highlight sweeps left to right using a translated gradient layer, linearly over
-  2.56 seconds, then rests offscreen for 0.64 seconds before repeating. This is an
-  indeterminate loading indicator, not a progress estimate.
-- “Opening Shelf…” remains available to screen readers; the skeleton is decorative.
+- The visible “Opening Shelf…” text stays in place. A soft highlight sweeps left
+  to right across the letters using a translated SVG gradient clipped to the text,
+  linearly over 2.56 seconds, then rests offscreen for 0.64 seconds. The base text
+  remains readable throughout; no skeleton bar replaces the loading message.
+- “Opening Shelf…” also remains available to screen readers as one text label;
+  the visual SVG copy is decorative.
 - OS reduced-motion preference, or the preview toggle, leaves both the mark and
-  skeleton completely static.
+  loading text completely static.
 - No spinner, fake percentage, growing dots, or full-screen zoom/fly-away exit.
 
 Feel-check: watch the live preview on a phone, including fast completion. The GIF

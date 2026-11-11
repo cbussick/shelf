@@ -31,7 +31,9 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.equal(await page.locator('#loading').evaluate(el => el.getAnimations({ subtree: true }).length), 4);
   assert.equal(await page.locator('.sr-only').textContent(), 'Opening Shelf…');
-  assert.equal(await page.locator('.skeleton').getAttribute('aria-hidden'), 'true');
+  assert.equal(await page.locator('.loading-label').getAttribute('aria-hidden'), 'true');
+  assert.equal(await page.locator('.loading-label > text').textContent(), 'Opening Shelf…');
+  assert.equal(await page.locator('.loading-label > text').isVisible(), true);
   const sweep = await page.locator('.shimmer').evaluate(el => {
     const animation = el.getAnimations()[0];
     animation.pause();
