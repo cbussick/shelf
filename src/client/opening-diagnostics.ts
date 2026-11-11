@@ -42,6 +42,7 @@ export class OpeningDiagnostics {
   private observedTypes: string[] = [];
   private browserTimings: BrowserTiming[] = [];
   private ranges = new WeakMap<Sample, { start: number; end?: number }>();
+  private evidence = new WeakMap<Sample, BrowserTiming[]>();
   private retained = new WeakSet<HTMLDialogElement>();
   private frame = 0;
   private timeout = 0;
@@ -99,6 +100,7 @@ export class OpeningDiagnostics {
     this.clearPointer();
     this.browserTimings = [];
     this.ranges = new WeakMap();
+    this.evidence = new WeakMap();
     this.samples = [];
     this.sequence = 0;
     this.retained = new WeakSet();
@@ -122,6 +124,7 @@ export class OpeningDiagnostics {
     this.clearPointer();
     this.samples = [...this.samples.slice(-5), sample];
     this.ranges.set(sample, { start });
+    this.evidence.set(sample, this.browserTimings.filter(timing => timing.start < now && timing.start + timing.durationMs >= start).slice(-16));
     this.openSample = sample;
     this.pending = { sample, start, candidate };
     this.timeout = window.setTimeout(() => this.finish('timeout'), 12_000);
@@ -214,8 +217,17 @@ export class OpeningDiagnostics {
           // Deliberately do not read scripts, attribution, URLs, DOM names,
           // selectors, interaction IDs, or any other PerformanceEntry fields.
           this.browserTimings.push(timing);
+          for (const sample of this.samples) {
+            const range = this.ranges.get(sample);
+            if (!range || timing.start >= (range.end ?? performance.now()) || timing.start + timing.durationMs < range.start) continue;
+            const captured = this.evidence.get(sample)!;
+            captured.push(timing);
+            if (captured.length > 16) captured.shift();
+          }
         }
-        this.browserTimings = this.browserTimings.slice(-128);
+        // 32 pre-request candidates + 16 entries per retained opening = 128.
+        // Later unrelated page activity cannot erase an opening's evidence.
+        this.browserTimings = this.browserTimings.slice(-32);
       });
       try {
         observer.observe({ type, buffered: false, durationThreshold: 16 } as PerformanceObserverInit & { durationThreshold: number });
@@ -237,8 +249,7 @@ export class OpeningDiagnostics {
       browserTimingTypes: this.observedTypes,
       samples: this.samples.map(sample => {
         const range = this.ranges.get(sample);
-        const end = range?.end ?? performance.now();
-        const browserTimings = range ? this.browserTimings.filter(timing => timing.start < end && timing.start + timing.durationMs >= range.start).map(({ start, ...timing }) => ({ ...timing, startMs: Math.round(start - range.start) })) : [];
+        const browserTimings = range ? (this.evidence.get(sample) ?? []).map(({ start, ...timing }) => ({ ...timing, startMs: Math.round(start - range.start) })) : [];
         return { ...sample, browserTimings };
       }),
     }, null, 2);

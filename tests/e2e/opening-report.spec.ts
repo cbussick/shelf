@@ -87,6 +87,36 @@ test('opt-in report measures actual cold/warm reuse without private data and sup
   expect(note.body).toBe(source); expect(note.version).toBe(1);
 });
 
+test('later unrelated browser activity cannot evict captured opening evidence', async ({ page }) => {
+  await page.addInitScript(() => {
+    type Entry = { entryType: string; name: string; startTime: number; duration: number };
+    const state = window as unknown as { emitTiming: (entry: Entry) => void };
+    Object.defineProperty(window, 'PerformanceObserver', { configurable: true, value: class {
+      static supportedEntryTypes = ['longtask'];
+      constructor(private callback: (list: { getEntries: () => Entry[] }) => void) {}
+      observe() { state.emitTiming = entry => this.callback({ getEntries: () => [entry] }); }
+      disconnect() { state.emitTiming = () => {}; }
+    } });
+    document.addEventListener('click', event => {
+      if (event.target instanceof Element && event.target.closest('[data-note-id]')) {
+        const startTime = event.timeStamp;
+        setTimeout(() => state.emitTiming({ entryType: 'longtask', name: 'self', startTime, duration: 71 }), 0);
+      }
+    }, true);
+  });
+  await setup(page); await showReport(page);
+  await page.getByRole('checkbox', { name: 'Enable opening timings' }).check();
+  await back(page); await open(page); await close(page);
+  await page.evaluate(() => {
+    const state = window as unknown as { emitTiming: (entry: { entryType: string; name: string; startTime: number; duration: number }) => void };
+    for (let i = 0; i < 200; i++) state.emitTiming({ entryType: 'longtask', name: 'self', startTime: performance.now() + 1000 + i * 100, duration: 99 });
+  });
+  await showReport(page);
+  const result = await report(page);
+  expect(result.samples[0].browserTimings).toContainEqual(expect.objectContaining({ kind: 'longtask', durationMs: 71 }));
+  expect(result.samples[0].browserTimings.every((entry: { durationMs: number }) => entry.durationMs !== 99)).toBe(true);
+});
+
 test('report still measures release timing when browser PerformanceObserver is unavailable', async ({ page }) => {
   await page.addInitScript(() => { Object.defineProperty(window, 'PerformanceObserver', { configurable: true, value: undefined }); });
   await setup(page);
