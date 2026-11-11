@@ -14,9 +14,14 @@ async function seedNote(page: Page, markdown = source) {
 }
 
 async function seedAndWarm(page: Page, markdown = source) {
+  // These tests intentionally exercise the cold-view / prepared-data fallback.
+  // The separate ready-dialog suite covers fully initialized warm openings.
+  await page.addInitScript(() => { window.requestIdleCallback = () => 0; window.cancelIdleCallback = () => {}; });
   const id = await seedNote(page, markdown);
   await page.getByRole('button', { name: 'Open note: Prepared note', exact: true }).click();
   await expect(body(page)).toBeVisible();
+  await page.getByRole('button', { name: 'Note color', exact: true }).click();
+  await page.getByRole('button', { name: 'Note color', exact: true }).click();
   await page.getByRole('button', { name: 'Close note', exact: true }).click();
   return id;
 }
@@ -28,24 +33,6 @@ async function pauseOpening(page: Page) {
 }
 
 test('visible cards prepare before their first opening without fetching inline resources', async ({ page }) => {
-  await page.addInitScript(() => {
-    const idle = window.requestIdleCallback?.bind(window);
-    (window as Window & { idleCompletions: number }).idleCompletions = 0;
-    if (idle) window.requestIdleCallback = (callback, options) => idle(deadline => {
-      callback(deadline);
-      (window as Window & { idleCompletions: number }).idleCompletions++;
-    }, options);
-    else {
-      const timeout = window.setTimeout.bind(window);
-      window.setTimeout = (handler, delay, ...args) => {
-        if (delay !== 250 || typeof handler !== 'function') return timeout(handler, delay, ...args);
-        return timeout(() => {
-          handler(...args);
-          (window as Window & { idleCompletions: number }).idleCompletions++;
-        }, delay);
-      };
-    }
-  });
   const id = await seedNote(page);
   const unsafe = `${source}\n\n![External](https://tracker.example/image.png)\n\n<script>alert(1)</script>\n\n[Unsafe](javascript:alert(1))`;
   const requests: string[] = [];
@@ -54,13 +41,11 @@ test('visible cards prepare before their first opening without fetching inline r
     id, title: 'Prepared note', body: unsafe, color: 'blue', pinned: false, expectedVersion: 1, retainedImageIds: [], retainedAudioIds: [],
   }) } })).ok()).toBe(true);
   await page.reload();
-  // Observe completed browser idle work (including WebKit's timeout fallback),
-  // not a production-only test hook or a fixed sleep before data has arrived.
-  await expect.poll(() => page.evaluate(() => (window as Window & { idleCompletions: number }).idleCompletions)).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('dialog[aria-label="Edit note"]:not([open]) #note-body[contenteditable="true"]')).toHaveCount(1);
   await pauseOpening(page);
-  const preview = page.getByRole('region', { name: 'Note preview', exact: true });
-  await expect(preview.locator('h2')).toHaveText('Prepared heading');
-  await expect(preview.locator('img,script,iframe,a[href^="javascript:"]')).toHaveCount(0);
+  await expect(body(page).locator('h2')).toHaveText('Prepared heading');
+  // ProseMirror emits inert img separators without src beside atomic nodes.
+  await expect(body(page).locator('img[src],img[srcset],script,iframe,a[href^="javascript:"]')).toHaveCount(0);
   expect(requests).toEqual([]);
   await page.getByRole('button', { name: 'Close note', exact: true }).dispatchEvent('click');
   await page.clock.resume();
@@ -89,6 +74,7 @@ test('prepared content is readable before initialization and immediate close pre
 
 test('initialization does not steal focus from a title edited while opening', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'New note', exact: true }).waitFor();
   await page.clock.install();
   await page.clock.pauseAt(new Date(Date.now() + 1000));
   await page.getByRole('button', { name: 'New note', exact: true }).dispatchEvent('click');
