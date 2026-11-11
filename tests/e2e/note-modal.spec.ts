@@ -57,6 +57,9 @@ for (const width of [1280, 390]) {
     const editor = page.getByRole('dialog', { name: 'Edit note' });
     await expect(editor).toBeVisible();
     expect(await editor.evaluate(element => element.matches(':modal'))).toBe(true);
+    // The opaque, full-screen mobile editor hides its entire backdrop. Avoid
+    // filtering the board underneath it; keep the visible desktop backdrop.
+    expect(await editor.evaluate(element => getComputedStyle(element, '::backdrop').backdropFilter)).toBe(width <= 700 ? 'none' : 'blur(3px)');
     const scrollBefore = await page.evaluate(() => window.scrollY);
 
     // An empty editing surface must not chain wheel scrolling to the page.
@@ -67,7 +70,9 @@ for (const width of [1280, 390]) {
 
     // Nested confirmation dismissal must leave the editor's scroll lock intact.
     await editor.getByRole('button', { name: 'Delete note' }).click();
-    await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Keep note' }).click();
+    const confirmation = page.getByRole('dialog', { name: 'Delete this note?' });
+    expect(await confirmation.evaluate(element => getComputedStyle(element, '::backdrop').backdropFilter)).toBe('blur(3px)');
+    await confirmation.getByRole('button', { name: 'Keep note' }).click();
     await expect(editor).toBeVisible();
     await expect(page.locator('html')).toHaveCSS('overflow-y', 'hidden');
 
