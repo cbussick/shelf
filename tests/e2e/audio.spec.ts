@@ -58,7 +58,7 @@ test('audio-only capture, card playback, seek, download, retention through pin/c
   await editorFor(page).getByRole('button', { name: 'Close note' }).click();
   await expect(editorFor(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  expect((await (await page.request.get('/api/notes')).json()).notes[0].audio).toEqual([]);
+  expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
 });
 
 test('Opus upload syncs on mobile, survives reload, and does not block subsequent text notes', async ({ page }) => {

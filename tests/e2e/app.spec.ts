@@ -39,12 +39,12 @@ test('creates, edits, pins, searches, and deletes a note', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Edit note' })).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open note: Image note' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Open note:/ })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Delete this note?' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
-  await page.getByRole('button', { name: 'Open note: Image note' }).click();
-  await page.getByRole('button', { name: 'Delete note' }).click();
-  await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note' }).click();
-  await expect(page.getByRole('button', { name: 'Open note: Image note' })).not.toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Open note:/ })).toHaveCount(0);
 });
 
 test('uses Shelf browser storage and install metadata', async ({ page, request }) => {
