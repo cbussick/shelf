@@ -94,12 +94,11 @@ export function Editor({ note, open = true, openingDiagnostics, initialImages = 
       viewport.removeEventListener('scroll', update);
     };
   }, []);
+  const empty = !title.trim() && !body.trim() && retainedImages.length + newImages.length + retainedAudio.length + newAudio.length === 0;
   const requestClose = () => {
     openingDiagnostics?.closeAttempt({ dirty, interacted: !canRetainReady.current, ready: Boolean(bodyInput.current?.isReady()) });
     if (saving || recordingOpen) return;
-    if (!dirty && note) return onClose(canRetainReady.current && bodyInput.current?.isReady());
-    // An empty draft has nothing to keep; shared images do.
-    if (!note && !title.trim() && !body.trim() && retainedImages.length + newImages.length + retainedAudio.length + newAudio.length === 0) return onClose();
+    if (!dirty && note && !empty) return onClose(canRetainReady.current && bodyInput.current?.isReady());
     if (saveFailed) return discardDialog.current?.showModal();
     void save();
   };
@@ -171,7 +170,12 @@ export function Editor({ note, open = true, openingDiagnostics, initialImages = 
     const cleanBody = bodyInput.current?.read() ?? body;
     setSaving(true); setError(''); setSaveFailed(false);
     try {
-      await onSave({ id: note?.id, title: cleanTitle, body: cleanBody, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio, version: note?.version, createdAt: note?.createdAt });
+      if (!cleanTitle && !cleanBody.trim() && retainedImages.length + newImages.length + retainedAudio.length + newAudio.length === 0) {
+        // Empty drafts are discarded; existing notes use the normal offline-safe deletion queue.
+        if (note) await onDelete(note);
+      } else {
+        await onSave({ id: note?.id, title: cleanTitle, body: cleanBody, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio, version: note?.version, createdAt: note?.createdAt });
+      }
       onClose();
     } catch (caught) {
       const reason = caught instanceof DOMException && caught.name === 'InvalidStateError'
