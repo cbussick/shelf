@@ -1104,7 +1104,8 @@ test('GET share-target bypasses cached navigation for older installed versions',
   await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible();
 });
 
-test('offers a refresh when a new offline app version is waiting', async ({ page }) => {
+test('offers a persistent update toast with refresh and later actions across sign-out', async ({ page, context }) => {
+  test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible();
@@ -1116,12 +1117,41 @@ test('offers a refresh when a new offline app version is waiting', async ({ page
   try {
     await writeFile(workerPath, `${original}\n// test update ${Date.now()}\n`);
     await page.evaluate(async () => (await navigator.serviceWorker.ready).update());
-    await expect(page.getByRole('button', { name: 'Refresh app' })).toBeVisible({ timeout: 10_000 });
+    const updateToast = page.locator('[data-sonner-toast]').filter({ hasText: 'A new version of Shelf is ready.' });
+    const refresh = updateToast.getByRole('button', { name: 'Refresh app' });
+    await expect(refresh).toBeVisible({ timeout: 10_000 });
+    // It must remain actionable beyond Sonner's ordinary notification lifetime.
+    await page.waitForTimeout(6000);
+    await expect(refresh).toBeVisible();
+    await context.setOffline(true);
+    await expect(refresh).toBeDisabled();
+    await context.setOffline(false);
+    await expect(refresh).toBeEnabled();
+    await page.getByRole('button', { name: 'New note' }).click();
+    await page.getByRole('textbox', { name: 'Title' }).fill('Update toast coexistence');
+    await page.getByRole('button', { name: 'Close note' }).click();
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Note added' })).toBeVisible();
+    await expect(refresh).toBeVisible();
+    await expect.poll(async () => {
+      const toastBox = (await updateToast.boundingBox())!;
+      const dockBox = (await page.getByRole('navigation', { name: 'Create a note' }).boundingBox())!;
+      return dockBox.y - (toastBox.y + toastBox.height);
+    }).toBeGreaterThanOrEqual(12);
     const reloaded = page.waitForEvent('load', { timeout: 10_000 });
     await page.getByRole('button', { name: 'Refresh app' }).click();
     await reloaded;
     await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Refresh app' })).toHaveCount(0, { timeout: 10_000 });
+
+    await writeFile(workerPath, `${original}\n// another test update ${Date.now()}\n`);
+    await page.evaluate(async () => (await navigator.serviceWorker.ready).update());
+    await expect(refresh).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+    await expect(refresh).toBeVisible();
+    await updateToast.getByRole('button', { name: 'Remind me later' }).click();
+    await expect(updateToast).toHaveCount(0);
   } finally {
     await writeFile(workerPath, original);
   }
