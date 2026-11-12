@@ -1,11 +1,11 @@
 import * as stylex from '@stylexjs/stylex';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isVideo, VISUAL_ACCEPT, type NoteColor } from '../shared/contracts';
 import { validateVisualFile } from './visual-media';
 import { api, ApiError } from './api';
-import { colors, styles } from './app.stylex';
+import { styles } from './app.stylex';
 import { Auth, Brand } from './components/Auth';
 import { ConfirmDialog, Editor, type EditorValue } from './components/Editor';
 import { Icon } from './components/Icon';
@@ -90,7 +90,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
   const notify = useCallback((message: string) => {
     toast(message, { id: 'note-notification', duration: 3500 });
   }, []);
-  useEffect(() => () => { toast.dismiss(); }, []);
+  useEffect(() => () => { toast.dismiss('note-notification'); }, []);
   const synchronize = useCallback(async () => {
     if (syncing.current) { syncRequested.current = true; return; }
     syncing.current = true;
@@ -287,7 +287,6 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
     {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} openingDiagnostics={openingDiagnostics} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<OpeningReport diagnostics={openingDiagnostics} onOpen={() => syncDialog.current?.close()}/><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
-    <Toaster theme="dark" position="bottom-center" offset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }} mobileOffset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))', left: 16, right: 16 }} style={{ fontFamily: 'inherit' }} toastOptions={{ style: { background: colors.ink, borderColor: colors.ink, borderRadius: 10 }, cancelButtonStyle: { minHeight: 44 } }}/>
   </>;
 }
 
