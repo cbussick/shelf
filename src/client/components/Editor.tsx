@@ -4,7 +4,6 @@ import { isVideo, VISUAL_ACCEPT, noteColorSchema, type ImageRotation, type NoteC
 import { validateVisualFile } from '../visual-media';
 import { styles } from '../app.stylex';
 import type { LocalAudio, LocalImage, LocalNote } from '../local-store';
-import type { OpeningDiagnostics } from '../opening-diagnostics';
 import { LocalPhoto } from './NoteBoard';
 import { Icon } from './Icon';
 import { ImageMosaic } from './ImageMosaic';
@@ -22,8 +21,8 @@ export type EditorValue = {
   retainedAudio: LocalAudio[]; newAudio: File[];
 };
 
-export function Editor({ note, open = true, openingDiagnostics, initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose }: {
-  openingDiagnostics?: OpeningDiagnostics; note?: LocalNote; open?: boolean; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<void>;
+export function Editor({ note, open = true, initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose }: {
+  note?: LocalNote; open?: boolean; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<void>;
   onDelete: (note: LocalNote) => Promise<void>; onClose: (retainReady?: boolean) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -67,17 +66,14 @@ export function Editor({ note, open = true, openingDiagnostics, initialImages = 
   useEffect(() => {
     const element = dialog.current;
     if (open) {
-      openingDiagnostics?.phase('dialogEffectMs');
       bodyInput.current?.restartReading();
-      openingDiagnostics?.phase('readingResetMs');
       element?.showModal();
-      openingDiagnostics?.phase('modalReturnMs');
       if (element) element.scrollTop = 0;
       // Mount the recorder only after the editor is in the browser's top layer.
       if (initialRecording) setRecordingOpen(true);
     } else element?.close();
     return () => element?.close();
-  }, [open, note, initialRecording, openingDiagnostics]);
+  }, [open, note, initialRecording]);
   useEffect(() => {
     const viewport = window.visualViewport;
     const element = dialog.current;
@@ -96,7 +92,6 @@ export function Editor({ note, open = true, openingDiagnostics, initialImages = 
   }, []);
   const empty = !title.trim() && !body.trim() && retainedImages.length + newImages.length + retainedAudio.length + newAudio.length === 0;
   const requestClose = () => {
-    openingDiagnostics?.closeAttempt({ dirty, interacted: !canRetainReady.current, ready: Boolean(bodyInput.current?.isReady()) });
     if (saving || recordingOpen) return;
     if (!dirty && note && !empty) return onClose(canRetainReady.current && bodyInput.current?.isReady());
     if (saveFailed) return discardDialog.current?.showModal();
