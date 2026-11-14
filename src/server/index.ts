@@ -20,11 +20,8 @@ if (existsSync(clientDirectory)) {
       if (path.endsWith('/sw.js') || path.endsWith('/index.html')) response.setHeader('Cache-Control', 'no-store');
     },
   }));
-  app.get(/^(?!\/api\/).*/, (request, response) => {
+  app.get(/^(?!\/api\/).*/, (_request, response) => {
     response.setHeader('Cache-Control', 'no-store');
-    // This read-only recovery URL bypasses even older installed workers. Normal
-    // app pages do not enable the profiler's code-mapping policy/overhead.
-    if (request.path === '/share-target') response.setHeader('Document-Policy', 'js-profiling');
     response.sendFile('index.html', { root: clientDirectory });
   });
 }
