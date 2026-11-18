@@ -57,6 +57,28 @@ export async function localNotes(): Promise<LocalNote[]> {
   return notes.sort((a, b) => a.position - b.position || b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
 }
 
+export async function pendingLocalChanges(): Promise<number> {
+  const database = await getDatabase();
+  const transaction = database.transaction(['outbox', 'meta']);
+  const [count, order] = await Promise.all([
+    transaction.objectStore('outbox').count(),
+    transaction.objectStore('meta').get('pendingOrder'),
+  ]);
+  await transaction.done;
+  return count + Number(Boolean(order));
+}
+
+export async function noteSyncState(id: string): Promise<{ note?: LocalNote; pending: boolean }> {
+  const database = await getDatabase();
+  const transaction = database.transaction(['notes', 'outbox']);
+  const [note, operation] = await Promise.all([
+    transaction.objectStore('notes').get(id),
+    transaction.objectStore('outbox').get(id),
+  ]);
+  await transaction.done;
+  return { note: parseOptionalNote(note), pending: Boolean(parseOptionalOperation(operation)) };
+}
+
 export async function hasLocalData(): Promise<boolean> {
   return z.boolean().catch(false).parse(await (await getDatabase()).get('meta', 'initialized'));
 }
@@ -70,19 +92,21 @@ export async function clearLocalData(): Promise<void> {
 
 export async function saveLocalNote(value: {
   id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
-  retainedImages: LocalImage[]; newImages: File[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
-  retainedAudio?: LocalAudio[]; newAudio?: File[];
+  retainedImages: LocalImage[]; newImages: File[]; newImageIds?: string[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
+  retainedAudio?: LocalAudio[]; newAudio?: File[]; newAudioIds?: string[];
 }): Promise<LocalNote> {
-  if (value.retainedImages.length + value.newImages.length > 6) throw new Error('Up to 6 images or videos per note.');
   for (const file of value.newAudio ?? []) validateAudioFile(file);
   const now = new Date().toISOString();
   const id = value.id ?? crypto.randomUUID();
   const images = [...value.retainedImages];
+  const rotations = new Map(value.retainedImages.map(image => [image.id, image.rotation]));
   const blobs: { id: string; file: File }[] = [];
   for (const [index, file] of value.newImages.entries()) {
     const dimensions = await visualDimensions(file);
     if (dimensions.width * dimensions.height > 40_000_000) throw new Error('Images and videos may contain up to 40 megapixels.');
-    const imageId = crypto.randomUUID();
+    const imageId = value.newImageIds?.[index] ?? crypto.randomUUID();
+    const rotation = value.newImageRotations?.[index];
+    if (rotation !== undefined) rotations.set(imageId, rotation);
     const blobId = `blob:${imageId}`;
     blobs.push({ id: blobId, file });
     images.push({ id: imageId, blobId, url: '', alt: file.name, mimeType: file.type as LocalImage['mimeType'], size: file.size, ...dimensions, rotation: value.newImageRotations?.[index] ?? 0 });
@@ -95,16 +119,28 @@ export async function saveLocalNote(value: {
   const existingOperation = parseOptionalOperation(await outbox.get(id));
   const currentImages = new Map(current?.images.map(image => [image.id, image]));
   // Reconcile upload metadata without discarding the editor's orientation.
-  const reconciledImages = images.map(image => ({ ...(currentImages.get(image.id) ?? image), rotation: image.rotation }));
+  const reconciledImages = [...new Map(images.map(image => [image.id, {
+    ...(currentImages.get(image.id) ?? image),
+    rotation: rotations.get(image.id) ?? currentImages.get(image.id)?.rotation ?? image.rotation,
+  }])).values()];
+  if (reconciledImages.length > 6) throw new Error('Up to 6 images or videos per note.');
   const currentAudio = new Map(current?.audio.map(attachment => [attachment.id, attachment]));
-  const audio = (value.retainedAudio ?? current?.audio ?? []).map(attachment => currentAudio.get(attachment.id) ?? attachment);
-  for (const file of value.newAudio ?? []) {
-    const audioId = crypto.randomUUID();
+  const audioById = new Map((value.retainedAudio ?? current?.audio ?? []).map(attachment => [attachment.id, currentAudio.get(attachment.id) ?? attachment]));
+  for (const [index, file] of (value.newAudio ?? []).entries()) {
+    const audioId = value.newAudioIds?.[index] ?? crypto.randomUUID();
+    if (audioById.has(audioId)) continue;
+    const existing = currentAudio.get(audioId);
+    if (existing) { audioById.set(audioId, existing); continue; }
     const blobId = `blob:${audioId}`;
     blobs.push({ id: blobId, file });
-    audio.push({ id: audioId, blobId, url: '', name: file.name.slice(0, 500), mimeType: audioMimeType(file), size: file.size, duration: recordingDuration(file) });
+    audioById.set(audioId, { id: audioId, blobId, url: '', name: file.name.slice(0, 500), mimeType: audioMimeType(file), size: file.size, duration: recordingDuration(file) });
   }
-  for (const blob of blobs) await transaction.objectStore('blobs').put(blob.file, blob.id);
+  const audio = [...audioById.values()];
+  // Stable IDs may refer to attachments already uploaded by an earlier save.
+  // Do not recreate their reclaimed blobs or rewrite still-pending bytes.
+  const existingBlobIds = new Set([...(current?.images ?? []), ...(current?.audio ?? [])].map(attachment => attachment.blobId));
+  const neededBlobIds = new Set([...reconciledImages, ...audio].map(attachment => attachment.blobId));
+  for (const blob of blobs) if (neededBlobIds.has(blob.id) && !existingBlobIds.has(blob.id)) await transaction.objectStore('blobs').put(blob.file, blob.id);
   const position = current?.position ?? Math.min(0, ...((await notes.getAll()).map(item => parseNote(item).position))) - 1;
   const note: LocalNote = {
     id, title: value.title, body: value.body, color: value.color, pinned: value.pinned,
@@ -153,13 +189,14 @@ export async function deleteLocalNote(note: LocalNote): Promise<void> {
   await transaction.done;
 }
 
-export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number; conflict: boolean; missingAttachments: string[]; connection: 'connected' | 'offline' | 'unauthorized' }> {
+export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number; conflict: boolean; missingAttachments: string[]; conflictCopies: Record<string, string>; connection: 'connected' | 'offline' | 'unauthorized' }> {
   let database = await getDatabase();
   const entries = z.array(outboxSchema).parse(await database.getAll('outbox'));
   let conflict = false;
+  const conflictCopies: Record<string, string> = {};
   const missingAttachments: string[] = [];
   let connection: 'connected' | 'offline' | 'unauthorized' = 'connected';
-  for (const entry of entries) {
+  syncEntries: for (const entry of entries) {
     const note = parseOptionalNote(await database.get('notes', entry.noteId));
     try {
       if (entry.type === 'delete') {
@@ -236,6 +273,10 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
           let copy: Awaited<ReturnType<typeof cloneAsConflict>>;
           try { copy = await cloneAsConflict(latest); }
           catch (error) {
+            if (error instanceof ApiError && (error.status === 0 || error.status === 401)) {
+              connection = error.status === 0 ? 'offline' : 'unauthorized';
+              break syncEntries;
+            }
             database = await getDatabase();
             const currentOperation = parseOptionalOperation(await database.get('outbox', entry.noteId));
             // A removal can reclaim a blob while copying waits for a fetch.
@@ -258,6 +299,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
           await transaction.objectStore('outbox').put(copy.operation);
           await transaction.done;
           await removeBlobs(latest);
+          conflictCopies[entry.noteId] = copy.note.id;
           missingAttachments.push(...copy.missingAttachments);
           break;
         }
@@ -277,7 +319,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
   }
 
   const order = await database.get('meta', 'pendingOrder') as { token: string } | undefined;
-  if (order) {
+  if (order && connection !== 'unauthorized') {
     try {
       // Include newly created notes, but leave notes added on another device for the server to append.
       await api.reorderNotes((await localNotes()).map(note => note.id));
@@ -286,10 +328,11 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
       if (latest?.token === order.token) await database.delete('meta', 'pendingOrder');
     } catch (error) {
       if (!(error instanceof ApiError && [0, 401, 409].includes(error.status))) throw error;
+      if (error.status === 0 || error.status === 401) connection = error.status === 0 ? 'offline' : 'unauthorized';
     }
   }
 
-  try {
+  if (connection !== 'unauthorized') try {
     const remote = await api.notes();
     database = await getDatabase();
     const remoteIds = new Set(remote.notes.map(note => note.id));
@@ -317,7 +360,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
     if (!(error instanceof ApiError && (error.status === 0 || error.status === 401))) throw error;
     connection = error.status === 0 ? 'offline' : 'unauthorized';
   }
-  return { notes: await localNotes(), pending: (await database.count('outbox')) + Number(Boolean(await database.get('meta', 'pendingOrder'))), conflict, missingAttachments, connection };
+  return { notes: await localNotes(), pending: await pendingLocalChanges(), conflict, conflictCopies, missingAttachments, connection };
 }
 
 export async function audioSource(audio: LocalAudio): Promise<string> {
