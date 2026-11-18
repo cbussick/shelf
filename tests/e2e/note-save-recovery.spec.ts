@@ -22,7 +22,7 @@ async function openExistingNote(page: Page) {
   await page.getByRole('textbox', { name: 'Title' }).fill('Recoverable note');
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Original text');
   await page.getByRole('button', { name: 'Close note' }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open note: Recoverable note' }).click();
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Unsaved changes');
   return page.getByRole('dialog', { name: 'Edit note' });
@@ -35,7 +35,7 @@ test('reopens a closed local database and saves the edited note', async ({ page 
   await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Open note: Recoverable note' })).toContainText('Unsaved changes');
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
 });
 
 for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
@@ -88,7 +88,7 @@ test('reconnects when the local database closes during image decoding', async ({
   const card = page.getByRole('button', { name: 'Open note: Recoverable note' });
   await expect(card).toContainText('Unsaved changes');
   await expect(card.locator('img')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
 });
 
 test('reconnects when the local database closes while syncing a save', async ({ page }) => {
@@ -101,7 +101,7 @@ test('reconnects when the local database closes while syncing a save', async ({ 
   });
   await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await page.unroute('**/api/notes');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Open note: Recoverable note' })).toContainText('Unsaved changes');

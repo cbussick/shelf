@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 import { z } from 'zod';
 import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema, type ImageRotation, type Note, type NoteAudio, type NoteColor, type NoteImage } from '../shared/contracts';
-import { api, ApiError } from './api';
+import { api, ApiError, syncErrorDetails } from './api';
 import { audioMimeType, recordingDuration, validateAudioFile } from './audio';
 import { visualDimensions } from './visual-media';
 
@@ -11,7 +11,7 @@ export type LocalNote = Omit<Note, 'images' | 'audio' | 'version'> & { images: L
 const localImageSchema = imageSchema.extend({ url: z.string(), blobId: z.string().optional() });
 const localAudioSchema = audioSchema.extend({ url: z.string(), blobId: z.string().optional() });
 const localNoteSchema = noteSchema.omit({ images: true, audio: true, version: true, position: true }).extend({ images: z.array(localImageSchema).max(6), audio: z.array(localAudioSchema).default([]), version: z.number().int().nonnegative(), position: z.number().int().default(0) });
-const outboxSchema = z.object({ noteId: z.uuid(), type: z.enum(['save', 'delete']), expectedVersion: z.number().int().nonnegative(), mutationId: z.uuid(), editorSession: z.string().optional() });
+const outboxSchema = z.object({ noteId: z.uuid(), type: z.enum(['save', 'delete']), expectedVersion: z.number().int().nonnegative(), mutationId: z.uuid(), editorSession: z.string().optional(), error: z.string().max(4000).optional() });
 const parseNote = (value: unknown) => localNoteSchema.parse(value);
 const parseOperation = (value: unknown) => outboxSchema.parse(value);
 const parseOptionalNote = (value: unknown) => value === undefined ? undefined : parseNote(value);
@@ -76,7 +76,29 @@ export async function pendingLocalChanges(): Promise<number> {
   return count + Number(Boolean(order));
 }
 
-export async function noteSyncState(id: string, editorSession?: string): Promise<{ note?: LocalNote; pending: boolean }> {
+export type PendingNoteSync = { error?: string };
+export type LocalSyncOverview = { pending: number; notes: Record<string, PendingNoteSync> };
+
+// One snapshot: count only visible, pending saves as unsynced notes. Deletions
+// and board reordering still contribute to the total work used by sign-out.
+export async function localSyncOverview(): Promise<LocalSyncOverview> {
+  const database = await getDatabase();
+  const transaction = database.transaction(['notes', 'outbox', 'meta']);
+  const [entries, ids, order] = await Promise.all([
+    transaction.objectStore('outbox').getAll(),
+    transaction.objectStore('notes').getAllKeys(),
+    transaction.objectStore('meta').get('pendingOrder'),
+  ]);
+  await transaction.done;
+  const operations = z.array(outboxSchema).parse(entries);
+  const existing = new Set(ids);
+  return {
+    pending: operations.length + Number(Boolean(order)),
+    notes: Object.fromEntries(operations.filter(entry => entry.type === 'save' && existing.has(entry.noteId)).map(entry => [entry.noteId, entry.error ? { error: entry.error } : {}])),
+  };
+}
+
+export async function noteSyncState(id: string, editorSession?: string): Promise<{ note?: LocalNote; pending: boolean; error?: string }> {
   const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'meta']);
   ({ id } = await followRedirects(transaction.objectStore('meta'), id, editorSession));
@@ -85,7 +107,8 @@ export async function noteSyncState(id: string, editorSession?: string): Promise
     transaction.objectStore('outbox').get(id),
   ]);
   await transaction.done;
-  return { note: parseOptionalNote(note), pending: Boolean(parseOptionalOperation(operation)) };
+  const pending = parseOptionalOperation(operation);
+  return { note: parseOptionalNote(note), pending: Boolean(pending), ...(pending?.error ? { error: pending.error } : {}) };
 }
 
 export async function hasLocalData(): Promise<boolean> {
@@ -242,7 +265,22 @@ export async function deleteLocalNote(note: LocalNote, editorSession?: string): 
   await transaction.done;
 }
 
-export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number; conflict: boolean; missingAttachments: string[]; conflictCopies: Record<string, string>; connection: 'connected' | 'offline' | 'unauthorized' }> {
+async function recordSyncError(entry: z.infer<typeof outboxSchema>, error?: string) {
+  const database = await getDatabase();
+  const transaction = database.transaction('outbox', 'readwrite');
+  const current = parseOptionalOperation(await transaction.store.get(entry.noteId));
+  // A failed old upload must not label a newer edit or deletion as failed.
+  if (current?.mutationId === entry.mutationId) await transaction.store.put({ ...current, error });
+  await transaction.done;
+}
+
+async function reportSyncFailure(entry: z.infer<typeof outboxSchema>, error: unknown, onProgress?: () => Promise<void>) {
+  if (error instanceof ApiError && error.status === 401 || typeof navigator !== 'undefined' && !navigator.onLine) return;
+  try { await recordSyncError(entry, syncErrorDetails(error)); await onProgress?.(); }
+  catch { /* Keep the original failure if the local database also failed. */ }
+}
+
+export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ notes: LocalNote[]; pending: number; conflict: boolean; missingAttachments: string[]; conflictCopies: Record<string, string>; connection: 'connected' | 'offline' | 'unauthorized' }> {
   let database = await getDatabase();
   const entries = z.array(outboxSchema).parse(await database.getAll('outbox'));
   let conflict = false;
@@ -252,6 +290,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
   syncEntries: for (const entry of entries) {
     const note = parseOptionalNote(await database.get('notes', entry.noteId));
     try {
+      if (entry.error && (typeof navigator === 'undefined' || navigator.onLine)) { await recordSyncError(entry); await onProgress?.(); }
       if (entry.type === 'delete') {
         await api.deleteNote(entry.noteId, entry.expectedVersion);
       } else if (note) {
@@ -305,11 +344,13 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
         }
         await transaction.done;
         await removeBlobs(note);
+        await onProgress?.();
         continue;
       }
       database = await getDatabase();
       const latestOperation = parseOptionalOperation(await database.get('outbox', entry.noteId));
       if (latestOperation?.mutationId === entry.mutationId) await database.delete('outbox', entry.noteId);
+      await onProgress?.();
     } catch (error) {
       if (error instanceof ApiError && error.status === 409 && note && entry.type === 'save') {
         conflict = true;
@@ -327,6 +368,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
           try { copy = await cloneAsConflict(latest); }
           catch (error) {
             if (error instanceof ApiError && (error.status === 0 || error.status === 401)) {
+              await reportSyncFailure(operation, error, onProgress);
               connection = error.status === 0 ? 'offline' : 'unauthorized';
               break syncEntries;
             }
@@ -335,6 +377,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
             // A removal can reclaim a blob while copying waits for a fetch.
             // If its owner changed, prepare the newer edit instead of failing.
             if (currentOperation?.mutationId !== operation.mutationId) continue;
+            await reportSyncFailure(operation, error, onProgress);
             throw error;
           }
           database = await getDatabase();
@@ -355,6 +398,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
           await removeBlobs(latest);
           conflictCopies[entry.noteId] = copy.note.id;
           missingAttachments.push(...copy.missingAttachments);
+          await onProgress?.();
           break;
         }
         continue;
@@ -364,6 +408,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
         await database.delete('outbox', entry.noteId);
         continue;
       }
+      await reportSyncFailure(entry, error, onProgress);
       if (error instanceof ApiError && (error.status === 0 || error.status === 401)) {
         connection = error.status === 0 ? 'offline' : 'unauthorized';
         break;

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { LocalImage, LocalNote } from '../local-store';
+import type { LocalImage, LocalNote, PendingNoteSync } from '../local-store';
 import { imageSource } from '../local-store';
 import { styles } from '../app.stylex';
 import { Icon } from './Icon';
@@ -11,8 +11,8 @@ import { LinkedText } from './LinkedText';
 import { linkParts } from './link-parts';
 import { noteExcerpt } from '../note-excerpt';
 
-export const NoteBoard = memo(function NoteBoard({ notes, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
-  notes: LocalNote[]; heading?: string; label: string;
+export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
+  notes: LocalNote[]; pendingSync?: Readonly<Record<string, PendingNoteSync>>; heading?: string; label: string;
   onOpen: (note: LocalNote) => void; onPin: (note: LocalNote) => void;
   onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void;
   onReorder: (source: string, target: string) => void;
@@ -153,7 +153,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, heading, label, onOpen
   return <section {...stylex.props(styles.section)}>
     {heading && <h2 {...stylex.props(styles.sectionHeading)}>{heading}</h2>}
     <ul ref={board} aria-label={label} {...stylex.props(styles.board)}>
-      {displayed.map((note) => <NoteCard key={note.id} note={note} onPin={onPin} onContextMenu={onContextMenu} dropTarget={placement?.source === note.id}
+      {displayed.map((note) => <NoteCard key={note.id} note={note} sync={pendingSync?.[note.id]} onPin={onPin} onContextMenu={onContextMenu} dropTarget={placement?.source === note.id}
         onPointerDown={event => start(event, note.id)}
         onCardClick={() => { if (suppressClick.current === note.id) { suppressClick.current = undefined; return; } onOpen(note); }}
         onKeyDown={event => {
@@ -167,8 +167,8 @@ export const NoteBoard = memo(function NoteBoard({ notes, heading, label, onOpen
   </section>;
 });
 
-function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPointerDown, onKeyDown }: {
-  note: LocalNote; onCardClick: () => void; onPin: (note: LocalNote) => void; onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void; dropTarget: boolean;
+function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, onPointerDown, onKeyDown }: {
+  note: LocalNote; sync?: PendingNoteSync; onCardClick: () => void; onPin: (note: LocalNote) => void; onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void; dropTarget: boolean;
   onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 }) {
@@ -191,10 +191,12 @@ function NoteCard({ note, onCardClick, onPin, onContextMenu, dropTarget, onPoint
       <AudioPlayer key={note.audio[0].id} audio={note.audio[0]} compact/>
       {note.audio.length > 1 && <button type="button" onClick={onCardClick} {...stylex.props(styles.audioMore)}>{note.audio.length - 1} more audio {note.audio.length === 2 ? 'file' : 'files'}</button>}
     </div>}
+    {sync && <span id={`note-sync-${note.id}`} data-testid="note-card-sync" {...stylex.props(styles.noteSyncStatus, Boolean(sync.error) && styles.saveStatusWarning)}><Icon name={sync.error ? 'cloud-warning' : 'clock'} width={15} {...stylex.props(styles.saveStatusIcon)}/><span>{sync.error ? 'Sync failed' : 'Waiting to sync'}</span></span>}
   </>;
   const buttonProps = {
     type: 'button' as const, 'data-note-id': note.id,
     'aria-label': `Open note: ${label}`,
+    'aria-describedby': sync ? `note-sync-${note.id}` : undefined,
     title: 'Drag to reorder · arrow keys to move', onClick: onCardClick, onPointerDown,
     onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => { event.preventDefault(); if (navigator.maxTouchPoints === 0) onContextMenu(note, event); },
     onDragStart: (event: React.DragEvent<HTMLButtonElement>) => event.preventDefault(), onKeyDown,

@@ -24,7 +24,7 @@ test('creates, edits, pins, searches, and deletes a note', async ({ page }) => {
   await expect(card).toHaveCSS('background-color', 'rgb(219, 235, 225)');
   await expect(card).toHaveCSS('border-style', 'solid');
   await expect(page.getByRole('heading', { name: 'Pinned', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
 
   await page.getByRole('button', { name: 'Open note: Keep this close' }).click();
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('An edited private thought.');
@@ -46,7 +46,7 @@ test('creates, edits, pins, searches, and deletes a note', async ({ page }) => {
   await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Open note:/ })).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'Delete this note?' })).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Open note:/ })).toHaveCount(0);
@@ -138,7 +138,7 @@ test('note colors stay in a palette popover that can be dismissed', async ({ pag
   await page.getByRole('dialog', { name: 'Edit note' }).getByRole('button', { name: 'Delete note' }).click();
   await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note' }).click();
   await expect(card).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
 });
 
 test('overview shortcuts search, create, and confirm deletion only for a focused note', async ({ page }) => {
@@ -224,19 +224,19 @@ test('shows the simplified copy and gives sync its own dismissible dialog', asyn
   await expect(page.getByRole('button', { name: 'Add an image' })).toBeVisible();
   await expect(page.getByText('All notes')).toHaveCount(0);
   await expect(page.getByText('Drag to reorder')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
-  await page.getByRole('button', { name: 'Synced' }).click();
-  const syncDialog = page.getByRole('dialog', { name: 'Synced' });
+  await page.getByRole('button', { name: 'Synced', exact: true }).click();
+  const syncDialog = page.getByRole('dialog', { name: 'Synced', exact: true });
   await expect(syncDialog).toBeVisible();
   await expect(syncDialog.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
   await expect(syncDialog.getByRole('link')).toHaveCount(0);
   await syncDialog.getByRole('button', { name: 'Back' }).click();
   await expect(syncDialog).not.toBeVisible();
-  await page.getByRole('button', { name: 'Synced' }).click();
+  await page.getByRole('button', { name: 'Synced', exact: true }).click();
   await syncDialog.getByRole('button', { name: 'Sync now' }).click();
   await expect(syncDialog).not.toBeVisible();
-  await page.getByRole('button', { name: 'Synced' }).click();
+  await page.getByRole('button', { name: 'Synced', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(syncDialog).not.toBeVisible();
   await page.getByRole('button', { name: 'New note' }).click();
@@ -323,7 +323,7 @@ test('pins from the board and shows pin controls on hover for both groups', asyn
   await expect(unpin).toHaveCSS('opacity', '0');
   await card.hover();
   await expect(unpin).toHaveCSS('opacity', '1');
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.reload();
   await page.mouse.move(0, 0);
   await expect(unpin).toHaveCSS('opacity', '0');
@@ -411,7 +411,7 @@ test('drags notes into a persistent order and supports keyboard reordering', asy
     await page.getByRole('textbox', { name: 'Title' }).fill(title);
     await page.getByRole('button', { name: 'Close note' }).click();
     await expect(page.getByRole('button', { name: `Open note: ${title}` })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   }
   const board = page.getByRole('list', { name: 'Notes' });
   const titles = async () => (await board.getByRole('button', { name: /^Open note:/ }).allTextContents()).filter(text => text.includes(suffix));
@@ -431,7 +431,7 @@ test('drags notes into a persistent order and supports keyboard reordering', asy
   await page.mouse.up();
   await expect(page.getByRole('dialog', { name: 'Edit note' })).not.toBeVisible();
   await expect.poll(order).toEqual(['one', 'three', 'two']);
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.reload();
   await expect.poll(order).toEqual(['one', 'three', 'two']);
   await first.focus();
@@ -504,12 +504,12 @@ test('saves a new text note when closed', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Saved by closing');
   await page.getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByRole('button', { name: 'Open note: Saved by closing' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
 });
 
 test('closes empty drafts without creating a note', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   const count = await page.getByRole('button', { name: 'Open note:', exact: false }).count();
   await page.keyboard.press('n');
   await page.getByRole('button', { name: 'Close note' }).click();
@@ -530,7 +530,7 @@ test('accepts an image and keeps the editor body fixed', async ({ page }) => {
   expect(after?.height).toBe(before?.height);
   await page.getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByRole('button', { name: 'Open note: Coffee first.' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
 });
 
 test('a note image fits without horizontal scrolling', async ({ page }) => {
@@ -652,7 +652,7 @@ test('pastes clipboard images into new and existing notes without disrupting tex
   await expect(body).toHaveText('A note with a picture');
   await expect(page.getByRole('button', { name: 'View image 1' })).toBeVisible();
   await page.getByRole('button', { name: 'Close note' }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: A note with a picture' }).click();
   await body.focus();
   expect(await pasteImage()).toBe(false);
@@ -662,7 +662,7 @@ test('pastes clipboard images into new and existing notes without disrupting tex
   expect(await pasteImage()).toBe(false);
   await expect(page.getByRole('alert')).toContainText('Up to 6 images or videos per note.');
   await page.getByRole('button', { name: 'Close note' }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: A note with a picture' }).click();
   await expect(page.getByRole('dialog', { name: 'Edit note' }).getByText('2 more images')).toBeVisible();
 });
@@ -675,7 +675,7 @@ test('closes notes from the footer or backdrop, and keeps destructive actions in
   await editor.getByRole('textbox', { name: 'Title' }).fill('Dismissible note');
   await editor.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(editor).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: Dismissible note' }).click();
   const saved = page.getByRole('dialog', { name: 'Edit note' });
   const deleteBox = await saved.getByRole('button', { name: 'Delete note' }).boundingBox();
@@ -684,7 +684,7 @@ test('closes notes from the footer or backdrop, and keeps destructive actions in
   await saved.getByRole('textbox', { name: 'Note', exact: true }).fill('Saved from backdrop');
   await page.mouse.click(5, 5);
   await expect(saved).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: Dismissible note' }).click();
   await expect(saved.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Saved from backdrop');
   await saved.getByRole('button', { name: 'Delete note' }).click();
@@ -714,7 +714,7 @@ test('confirms removal of draft and saved images without removing them on cancel
   await editor.getByRole('button', { name: 'Attach an image' }).click();
   await page.locator('input[type=file]').last().setInputFiles('tests/fixtures/image.jpg');
   await editor.getByRole('button', { name: 'Close note' }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: Image removal test', exact: true }).click();
   const saved = page.getByRole('dialog', { name: 'Edit note' });
   await expect(saved.getByRole('button', { name: 'Remove image 1' })).toHaveCount(0);
@@ -728,7 +728,7 @@ test('confirms removal of draft and saved images without removing them on cancel
   await expect(preview).not.toBeVisible();
   await expect(saved.getByRole('button', { name: 'View image 1' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close note' }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: Image removal test', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View image 1' })).toHaveCount(0);
 });
@@ -859,7 +859,7 @@ test('centers images and navigates and removes mixed gallery images', async ({ p
   await page.getByRole('button', { name: 'Attach an image' }).click();
   await page.locator('input[type=file]').last().setInputFiles('tests/fixtures/image.jpg');
   await page.getByRole('button', { name: 'Close', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: Gallery note', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Edit note' });
   const bounds = await editor.boundingBox();
@@ -893,7 +893,7 @@ test('centers images and navigates and removes mixed gallery images', async ({ p
   await expect(gallery).not.toBeVisible();
   await expect(editor.getByRole('button', { name: 'View image 1' })).toHaveCount(0);
   await editor.getByRole('button', { name: 'Close', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: 'Open note: Gallery note', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View image 1' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Delete note' }).click();
@@ -934,7 +934,7 @@ test('shows the same image mosaic on cards and in the editor', async ({ page }) 
       await preview.getByRole('button', { name: 'Close image preview' }).click();
     }
     await editor.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
     const card = page.getByRole('button', { name: `Open note: ${title}` });
     await expect(card.locator('img')).toHaveCount(Math.min(count, 4));
     const cardBoxes = await card.evaluate(element => Array.from(element.querySelectorAll('img'), image => image.getBoundingClientRect().toJSON()));
@@ -946,7 +946,7 @@ test('shows the same image mosaic on cards and in the editor', async ({ page }) 
     await page.getByRole('button', { name: 'Delete note' }).click();
     await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note' }).click();
     await expect(card).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
   }
 });
 
@@ -995,7 +995,7 @@ test('receives an Android share as a draft and saves it on close', async ({ page
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Add note' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Open note: Shared screenshot note' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await page.goto(second);
   await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toContainText('no longer available');
 });
@@ -1029,10 +1029,10 @@ test('can receive and save a shared screenshot offline', async ({ page, context 
   await page.getByRole('textbox', { name: 'Title' }).fill('Shared while offline');
   await page.getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByRole('button', { name: 'Open note: Shared while offline' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Saved on device' })).toBeVisible();
+  await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
   await context.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
 });
 
 test('works offline after the first online visit and syncs on reconnect', async ({ page, context }) => {
@@ -1047,10 +1047,10 @@ test('works offline after the first online visit and syncs on reconnect', async 
   await page.getByRole('textbox', { name: 'Title' }).fill('Written offline');
   await page.getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByRole('button', { name: 'Open note: Written offline' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Saved on device' })).toBeVisible();
+  await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
   await context.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
 });
 
 for (const width of [390, 834, 1440]) {

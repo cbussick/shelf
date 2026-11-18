@@ -10,7 +10,7 @@ async function saveAndSync(page: Page) {
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
 }
 async function syncConflictCopy(page: Page) {
-  await page.getByRole('button', { name: /^(Saved on device|Syncing…|Synced|Sync needs attention)$/ }).click();
+  await page.getByRole('button', { name: /^(Saved on device|Syncing…|Synced|Sync needs attention|\d+ not synced)$/ }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
 }

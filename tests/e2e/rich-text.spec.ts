@@ -294,7 +294,7 @@ test('rich editor assets load offline before the first editor visit and checklis
   await page.getByRole('button', { name: 'Checklist', exact: true }).click();
   await page.getByRole('checkbox', { name: 'An offline task', exact: true }).check();
   await page.getByRole('button', { name: 'Close note', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Saved on device', exact: true })).toBeVisible();
+  await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
   await page.reload();
   await page.getByRole('button', { name: 'Open note:', exact: false }).click();
   await expect(page.getByRole('checkbox', { name: 'An offline task', exact: true })).toBeChecked();

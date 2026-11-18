@@ -6,7 +6,7 @@ test('preserves a cleared note offline and syncs the empty edit after reconnecti
   await page.getByRole('textbox', { name: 'Title' }).fill('Clear me');
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Some text');
   await page.getByRole('button', { name: 'Close note' }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await context.setOffline(true);
   await page.getByRole('button', { name: 'Open note: Clear me' }).click();
   await page.getByRole('textbox', { name: 'Title' }).fill('   ');
@@ -15,7 +15,7 @@ test('preserves a cleared note offline and syncs the empty edit after reconnecti
   await expect(page.getByRole('dialog', { name: 'Edit note' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: /^Open note:/ })).toHaveCount(1);
   await context.setOffline(false);
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Your notes' })).toBeVisible();
   await page.getByRole('button', { name: /^Open note:/ }).click();
@@ -39,7 +39,7 @@ test('opening and closing an existing empty note does not delete or rewrite it',
   await card.click();
   await page.getByRole('button', { name: 'Close note' }).click();
   await expect(card).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   const after = (await (await request.get('/api/notes')).json()).notes[0];
   expect(after).toEqual(before);
 });

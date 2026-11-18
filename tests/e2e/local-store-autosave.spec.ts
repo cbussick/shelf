@@ -400,3 +400,74 @@ test('conflict recovery reports the preserved copy id and keeps the server origi
   expect(result.copyState.note?.title).toBe('Local edit (conflict copy)');
   expect(result.sync.notes.find(note => note.id === result.originalId)?.title).toBe('Server edit');
 });
+
+test('overview counts visible pending saves, not deletions or reorder work, and retains specific errors across reload', async ({ page }) => {
+  const id = await page.evaluate(async () => {
+    const { storage, draft } = window;
+    await storage.saveLocalNote(draft);
+    const removed = await storage.saveLocalNote({ ...draft, id: crypto.randomUUID(), title: 'Remove me' });
+    await storage.syncNotes();
+    await storage.saveLocalNote({ ...draft, body: 'Pending' });
+    await storage.deleteLocalNote(removed);
+    await storage.reorderLocalNotes([draft.id!]);
+    const overview = await storage.localSyncOverview();
+    if (overview.pending !== 3 || Object.keys(overview.notes).join() !== draft.id) throw new Error('Overview must count notes separately from other work');
+    return draft.id!;
+  });
+  await page.route(`**/api/notes/${id}`, route => route.fulfill({ status: 503, json: { error: 'Try this upload again later.' } }));
+  await page.evaluate(async () => { try { await window.storage.syncNotes(); } catch { /* Expected server failure. */ } });
+  const before = await page.evaluate(id => window.storage.noteSyncState(id), id);
+  expect(before.error).toBe('Try this upload again later. (HTTP 503)');
+  await page.reload();
+  await page.addScriptTag({ content: storageScript });
+  const overview = await page.evaluate(() => window.storage.localSyncOverview());
+  expect(Object.keys(overview.notes)).toEqual([id]);
+  expect(overview.notes[id].error).toBe(before.error);
+});
+
+test('a failed stale upload does not attach its error to a newer edit', async ({ page }) => {
+  await page.evaluate(() => window.storage.saveLocalNote(window.draft));
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let requested!: () => void;
+  const started = new Promise<void>(resolve => { requested = resolve; });
+  await page.route('**/api/notes/*', async route => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    requested(); await held;
+    await route.fulfill({ status: 500, json: { error: 'The old upload failed.' } });
+  });
+  await page.evaluate(() => { window.syncing = window.storage.syncNotes(); void window.syncing.catch(() => {}); });
+  await started;
+  await page.evaluate(() => window.storage.saveLocalNote({ ...window.draft, body: 'A newer revision' }));
+  release();
+  const result = await page.evaluate(async () => {
+    try { await window.syncing; } catch { /* Expected server failure. */ }
+    return { state: await window.storage.noteSyncState(window.draft.id!), overview: await window.storage.localSyncOverview() };
+  });
+  expect(result.state.note?.body).toBe('A newer revision');
+  expect(result.state.error).toBeUndefined();
+  expect(result.overview.pending).toBe(1);
+  expect(Object.values(result.overview.notes)).toEqual([{}]);
+});
+
+test('a conflict-copy attachment failure is attributed to that queued note', async ({ page }) => {
+  await page.route('**/fixture.jpg', route => route.fulfill({ path: 'tests/fixtures/image.jpg' }));
+  const note = await page.evaluate(async () => {
+    const { storage, draft } = window;
+    draft.newImages = [new File([await (await fetch('/fixture.jpg')).blob()], 'image.jpg', { type: 'image/jpeg' })];
+    draft.newImageIds = [crypto.randomUUID()];
+    await storage.saveLocalNote(draft);
+    const synced = (await storage.syncNotes()).notes[0];
+    await storage.saveLocalNote({ ...draft, title: 'Keep my edit' });
+    return synced;
+  });
+  await page.route(`**/api/notes/${note.id}`, route => route.fulfill({ status: 409, json: { error: 'Conflict', note } }));
+  await page.route('**/api/images/*', route => route.fulfill({ status: 503, json: { error: 'Image temporarily unavailable.' } }));
+  const state = await page.evaluate(async id => {
+    try { await window.storage.syncNotes(); } catch { /* Expected attachment fetch failure. */ }
+    return window.storage.noteSyncState(id);
+  }, note.id);
+  expect(state.pending).toBe(true);
+  expect(state.note?.title).toBe('Keep my edit');
+  expect(state.error).toBe('Could not download the attachment to preserve this conflict. (HTTP 503)');
+});

@@ -25,8 +25,8 @@ export type EditorValue = {
 
 export type EditorSyncState = 'syncing' | 'synced' | 'offline' | 'error';
 
-export function Editor({ note, open = true, locked = false, syncState = 'syncing', initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose, onRetrySync, onDirtyChange }: {
-  note?: LocalNote; open?: boolean; locked?: boolean; syncState?: EditorSyncState; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<LocalNote>;
+export function Editor({ note, open = true, locked = false, syncState = 'syncing', syncError, initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose, onRetrySync, onDirtyChange }: {
+  note?: LocalNote; open?: boolean; locked?: boolean; syncState?: EditorSyncState; syncError?: string; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<LocalNote>;
   onDelete: (note: LocalNote, editorSession?: string) => Promise<void>; onClose: (retainReady?: boolean) => void;
   onRetrySync?: () => void; onDirtyChange?: (dirty: boolean) => void;
 }) {
@@ -228,6 +228,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   const localError = saveFailed ? saveError(writer.error) : '';
   const status = saveFailed ? 'Changes not saved' : dirty || writer.saving ? 'Saving…' : !committedNote.current ? '' : syncState === 'offline' ? 'Saved on this device · Offline' : syncState === 'error' ? 'Saved on this device · Sync failed' : syncState === 'synced' ? 'Saved' : 'Syncing…';
   const syncFailed = !saveFailed && !dirty && !writer.saving && syncState === 'error';
+  const showSyncError = Boolean(committedNote.current && syncError && !saveFailed && !dirty && !writer.saving);
   const retry = saveFailed ? () => void flush() : syncFailed ? onRetrySync : undefined;
   return <>
     <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'}
@@ -273,7 +274,8 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
           <label className="sr-only" htmlFor="note-title">Title</label><input id="note-title" maxLength={160} placeholder="Title" value={title} onChange={event => setTitle(event.target.value)} {...stylex.props(styles.titleInput)}/>
           <RichTextEditor ref={bodyInput} initialValue={note?.body ?? ''} onChange={value => { canRetainReady.current = false; setBody(value); }} autoFocus={!note} disabled={saving}/>
         </div>
-        <p role="alert" {...stylex.props(styles.error)}>{localError || error}</p>
+        {(localError || error) && <p role="alert" {...stylex.props(styles.error)}>{localError || error}</p>}
+        {showSyncError && <div role="alert" data-testid="note-sync-error" {...stylex.props(styles.editorSyncError)}><div>Your note is saved on this device.</div><div>{syncState === 'offline' && 'Last sync attempt: '}{syncError}</div></div>}
         <footer {...stylex.props(styles.editorFooter)}><div {...stylex.props(styles.tools, styles.editorTools)}>
           <AddAudio onUpload={addAudio} onRecord={() => setRecordingOpen(true)} disabled={saving}/>
           <button type="button" aria-label="Attach an image or video" onClick={() => input.current?.click()} {...stylex.props(styles.iconButton)}><Icon name="image"/></button>

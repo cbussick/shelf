@@ -52,6 +52,6 @@ test('deleting a newly saved note during sync does not resurrect it', async ({ p
   await pulled;
   await expect(page.getByRole('button', { name: `Open note: ${title}` })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole('button', { name: `Open note: ${title}` })).toHaveCount(0);
 });

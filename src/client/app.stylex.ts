@@ -124,6 +124,8 @@ export const styles = stylex.create({
   editorFooter: { padding: '14px 18px', borderTop: '1px solid #26363012', display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto auto', alignItems: 'center', gap: 8, '@media (max-width: 700px)': { padding: '8px 16px 12px', gridTemplateColumns: 'minmax(0, 1fr) auto auto', flexShrink: 0 } },
   editorTools: { '@media (max-width: 700px)': { gridColumn: '1 / -1' } },
   editorSaveStatus: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, minWidth: 0, color: '#546358', fontSize: 12, lineHeight: 1.5, overflowWrap: 'anywhere', '@media (max-width: 700px)': { gridColumn: 1, gridRow: 2, justifyContent: 'flex-start' } },
+  editorSyncError: { margin: '0 28px 12px', color: '#546358', fontSize: 13, lineHeight: 1.5, overflowWrap: 'anywhere', maxHeight: 120, overflowY: 'auto', flexShrink: 0, '@media (max-width: 700px)': { margin: '0 16px 12px' } },
+  noteSyncStatus: { display: 'flex', alignItems: 'center', gap: 6, padding: '0 23px 18px', color: '#546358', fontSize: 12, lineHeight: 1.5, pointerEvents: 'none', '@media (max-width: 700px)': { padding: '0 14px 14px', fontSize: 11 } },
   editorRetry: { gridColumn: 3, background: 'transparent', border: '1px solid currentColor', borderRadius: 8, padding: '8px 12px', minHeight: 44, fontSize: 12, cursor: 'pointer', '@media (max-width: 700px)': { gridColumn: 2, gridRow: 2 } },
   editorClose: { gridColumn: 4, '@media (max-width: 700px)': { gridColumn: 3, gridRow: 2 } },
   saveStatusIcon: { flexShrink: 0 },

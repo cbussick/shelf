@@ -14,7 +14,7 @@ async function createNote(page: Page, withImage = false) {
   await page.getByRole('button', { name: 'Close note' }).click();
   const card = page.getByRole('button', { name: 'Open note: Color target' });
   await expect(card).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   return card;
 }
 
@@ -43,7 +43,7 @@ test('changes every note color without opening it or altering its content, image
     await expect(card).toBeFocused();
     await expect(card).toHaveCSS('background-color', background);
     await expect(page.getByRole('dialog', { name: 'Edit note' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
     const saved = (await (await request.get('/api/notes')).json()).notes[0];
     expect(saved).toMatchObject({
       id: original.id, title: original.title, body: original.body,
@@ -188,7 +188,7 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
   await menu.getByRole('menuitem', { name: 'Change color' }).click();
   await menu.getByRole('menuitemradio', { name: 'Mint' }).click();
   await expect(card).toHaveCSS('background-color', 'rgb(219, 235, 225)');
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
 });
 
 test('saves context-menu color changes offline and syncs after reconnecting', async ({ page, context, request }) => {
@@ -199,10 +199,10 @@ test('saves context-menu color changes offline and syncs after reconnecting', as
   await menu.getByRole('menuitem', { name: 'Change color' }).click();
   await menu.getByRole('menuitemradio', { name: 'Mint' }).click();
   await expect(card).toHaveCSS('background-color', 'rgb(219, 235, 225)');
-  await expect(page.getByRole('button', { name: 'Saved on device' })).toBeVisible();
+  await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
   expect((await (await request.get('/api/notes')).json()).notes[0].color).toBe('paper');
   await context.setOffline(false);
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   expect((await (await request.get('/api/notes')).json()).notes[0].color).toBe('mint');
   await page.reload();
   await expect(card).toHaveCSS('background-color', 'rgb(219, 235, 225)');
