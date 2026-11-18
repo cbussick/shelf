@@ -6,6 +6,8 @@ declare global {
     storage: typeof import('../../src/client/local-store');
     draft: Parameters<typeof import('../../src/client/local-store').saveLocalNote>[0];
     syncing: ReturnType<typeof import('../../src/client/local-store').syncNotes>;
+    saving: ReturnType<typeof import('../../src/client/local-store').saveLocalNote>;
+    releaseMedia: () => void;
   }
 }
 
@@ -214,6 +216,162 @@ test('a conflict attachment 401 leaves the local edit queued and stops network w
   expect(result.conflictCopies).toEqual({});
   expect(result.notes[0].title).toBe('Keep this edit');
   expect(requests).toEqual([`PUT /api/notes/${note.id}`, `GET /api/images/${note.images[0].id}`]);
+});
+
+test('session redirects fence continued text and stable media retries, including after acknowledgement and deletion', async ({ page }) => {
+  await page.route('**/fixture.jpg', route => route.fulfill({ path: 'tests/fixtures/image.jpg' }));
+  await page.route('**/fixture.opus', route => route.fulfill({ path: 'tests/fixtures/audio.opus' }));
+  const original = await page.evaluate(async () => {
+    const { storage, draft } = window;
+    draft.editorSession = crypto.randomUUID();
+    draft.newImages = [new File([await (await fetch('/fixture.jpg')).blob()], 'image.jpg', { type: 'image/jpeg' })];
+    draft.newAudio = [new File([await (await fetch('/fixture.opus')).blob()], 'audio.opus', { type: 'audio/ogg' })];
+    draft.newImageIds = [crypto.randomUUID()];
+    draft.newAudioIds = [crypto.randomUUID()];
+    const first = await storage.saveLocalNote(draft);
+    draft.retainedImages = first.images;
+    draft.retainedAudio = first.audio;
+    await storage.syncNotes();
+    const original = (await storage.noteSyncState(draft.id!)).note!;
+    draft.createdAt = original.createdAt;
+    await storage.saveLocalNote({ ...draft, title: 'Local edit' });
+    return original;
+  });
+  await page.route(`**/api/notes/${original.id}`, route => route.fulfill({ status: 409, json: { error: 'Conflict', note: original } }));
+  await page.evaluate(() => {
+    const decode = window.createImageBitmap;
+    const gate = new Promise<void>(resolve => { window.releaseMedia = resolve; });
+    window.createImageBitmap = async (...args: Parameters<typeof createImageBitmap>) => {
+      await gate;
+      return decode(...args);
+    };
+    // Preparation starts before the conflict transaction but writes afterward.
+    window.saving = window.storage.saveLocalNote({ ...window.draft, body: 'Prepared before conflict' });
+  });
+  const conflict = await page.evaluate(() => window.storage.syncNotes());
+  const inFlight = await page.evaluate(async () => {
+    window.releaseMedia();
+    return window.saving;
+  });
+  await page.unroute(`**/api/notes/${original.id}`);
+  const copyId = conflict.conflictCopies[original.id];
+  expect(inFlight.id).toBe(copyId);
+  expect(inFlight.body).toBe('Prepared before conflict');
+  const result = await page.evaluate(async ({ copyId }) => {
+    const { storage, draft } = window;
+    const copy = (await storage.noteSyncState(draft.id!, draft.editorSession)).note!;
+    const retry = await storage.saveLocalNote({ ...draft, title: 'Continued', body: 'New text', newImageRotations: [90] });
+    const pending = await storage.noteSyncState(draft.id!, draft.editorSession);
+    const uploadBlobKeys = async () => {
+      const database = await new Promise<IDBDatabase>(resolve => {
+        const request = indexedDB.open('shelf');
+        request.onsuccess = () => resolve(request.result);
+      });
+      try {
+        const keys = await new Promise<IDBValidKey[]>(resolve => {
+          const request = database.transaction('blobs').objectStore('blobs').getAllKeys();
+          request.onsuccess = () => resolve(request.result);
+        });
+        return keys.filter(key => String(key).startsWith('blob:'));
+      } finally { database.close(); }
+    };
+    const pendingBlobs = await uploadBlobKeys();
+    await storage.syncNotes();
+    const uploadedRetry = await storage.saveLocalNote({ ...draft, title: 'Continued', body: 'After upload' });
+    const uploadedBlobs = await uploadBlobKeys();
+    // A newly prepared attachment was never present in the conflict snapshot.
+    const nextDraft = { ...draft, newImageIds: [crypto.randomUUID()], retainedImages: uploadedRetry.images, retainedAudio: uploadedRetry.audio, newAudio: [] };
+    const added = await storage.saveLocalNote(nextDraft);
+    const addedRetry = await storage.saveLocalNote(nextDraft);
+    const addedBlobs = await uploadBlobKeys();
+    const untouched = await storage.noteSyncState(draft.id!);
+    const fresh = await storage.saveLocalNote({ ...draft, editorSession: crypto.randomUUID(), title: 'Fresh session', retainedImages: untouched.note!.images, newImages: [], retainedAudio: untouched.note!.audio, newAudio: [] });
+    // UI may already know the copy ID while a queued writer still holds the original.
+    await storage.deleteLocalNote(copy, draft.editorSession);
+    const deleted = await storage.noteSyncState(draft.id!, draft.editorSession);
+    let rejected = false;
+    try { await storage.saveLocalNote(draft); } catch { rejected = true; }
+    return { copy, retry, pending, pendingBlobs, uploadedBlobs, addedBlobs, uploadedRetry, added, addedRetry, untouched, fresh, deleted, rejected, copyState: await storage.noteSyncState(copyId), original: await storage.noteSyncState(draft.id!) };
+  }, { copyId });
+  expect(result.copy.id).toBe(copyId);
+  expect(result.retry.id).toBe(copyId);
+  expect(result.retry.title).toBe('Continued (conflict copy)');
+  expect(result.retry.createdAt).toBe(result.copy.createdAt);
+  expect(result.retry.images[0].id).toBe(result.copy.images[0].id);
+  expect(result.retry.audio[0].id).toBe(result.copy.audio[0].id);
+  expect(result.retry.images[0].rotation).toBe(90);
+  expect(result.pending.pending).toBe(true);
+  expect(result.pendingBlobs).toHaveLength(2);
+  expect(result.uploadedBlobs).toHaveLength(0);
+  expect(result.addedBlobs).toHaveLength(1);
+  expect(result.uploadedRetry.images[0].blobId).toBeUndefined();
+  expect(result.uploadedRetry.audio[0].blobId).toBeUndefined();
+  expect(result.added.images).toHaveLength(2);
+  expect(result.addedRetry.images.map(image => image.id)).toEqual(result.added.images.map(image => image.id));
+  expect(result.untouched.note).toEqual(original);
+  expect(result.fresh.id).toBe(original.id);
+  expect(result.fresh.title).toBe('Fresh session');
+  expect(result.deleted).toEqual({ pending: true });
+  expect(result.copyState).toEqual({ pending: true });
+  expect(result.rejected).toBe(true);
+  expect(result.original.note?.title).toBe('Fresh session');
+});
+
+test('the original session follows recursive conflict redirects without redirecting a fresh reader', async ({ page }) => {
+  await page.evaluate(async () => {
+    window.draft.editorSession = crypto.randomUUID();
+    await window.storage.saveLocalNote(window.draft);
+  });
+  await page.route('**/api/notes/*', route => route.fulfill({ status: 409, json: { error: 'Conflict' } }));
+  const result = await page.evaluate(async () => {
+    const { storage, draft } = window;
+    const first = await storage.syncNotes();
+    const firstId = first.conflictCopies[draft.id!];
+    const second = await storage.syncNotes();
+    const secondId = second.conflictCopies[firstId];
+    const retry = await storage.saveLocalNote({ ...draft, body: 'Through two redirects' });
+    const state = await storage.noteSyncState(draft.id!, draft.editorSession);
+    const fresh = await storage.noteSyncState(draft.id!, crypto.randomUUID());
+    await storage.deleteLocalNote({ ...retry, id: draft.id! }, draft.editorSession);
+    return { firstId, secondId, retry, state, fresh, deleted: await storage.noteSyncState(draft.id!, draft.editorSession) };
+  });
+  expect(result.firstId).toBeTruthy();
+  expect(result.secondId).toBeTruthy();
+  expect(result.secondId).not.toBe(result.firstId);
+  expect(result.retry.id).toBe(result.secondId);
+  expect(result.retry.title).toBe('Autosave (conflict copy)');
+  expect(result.state.note?.body).toBe('Through two redirects');
+  expect(result.fresh).toEqual({ pending: false });
+  expect(result.deleted).toEqual({ pending: true });
+});
+
+test('session redirects omit missing retained and stable media instead of resurrecting it', async ({ page }) => {
+  await page.route('**/fixture.jpg', route => route.fulfill({ path: 'tests/fixtures/image.jpg' }));
+  const original = await page.evaluate(async () => {
+    const { storage, draft } = window;
+    draft.editorSession = crypto.randomUUID();
+    draft.newImages = [new File([await (await fetch('/fixture.jpg')).blob()], 'gone.jpg', { type: 'image/jpeg' })];
+    draft.newImageIds = [crypto.randomUUID()];
+    const first = await storage.saveLocalNote(draft);
+    draft.retainedImages = first.images;
+    await storage.syncNotes();
+    const original = (await storage.noteSyncState(draft.id!)).note!;
+    await storage.saveLocalNote(draft);
+    return original;
+  });
+  await page.route(`**/api/notes/${original.id}`, route => route.fulfill({ status: 409, json: { error: 'Conflict', note: original } }));
+  await page.route('**/api/images/*', route => route.fulfill({ status: 404 }));
+  const result = await page.evaluate(async () => {
+    const { storage, draft } = window;
+    const conflict = await storage.syncNotes();
+    const retry = await storage.saveLocalNote(draft);
+    const retainedRetry = await storage.saveLocalNote({ ...draft, newImages: [] });
+    return { conflict, retry, retainedRetry };
+  });
+  expect(result.conflict.missingAttachments).toEqual(['gone.jpg']);
+  expect(result.retry.id).toBe(result.conflict.conflictCopies[original.id]);
+  expect(result.retry.images).toEqual([]);
+  expect(result.retainedRetry.images).toEqual([]);
 });
 
 test('conflict recovery reports the preserved copy id and keeps the server original', async ({ page }) => {

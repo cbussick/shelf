@@ -11,7 +11,7 @@ export type LocalNote = Omit<Note, 'images' | 'audio' | 'version'> & { images: L
 const localImageSchema = imageSchema.extend({ url: z.string(), blobId: z.string().optional() });
 const localAudioSchema = audioSchema.extend({ url: z.string(), blobId: z.string().optional() });
 const localNoteSchema = noteSchema.omit({ images: true, audio: true, version: true, position: true }).extend({ images: z.array(localImageSchema).max(6), audio: z.array(localAudioSchema).default([]), version: z.number().int().nonnegative(), position: z.number().int().default(0) });
-const outboxSchema = z.object({ noteId: z.uuid(), type: z.enum(['save', 'delete']), expectedVersion: z.number().int().nonnegative(), mutationId: z.uuid() });
+const outboxSchema = z.object({ noteId: z.uuid(), type: z.enum(['save', 'delete']), expectedVersion: z.number().int().nonnegative(), mutationId: z.uuid(), editorSession: z.string().optional() });
 const parseNote = (value: unknown) => localNoteSchema.parse(value);
 const parseOperation = (value: unknown) => outboxSchema.parse(value);
 const parseOptionalNote = (value: unknown) => value === undefined ? undefined : parseNote(value);
@@ -68,9 +68,10 @@ export async function pendingLocalChanges(): Promise<number> {
   return count + Number(Boolean(order));
 }
 
-export async function noteSyncState(id: string): Promise<{ note?: LocalNote; pending: boolean }> {
+export async function noteSyncState(id: string, editorSession?: string): Promise<{ note?: LocalNote; pending: boolean }> {
   const database = await getDatabase();
-  const transaction = database.transaction(['notes', 'outbox']);
+  const transaction = database.transaction(['notes', 'outbox', 'meta']);
+  ({ id } = await followRedirects(transaction.objectStore('meta'), id, editorSession));
   const [note, operation] = await Promise.all([
     transaction.objectStore('notes').get(id),
     transaction.objectStore('outbox').get(id),
@@ -91,14 +92,14 @@ export async function clearLocalData(): Promise<void> {
 }
 
 export async function saveLocalNote(value: {
-  id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
+  id?: string; editorSession?: string; title: string; body: string; color: NoteColor; pinned: boolean;
   retainedImages: LocalImage[]; newImages: File[]; newImageIds?: string[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
   retainedAudio?: LocalAudio[]; newAudio?: File[]; newAudioIds?: string[];
 }): Promise<LocalNote> {
   for (const file of value.newAudio ?? []) validateAudioFile(file);
   const now = new Date().toISOString();
-  const id = value.id ?? crypto.randomUUID();
-  const images = [...value.retainedImages];
+  let id = value.id ?? crypto.randomUUID();
+  let images = [...value.retainedImages];
   const rotations = new Map(value.retainedImages.map(image => [image.id, image.rotation]));
   const blobs: { id: string; file: File }[] = [];
   for (const [index, file] of value.newImages.entries()) {
@@ -115,6 +116,38 @@ export async function saveLocalNote(value: {
   const transaction = database.transaction(['notes', 'outbox', 'meta', 'blobs'], 'readwrite');
   const notes = transaction.objectStore('notes');
   const outbox = transaction.objectStore('outbox');
+  const redirect = await followRedirects(transaction.objectStore('meta'), id, value.editorSession);
+  id = redirect.id;
+  if (redirect.deleted) throw new Error('This editor’s note has been deleted.');
+  let retainedAudio = value.retainedAudio;
+  let newAudioIds = value.newAudioIds;
+  for (const { key, value: target } of redirect.path) {
+    const remap = (attachmentId: string) => {
+      if (Object.values(target.attachments).includes(attachmentId)) return attachmentId;
+      if (!(attachmentId in target.attachments)) target.attachments[attachmentId] = crypto.randomUUID();
+      return target.attachments[attachmentId];
+    };
+    images = images.flatMap(image => {
+      const mapped = remap(image.id);
+      if (mapped === null) return [];
+      const rotation = rotations.get(image.id);
+      if (rotation !== undefined) rotations.set(mapped, rotation);
+      return [{ ...image, id: mapped, ...(image.blobId ? { blobId: `blob:${mapped}` } : {}) }];
+    });
+    retainedAudio = retainedAudio?.flatMap(audio => {
+      const mapped = remap(audio.id);
+      return mapped === null ? [] : [{ ...audio, id: mapped, ...(audio.blobId ? { blobId: `blob:${mapped}` } : {}) }];
+    });
+    newAudioIds = (value.newAudio ?? []).map((_, index) => {
+      const oldId = newAudioIds?.[index] ?? crypto.randomUUID();
+      return oldId ? remap(oldId) ?? '' : '';
+    });
+    for (const blob of blobs) {
+      const mapped = remap(blob.id.slice('blob:'.length));
+      blob.id = mapped === null ? '' : `blob:${mapped}`;
+    }
+    await transaction.objectStore('meta').put(target, key);
+  }
   const current = parseOptionalNote(await notes.get(id));
   const existingOperation = parseOptionalOperation(await outbox.get(id));
   const currentImages = new Map(current?.images.map(image => [image.id, image]));
@@ -125,9 +158,10 @@ export async function saveLocalNote(value: {
   }])).values()];
   if (reconciledImages.length > 6) throw new Error('Up to 6 images or videos per note.');
   const currentAudio = new Map(current?.audio.map(attachment => [attachment.id, attachment]));
-  const audioById = new Map((value.retainedAudio ?? current?.audio ?? []).map(attachment => [attachment.id, currentAudio.get(attachment.id) ?? attachment]));
+  const audioById = new Map((retainedAudio ?? current?.audio ?? []).map(attachment => [attachment.id, currentAudio.get(attachment.id) ?? attachment]));
   for (const [index, file] of (value.newAudio ?? []).entries()) {
-    const audioId = value.newAudioIds?.[index] ?? crypto.randomUUID();
+    const audioId = newAudioIds?.[index] ?? crypto.randomUUID();
+    if (!audioId) continue;
     if (audioById.has(audioId)) continue;
     const existing = currentAudio.get(audioId);
     if (existing) { audioById.set(audioId, existing); continue; }
@@ -143,8 +177,8 @@ export async function saveLocalNote(value: {
   for (const blob of blobs) if (neededBlobIds.has(blob.id) && !existingBlobIds.has(blob.id)) await transaction.objectStore('blobs').put(blob.file, blob.id);
   const position = current?.position ?? Math.min(0, ...((await notes.getAll()).map(item => parseNote(item).position))) - 1;
   const note: LocalNote = {
-    id, title: value.title, body: value.body, color: value.color, pinned: value.pinned,
-    createdAt: value.createdAt ?? current?.createdAt ?? now,
+    id, title: redirect.path.length ? conflictTitle(value.title) : value.title, body: value.body, color: value.color, pinned: value.pinned,
+    createdAt: redirect.path.length ? current?.createdAt ?? now : value.createdAt ?? current?.createdAt ?? now,
     updatedAt: now,
     position,
     version: current?.version ?? value.version ?? 0,
@@ -155,7 +189,7 @@ export async function saveLocalNote(value: {
   }
   for (const image of current?.images ?? []) if (image.blobId && !reconciledImages.some(item => item.id === image.id)) await transaction.objectStore('blobs').delete(image.blobId);
   await notes.put(note);
-  await outbox.put({ noteId: id, type: 'save', expectedVersion: existingOperation?.expectedVersion ?? note.version, mutationId: crypto.randomUUID() });
+  await outbox.put({ noteId: id, type: 'save', expectedVersion: existingOperation?.expectedVersion ?? note.version, mutationId: crypto.randomUUID(), editorSession: value.editorSession });
   await transaction.objectStore('meta').put(true, 'initialized');
   await transaction.done;
   return note;
@@ -172,9 +206,12 @@ export async function reorderLocalNotes(ids: string[]): Promise<void> {
   await transaction.done;
 }
 
-export async function deleteLocalNote(note: LocalNote): Promise<void> {
+export async function deleteLocalNote(note: LocalNote, editorSession?: string): Promise<void> {
   const database = await getDatabase();
-  const transaction = database.transaction(['notes', 'outbox', 'blobs'], 'readwrite');
+  const transaction = database.transaction(['notes', 'outbox', 'blobs', 'meta'], 'readwrite');
+  const redirect = await followRedirects(transaction.objectStore('meta'), note.id, editorSession);
+  if (editorSession) await transaction.objectStore('meta').put({ id: redirect.id, attachments: {}, deleted: true }, redirectKey(editorSession, redirect.id));
+  note = { ...note, id: redirect.id };
   const notes = transaction.objectStore('notes');
   const outbox = transaction.objectStore('outbox');
   const current = parseOptionalNote(await notes.get(note.id));
@@ -184,8 +221,9 @@ export async function deleteLocalNote(note: LocalNote): Promise<void> {
   // the server acknowledgement can advance the expected version before deleting.
   if (!current?.version && !operation) await outbox.delete(note.id);
   else await outbox.put({ noteId: note.id, type: 'delete', expectedVersion: operation?.expectedVersion ?? current?.version ?? note.version, mutationId: crypto.randomUUID() });
-  for (const image of (current ?? note).images) if (image.blobId) await transaction.objectStore('blobs').delete(image.blobId);
-  for (const audio of (current ?? note).audio) for (const key of audioBlobKeys(audio)) await transaction.objectStore('blobs').delete(key);
+  const attachments = current ?? (redirect.path.length ? { images: [], audio: [] } : note);
+  for (const image of attachments.images) if (image.blobId) await transaction.objectStore('blobs').delete(image.blobId);
+  for (const audio of attachments.audio) for (const key of audioBlobKeys(audio)) await transaction.objectStore('blobs').delete(key);
   await transaction.done;
 }
 
@@ -285,7 +323,7 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
             throw error;
           }
           database = await getDatabase();
-          const transaction = database.transaction(['notes', 'outbox', 'blobs'], 'readwrite');
+          const transaction = database.transaction(['notes', 'outbox', 'blobs', 'meta'], 'readwrite');
           const currentOperation = parseOptionalOperation(await transaction.objectStore('outbox').get(entry.noteId));
           if (currentOperation?.mutationId !== operation.mutationId) { await transaction.done; continue; }
           for (const attachment of copy.blobs) await transaction.objectStore('blobs').put(attachment.blob, attachment.blobId);
@@ -296,7 +334,8 @@ export async function syncNotes(): Promise<{ notes: LocalNote[]; pending: number
           if (serverNote) await transaction.objectStore('notes').put(serverNote);
           else await transaction.objectStore('notes').delete(entry.noteId);
           await transaction.objectStore('notes').put(copy.note);
-          await transaction.objectStore('outbox').put(copy.operation);
+          await transaction.objectStore('outbox').put({ ...copy.operation, editorSession: operation.editorSession });
+          if (operation.editorSession) await transaction.objectStore('meta').put({ id: copy.note.id, attachments: copy.attachmentIds }, redirectKey(operation.editorSession, entry.noteId));
           await transaction.done;
           await removeBlobs(latest);
           conflictCopies[entry.noteId] = copy.note.id;
@@ -386,17 +425,19 @@ async function cloneAsConflict(note: LocalNote) {
   const images: LocalImage[] = [];
   const blobs: { blobId: string; blob: Blob }[] = [];
   const missingAttachments: string[] = [];
+  const attachmentIds: Record<string, string | null> = {};
   for (const image of note.images) {
     let blob: Blob;
     if (image.blobId) blob = parseBlob(await database.get('blobs', image.blobId));
     else {
       try { blob = await attachmentBlob(image.url); }
       catch (error) {
-        if (error instanceof ApiError && [404, 410].includes(error.status)) { missingAttachments.push(image.alt || 'Image'); continue; }
+        if (error instanceof ApiError && [404, 410].includes(error.status)) { missingAttachments.push(image.alt || 'Image'); attachmentIds[image.id] = null; continue; }
         throw error;
       }
     }
     const imageId = crypto.randomUUID();
+    attachmentIds[image.id] = imageId;
     const blobId = `blob:${imageId}`;
     blobs.push({ blobId, blob });
     images.push({ ...image, id: imageId, url: '', blobId });
@@ -410,20 +451,43 @@ async function cloneAsConflict(note: LocalNote) {
       if (attachment.blobId) throw new Error('A pending recording is missing from this device.');
       try { blob = await attachmentBlob(attachment.url); }
       catch (error) {
-        if (error instanceof ApiError && [404, 410].includes(error.status)) { missingAttachments.push(attachment.name || 'Audio'); continue; }
+        if (error instanceof ApiError && [404, 410].includes(error.status)) { missingAttachments.push(attachment.name || 'Audio'); attachmentIds[attachment.id] = null; continue; }
         throw error;
       }
     }
     const audioId = crypto.randomUUID();
+    attachmentIds[attachment.id] = audioId;
     const blobId = `blob:${audioId}`;
     blobs.push({ blobId, blob });
     audio.push({ ...attachment, id: audioId, url: '', blobId });
   }
   const now = new Date().toISOString();
-  const suffix = ' (conflict copy)';
   const warning = missingAttachments.length ? `\n\nAttachments already removed from the server could not be copied: ${missingAttachments.join(', ')}.` : '';
-  const copy: LocalNote = { ...note, id, title: `${(note.title || 'Untitled').slice(0, 160 - suffix.length)}${suffix}`, body: note.body.length + warning.length <= 20_000 ? note.body + warning : note.body, images, audio, version: 0, createdAt: now, updatedAt: now };
-  return { note: copy, blobs, missingAttachments, operation: { noteId: id, type: 'save' as const, expectedVersion: 0, mutationId: crypto.randomUUID() } };
+  const copy: LocalNote = { ...note, id, title: conflictTitle(note.title), body: note.body.length + warning.length <= 20_000 ? note.body + warning : note.body, images, audio, version: 0, createdAt: now, updatedAt: now };
+  return { note: copy, blobs, missingAttachments, attachmentIds, operation: { noteId: id, type: 'save' as const, expectedVersion: 0, mutationId: crypto.randomUUID() } };
+}
+
+type EditorRedirect = { id: string; attachments: Record<string, string | null>; deleted?: boolean };
+const redirectKey = (session: string, id: string) => `editorRedirect:${session}:${id}`;
+
+// Resolve under the caller's transaction: conflict retargeting and a queued
+// writer must serialize, including media prepared before the conflict committed.
+async function followRedirects(meta: { get(key: string): Promise<unknown> }, id: string, session?: string) {
+  const path: { key: string; value: EditorRedirect }[] = [];
+  if (session) while (true) {
+    const key = redirectKey(session, id);
+    const value = await meta.get(key) as EditorRedirect | undefined;
+    if (!value) break;
+    path.push({ key, value });
+    if (id === value.id) break; // A terminal tombstone fences writers already targeting the copy.
+    id = value.id;
+  }
+  return { id, path, deleted: path.some(target => target.value.deleted) };
+}
+
+function conflictTitle(title: string) {
+  const suffix = ' (conflict copy)';
+  return title.endsWith(suffix) ? title : `${(title || 'Untitled').slice(0, 160 - suffix.length)}${suffix}`;
 }
 
 async function removeBlobs(note: LocalNote) {
