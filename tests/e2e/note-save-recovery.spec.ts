@@ -49,7 +49,7 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
     await editor.getByRole('button', { name: 'Close note' }).click();
     await expect(editor.getByRole('alert')).not.toBeEmpty();
     await expect(editor.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Unsaved changes');
-    await expect(editor.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
+    await expect(editor.getByRole('button', { name: 'Retry save', exact: true })).toBeVisible();
     const close = async () => {
       if (closeMethod === 'button') await editor.getByRole('button', { name: 'Close', exact: true }).click();
       else if (closeMethod === 'header') await editor.getByRole('button', { name: 'Close note' }).click();
@@ -117,7 +117,10 @@ test('can retry a failed save without losing the edits', async ({ page }) => {
   await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor.getByRole('alert')).not.toBeEmpty();
   await page.evaluate(() => (window as unknown as { restoreTransactions: () => void }).restoreTransactions());
-  await editor.getByRole('button', { name: 'Try again', exact: true }).click();
+  await editor.getByRole('button', { name: 'Retry save', exact: true }).click();
+  await expect(editor.getByTestId('note-save-status')).toHaveText('Saved');
+  await expect(editor).toBeVisible();
+  await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Open note: Recoverable note' })).toContainText('Unsaved changes');
 });

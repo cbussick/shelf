@@ -18,6 +18,14 @@ const parseOptionalNote = (value: unknown) => value === undefined ? undefined : 
 const parseOptionalOperation = (value: unknown) => value === undefined ? undefined : parseOperation(value);
 const parseBlob = (value: unknown) => z.instanceof(Blob).parse(value);
 
+const visualMetadata = new WeakMap<File, ReturnType<typeof visualDimensions>>();
+async function prepareVisual(file: File) {
+  const pending = visualMetadata.get(file) ?? visualDimensions(file);
+  visualMetadata.set(file, pending);
+  try { return await pending; }
+  catch (error) { visualMetadata.delete(file); throw error; }
+}
+
 let databasePromise: ReturnType<typeof openDB> | undefined;
 function openDatabase() {
   const opening = openDB('shelf', 1, {
@@ -92,7 +100,7 @@ export async function clearLocalData(): Promise<void> {
 }
 
 export async function saveLocalNote(value: {
-  id?: string; editorSession?: string; title: string; body: string; color: NoteColor; pinned: boolean;
+  id?: string; editorSession?: string; baseNote?: LocalNote; title: string; body: string; color: NoteColor; pinned: boolean;
   retainedImages: LocalImage[]; newImages: File[]; newImageIds?: string[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
   retainedAudio?: LocalAudio[]; newAudio?: File[]; newAudioIds?: string[];
 }): Promise<LocalNote> {
@@ -103,7 +111,7 @@ export async function saveLocalNote(value: {
   const rotations = new Map(value.retainedImages.map(image => [image.id, image.rotation]));
   const blobs: { id: string; file: File }[] = [];
   for (const [index, file] of value.newImages.entries()) {
-    const dimensions = await visualDimensions(file);
+    const dimensions = await prepareVisual(file);
     if (dimensions.width * dimensions.height > 40_000_000) throw new Error('Images and videos may contain up to 40 megapixels.');
     const imageId = value.newImageIds?.[index] ?? crypto.randomUUID();
     const rotation = value.newImageRotations?.[index];
@@ -150,6 +158,13 @@ export async function saveLocalNote(value: {
   }
   const current = parseOptionalNote(await notes.get(id));
   const existingOperation = parseOptionalOperation(await outbox.get(id));
+  const changedElsewhere = !redirect.path.length && current && value.baseNote && contentKey(current) !== contentKey(value.baseNote);
+  if (changedElsewhere && existingOperation && existingOperation.editorSession !== value.editorSession) {
+    throw new Error('This note changed in another tab. Copy your latest changes before reopening it.');
+  }
+  // A remote refresh must not silently advance an open editor's write version.
+  // Acknowledgements with unchanged content can safely advance it, however.
+  const expectedVersion = existingOperation?.expectedVersion ?? (changedElsewhere ? value.baseNote!.version : current?.version ?? value.version ?? 0);
   const currentImages = new Map(current?.images.map(image => [image.id, image]));
   // Reconcile upload metadata without discarding the editor's orientation.
   const reconciledImages = [...new Map(images.map(image => [image.id, {
@@ -189,7 +204,7 @@ export async function saveLocalNote(value: {
   }
   for (const image of current?.images ?? []) if (image.blobId && !reconciledImages.some(item => item.id === image.id)) await transaction.objectStore('blobs').delete(image.blobId);
   await notes.put(note);
-  await outbox.put({ noteId: id, type: 'save', expectedVersion: existingOperation?.expectedVersion ?? note.version, mutationId: crypto.randomUUID(), editorSession: value.editorSession });
+  await outbox.put({ noteId: id, type: 'save', expectedVersion, mutationId: crypto.randomUUID(), editorSession: value.editorSession });
   await transaction.objectStore('meta').put(true, 'initialized');
   await transaction.done;
   return note;
@@ -502,6 +517,10 @@ function audioBlobKeys(audio: LocalAudio): string[] {
 function reconcileAttachments<T extends { id: string; blobId?: string }>(local: T[], uploaded: T[]): T[] {
   const byId = new Map(uploaded.map(attachment => [attachment.id, attachment]));
   return local.map(attachment => attachment.blobId ? byId.get(attachment.id) ?? attachment : attachment);
+}
+
+function contentKey(note: LocalNote) {
+  return JSON.stringify([note.title, note.body, note.color, note.pinned, note.images.map(image => [image.id, image.rotation]), note.audio.map(audio => audio.id)]);
 }
 
 async function attachmentBlob(url: string): Promise<Blob> {

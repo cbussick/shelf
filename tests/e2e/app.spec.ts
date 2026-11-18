@@ -39,6 +39,11 @@ test('creates, edits, pins, searches, and deletes a note', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Edit note' })).not.toBeVisible();
+  // Clearing a saved note is an edit, not an implicit permanent deletion.
+  await expect(page.getByRole('button', { name: /^Open note:/ })).toHaveCount(1);
+  await page.getByRole('button', { name: /^Open note:/ }).click();
+  await page.getByRole('button', { name: 'Delete note', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Open note:/ })).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'Delete this note?' })).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
@@ -250,7 +255,7 @@ test('keeps the header and floating create action visible while scrolling', asyn
   await page.setViewportSize({ width: 1280, height: 700 });
   await page.goto('/');
   await page.locator('#main').evaluate(main => { main.style.minHeight = '200vh'; });
-  const header = page.locator('#root > header');
+  const header = page.getByRole('banner').first();
   const floating = page.getByRole('navigation', { name: 'Create a note' });
   await expect(floating.getByRole('button', { name: 'New note' })).toBeVisible();
   await expect(floating).toBeVisible();
@@ -286,7 +291,7 @@ test('keeps the mobile create action visible while the header sticks', async ({ 
   await expect(floating).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 300));
   await expect(floating).toBeVisible();
-  expect(await page.locator('#root > header').evaluate(element => element.getBoundingClientRect().top)).toBe(0);
+  expect(await page.getByRole('banner').first().evaluate(element => element.getBoundingClientRect().top)).toBe(0);
 });
 
 test('pins from the board and shows pin controls on hover for both groups', async ({ page }) => {
@@ -1130,7 +1135,7 @@ test('offers a persistent update toast with refresh and later actions across sig
     await page.getByRole('button', { name: 'New note' }).click();
     await page.getByRole('textbox', { name: 'Title' }).fill('Update toast coexistence');
     await page.getByRole('button', { name: 'Close note' }).click();
-    await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Note added' })).toBeVisible();
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Note added' })).toHaveCount(0);
     await expect(refresh).toBeVisible();
     await expect.poll(async () => {
       const toastBox = (await updateToast.boundingBox())!;

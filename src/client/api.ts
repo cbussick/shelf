@@ -8,6 +8,8 @@ export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly body?: unknown) { super(message); }
 }
 
+export const sessionEvents = new EventTarget();
+
 async function request<T>(url: string, schema: ZodType<T>, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -17,6 +19,7 @@ async function request<T>(url: string, schema: ZodType<T>, init?: RequestInit): 
   }
   const body: unknown = response.status === 204 ? { ok: true } : await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401) sessionEvents.dispatchEvent(new Event('expired'));
     const parsed = errorResponseSchema.safeParse(body);
     throw new ApiError(parsed.success ? parsed.data.error : 'Request failed.', response.status, body);
   }

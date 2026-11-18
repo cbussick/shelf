@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { CheckpointWriter } from '../checkpoint-writer';
 import { isVideo, VISUAL_ACCEPT, noteColorSchema, type ImageRotation, type NoteColor } from '../../shared/contracts';
 import { validateVisualFile } from '../visual-media';
 import { styles } from '../app.stylex';
@@ -19,11 +20,15 @@ export type EditorValue = {
   id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
   retainedImages: LocalImage[]; newImages: File[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
   retainedAudio: LocalAudio[]; newAudio: File[];
+  newImageIds?: string[]; newAudioIds?: string[]; editorSession?: string; baseNote?: LocalNote;
 };
 
-export function Editor({ note, open = true, initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose }: {
-  note?: LocalNote; open?: boolean; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<void>;
-  onDelete: (note: LocalNote) => Promise<void>; onClose: (retainReady?: boolean) => void;
+export type EditorSyncState = 'syncing' | 'synced' | 'offline' | 'error';
+
+export function Editor({ note, open = true, locked = false, syncState = 'syncing', initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose, onRetrySync, onDirtyChange }: {
+  note?: LocalNote; open?: boolean; locked?: boolean; syncState?: EditorSyncState; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<LocalNote>;
+  onDelete: (note: LocalNote, editorSession?: string) => Promise<void>; onClose: (retainReady?: boolean) => void;
+  onRetrySync?: () => void; onDirtyChange?: (dirty: boolean) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const backdropPress = useRef(false);
@@ -51,7 +56,17 @@ export function Editor({ note, open = true, initialImages = [], initialAudio = [
   const editorPhoto = stylex.props(styles.editorPhoto, hasAudio && styles.mixedEditorPhoto);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [, renderCheckpoint] = useState(0);
+  const sessionId = useRef(note?.id ?? crypto.randomUUID());
+  const editorSession = useRef(crypto.randomUUID());
+  const committedNote = useRef(note);
+  const attachmentIds = useRef(new WeakMap<File, string>());
+  const fileId = (file: File) => {
+    let id = attachmentIds.current.get(file);
+    if (!id) { id = crypto.randomUUID(); attachmentIds.current.set(file, id); }
+    return id;
+  };
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const newImageUrls = useMemo(() => newImages.map(file => URL.createObjectURL(file)), [newImages]);
   useEffect(() => () => newImageUrls.forEach(url => URL.revokeObjectURL(url)), [newImageUrls]);
@@ -60,12 +75,48 @@ export function Editor({ note, open = true, initialImages = [], initialAudio = [
     ...newImages.map((file, index) => ({ src: newImageUrls[index], alt: file.name, mimeType: file.type, rotation: newImageRotations[index], removal: { kind: 'new' as const, index } })),
   ];
   const previewKind = previewIndex !== null && gallery[previewIndex] && galleryVideo(gallery[previewIndex]) ? 'video' : 'image';
-  const initial = useRef(snapshot({ title, body, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio }));
-  const dirty = initial.current !== snapshot({ title, body, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio });
+  const value: EditorValue = { id: sessionId.current, editorSession: editorSession.current, title: title.trim(), body, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio, newImageIds: newImages.map(fileId), newAudioIds: newAudio.map(fileId) };
+  const latest = useRef({ value, onSave });
+  latest.current = { value, onSave };
+  const [writer] = useState(() => new CheckpointWriter<EditorValue>(note || (!initialImages.length && !initialAudio.length) ? snapshot(value) : '', () => latest.current.value, snapshot, async checkpoint => {
+    committedNote.current = await latest.current.onSave({ ...checkpoint, baseNote: committedNote.current, version: committedNote.current?.version, createdAt: committedNote.current?.createdAt });
+  }, checkpoint => Boolean(committedNote.current) || !emptyValue(checkpoint)));
+  const key = snapshot(value);
+  const dirty = key !== writer.savedKey;
+  const saveFailed = Boolean(writer.error);
+  const flush = () => {
+    try {
+      if (dirty) latest.current.value = { ...latest.current.value, body: bodyInput.current?.read() ?? body };
+      return writer.flush();
+    } catch (caught) { writer.error = caught; writer.changed(); return Promise.resolve(false); }
+  };
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  useEffect(() => {
+    writer.resume();
+    writer.changed = () => renderCheckpoint(count => count + 1);
+    return () => { writer.changed = () => {}; void writer.stop(); };
+  }, [writer]);
+  useEffect(() => { if (open && !deleting) writer.schedule(); }, [writer, key, open, deleting]);
+  useEffect(() => { onDirtyChange?.(dirty || writer.saving); }, [dirty, writer.saving, onDirtyChange]);
+  useEffect(() => {
+    if (!open) return;
+    const hidden = () => { if (document.visibilityState === 'hidden') void flushRef.current(); };
+    const pagehide = () => { void flushRef.current(); };
+    document.addEventListener('visibilitychange', hidden);
+    addEventListener('pagehide', pagehide);
+    return () => { document.removeEventListener('visibilitychange', hidden); removeEventListener('pagehide', pagehide); };
+  }, [open]);
+  useEffect(() => {
+    if (!open || (!dirty && !writer.saving)) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    addEventListener('beforeunload', warn);
+    return () => removeEventListener('beforeunload', warn);
+  }, [open, dirty, writer.saving]);
 
   useEffect(() => {
     const element = dialog.current;
-    if (open) {
+    if (open && !locked) {
       bodyInput.current?.restartReading();
       element?.showModal();
       if (element) element.scrollTop = 0;
@@ -73,7 +124,7 @@ export function Editor({ note, open = true, initialImages = [], initialAudio = [
       if (initialRecording) setRecordingOpen(true);
     } else element?.close();
     return () => element?.close();
-  }, [open, note, initialRecording]);
+  }, [open, note, initialRecording, locked]);
   useEffect(() => {
     const viewport = window.visualViewport;
     const element = dialog.current;
@@ -90,12 +141,11 @@ export function Editor({ note, open = true, initialImages = [], initialAudio = [
       viewport.removeEventListener('scroll', update);
     };
   }, []);
-  const empty = !title.trim() && !body.trim() && retainedImages.length + newImages.length + retainedAudio.length + newAudio.length === 0;
   const requestClose = () => {
-    if (saving || recordingOpen) return;
-    if (!dirty && note && !empty) return onClose(canRetainReady.current && bodyInput.current?.isReady());
+    if (saving || deleting || recordingOpen) return;
+    if (!dirty && !writer.saving) return onClose(canRetainReady.current && Boolean(note) && bodyInput.current?.isReady());
     if (saveFailed) return discardDialog.current?.showModal();
-    void save();
+    void saveAndClose();
   };
   const requestImageRemoval = (image: NonNullable<typeof imageToRemove.current>) => {
     imageToRemove.current = image;
@@ -159,28 +209,26 @@ export function Editor({ note, open = true, initialImages = [], initialAudio = [
       return file ? [file] : [];
     }));
   };
-  const save = async () => {
-    if (saving) return;
-    const cleanTitle = title.trim();
-    const cleanBody = bodyInput.current?.read() ?? body;
-    setSaving(true); setError(''); setSaveFailed(false);
+  const saveAndClose = async () => {
+    setSaving(true);
+    if (await flush()) onClose();
+    else setSaving(false);
+  };
+  const remove = async () => {
+    setDeleting(true);
+    await writer.stop(); // Fence queued checkpoints before deleting, including a first upload.
     try {
-      if (!cleanTitle && !cleanBody.trim() && retainedImages.length + newImages.length + retainedAudio.length + newAudio.length === 0) {
-        // Empty drafts are discarded; existing notes use the normal offline-safe deletion queue.
-        if (note) await onDelete(note);
-      } else {
-        await onSave({ id: note?.id, title: cleanTitle, body: cleanBody, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio, version: note?.version, createdAt: note?.createdAt });
-      }
-      onClose();
+      if (committedNote.current) await onDelete(committedNote.current, editorSession.current);
+      else onClose();
     } catch (caught) {
-      const reason = caught instanceof DOMException && caught.name === 'InvalidStateError'
-        ? 'The browser’s local database is unavailable.'
-        : caught instanceof Error ? caught.message : 'Could not save this note.';
-      setError(`${reason} Your changes are still here. Try again, or close without saving.`);
-      setSaveFailed(true);
-      setSaving(false);
+      setError(caught instanceof Error ? caught.message : 'Could not delete this note.');
+      writer.resume(); setDeleting(false);
     }
   };
+  const localError = saveFailed ? saveError(writer.error) : '';
+  const status = saveFailed ? 'Changes not saved' : dirty || writer.saving ? 'Saving…' : !committedNote.current ? '' : syncState === 'offline' ? 'Saved on this device · Offline' : syncState === 'error' ? 'Saved on this device · Sync failed' : syncState === 'synced' ? 'Saved' : 'Syncing…';
+  const syncFailed = !saveFailed && !dirty && !writer.saving && syncState === 'error';
+  const retry = saveFailed ? () => void flush() : syncFailed ? onRetrySync : undefined;
   return <>
     <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'}
       onInputCapture={() => { canRetainReady.current = false; }}
@@ -205,7 +253,7 @@ export function Editor({ note, open = true, initialImages = [], initialAudio = [
             <span>Updated <time dateTime={note.updatedAt}>{formatTimestamp(note.updatedAt)}</time></span>
           </div>}
           <div {...stylex.props(styles.headerActions)}>
-            {note && <button type="button" aria-label="Delete note" onClick={() => deleteDialog.current?.showModal()} {...stylex.props(styles.iconButton, styles.deleteIcon)}><Icon name="trash"/></button>}
+            {(note || committedNote.current) && <button type="button" aria-label="Delete note" disabled={deleting} onClick={() => deleteDialog.current?.showModal()} {...stylex.props(styles.iconButton, styles.deleteIcon)}><Icon name="trash"/></button>}
             <button type="button" aria-label={pinned ? 'Unpin note' : 'Pin note'} aria-pressed={pinned} onClick={() => setPinned(value => !value)} {...stylex.props(styles.pinText, pinned && styles.pinned)}><Icon name={pinned ? 'pin-filled' : 'pin'} width={18}/></button>
             <button type="button" data-close-note aria-label="Close note" disabled={saving} onClick={requestClose} {...stylex.props(styles.iconButton)}><Icon name="x"/></button>
           </div>
@@ -225,23 +273,21 @@ export function Editor({ note, open = true, initialImages = [], initialAudio = [
           <label className="sr-only" htmlFor="note-title">Title</label><input id="note-title" maxLength={160} placeholder="Title" value={title} onChange={event => setTitle(event.target.value)} {...stylex.props(styles.titleInput)}/>
           <RichTextEditor ref={bodyInput} initialValue={note?.body ?? ''} onChange={value => { canRetainReady.current = false; setBody(value); }} autoFocus={!note} disabled={saving}/>
         </div>
-        {(newAudio.length > 0 || (dirty && (retainedAudio.length > 0 || (note?.audio.length ?? 0) > 0))) && !saving && <p role="status" {...stylex.props(styles.audioDraftStatus)}>Audio changes are not saved yet. Close the note to save on this device.</p>}
-        <p role="alert" {...stylex.props(styles.error)}>{error}</p>
-        {saving && <span role="status" className="sr-only">Saving note…</span>}
-        <footer {...stylex.props(styles.editorFooter)}><div {...stylex.props(styles.tools)}>
+        <p role="alert" {...stylex.props(styles.error)}>{localError || error}</p>
+        <footer {...stylex.props(styles.editorFooter)}><div {...stylex.props(styles.tools, styles.editorTools)}>
           <AddAudio onUpload={addAudio} onRecord={() => setRecordingOpen(true)} disabled={saving}/>
           <button type="button" aria-label="Attach an image or video" onClick={() => input.current?.click()} {...stylex.props(styles.iconButton)}><Icon name="image"/></button>
           <input ref={input} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }}/>
           <ColorPicker color={color} onChange={setColor}/>
-        </div><div {...stylex.props(styles.tools)}>{saveFailed && <button type="button" disabled={saving} onClick={() => void save()} {...stylex.props(styles.primary)}>Try again</button>}<button type="button" data-close-note disabled={saving} onClick={requestClose} {...stylex.props(styles.secondary)}>Close</button></div></footer>
+        </div><div data-testid="note-save-status" aria-live="off" {...stylex.props(styles.editorSaveStatus, saveFailed && styles.saveStatusError, syncFailed && styles.saveStatusWarning)}>{status && <><Icon name={saveFailed ? 'warning' : dirty || writer.saving ? 'clock' : syncFailed ? 'warning' : syncState === 'syncing' ? 'refresh' : 'check'} width={15} {...stylex.props(styles.saveStatusIcon)}/><span>{status}</span></>}</div>{retry && <button type="button" aria-label={saveFailed ? 'Retry save' : 'Retry sync'} disabled={writer.saving} onClick={retry} {...stylex.props(styles.editorRetry, saveFailed ? styles.saveStatusError : styles.saveStatusWarning)}>Retry</button>}<button type="button" data-close-note disabled={saving || deleting} onClick={requestClose} {...stylex.props(styles.secondary, styles.editorClose)}>Close</button></footer>
       </div>
     </dialog>
-    {recordingOpen && <AudioRecorder onKeep={file => { addAudio([file]); setRecordingOpen(false); }} onClose={() => setRecordingOpen(false)}/>}
+    {recordingOpen && <AudioRecorder suspended={locked} onKeep={file => { addAudio([file]); setRecordingOpen(false); }} onClose={() => setRecordingOpen(false)}/>}
     <ConfirmDialog ref={removeAudioDialog} title="Remove this audio?" copy="This audio will no longer be attached to this note." cancel="Keep audio" confirm="Remove audio" onConfirm={confirmAudioRemoval}/>
-    {previewIndex !== null && gallery[previewIndex] && <ImagePreview gallery={gallery} index={previewIndex} onIndexChange={setPreviewIndex} onRotate={rotateImage} onRemove={() => requestImageRemoval(gallery[previewIndex].removal)} onClose={() => setPreviewIndex(null)}/>}
+    {!locked && previewIndex !== null && gallery[previewIndex] && <ImagePreview gallery={gallery} index={previewIndex} onIndexChange={setPreviewIndex} onRotate={rotateImage} onRemove={() => requestImageRemoval(gallery[previewIndex].removal)} onClose={() => setPreviewIndex(null)}/>}
     <ConfirmDialog ref={removeImageDialog} title={`Remove this ${previewKind}?`} copy="This attachment will no longer be attached to this note." cancel={`Keep ${previewKind}`} confirm={`Remove ${previewKind}`} onConfirm={confirmImageRemoval}/>
     <ConfirmDialog ref={discardDialog} title="Close without saving?" copy="Your latest changes could not be saved. Closing will discard those changes, but will not delete an existing note." cancel="Keep editing" confirm="Close without saving" onConfirm={onClose}/>
-    <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => note && onDelete(note)}/>
+    <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={remove}/>
   </>;
 }
 
@@ -346,6 +392,17 @@ function formatTimestamp(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
-function snapshot(value: { title: string; body: string; color: NoteColor; pinned: boolean; retainedImages: LocalImage[]; newImages: File[]; newImageRotations: ImageRotation[]; retainedAudio: LocalAudio[]; newAudio: File[] }) {
-  return JSON.stringify({ ...value, retainedImages: value.retainedImages.map(image => [image.id, image.rotation]), newImages: value.newImages.map(file => [file.name, file.size, file.lastModified]), retainedAudio: value.retainedAudio.map(audio => audio.id), newAudio: value.newAudio.map(file => [file.name, file.size, file.lastModified]) });
+function emptyValue(value: EditorValue) {
+  return !value.title.trim() && !value.body.trim() && value.retainedImages.length + value.newImages.length + value.retainedAudio.length + value.newAudio.length === 0;
+}
+
+function saveError(error: unknown) {
+  const reason = error instanceof DOMException && error.name === 'QuotaExceededError' ? 'This device’s storage is full.'
+    : error instanceof DOMException && error.name === 'InvalidStateError' ? 'The browser’s local database is unavailable.'
+    : error instanceof Error ? error.message : 'Could not save this note.';
+  return `${reason} Your latest changes are still here. Keep this note open and retry, or copy them before leaving.`;
+}
+
+function snapshot(value: EditorValue) {
+  return JSON.stringify({ title: value.title, body: value.body, color: value.color, pinned: value.pinned, retainedImages: value.retainedImages.map(image => [image.id, image.rotation]), newImages: value.newImageIds ?? value.newImages.map(file => [file.name, file.size, file.lastModified]), newImageRotations: value.newImageRotations, retainedAudio: value.retainedAudio.map(audio => audio.id), newAudio: value.newAudioIds ?? value.newAudio.map(file => [file.name, file.size, file.lastModified]) });
 }

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/isolated-test';
 
-test('updated note toast stays above the create action on desktop and phone', async ({ page }) => {
+test('routine saves are quiet and action toasts stay above the create action on desktop and phone', async ({ page }) => {
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/');
@@ -12,7 +12,9 @@ test('updated note toast stays above the create action on desktop and phone', as
     await page.getByRole('button', { name: 'Open note: Position check' }).click();
     await page.getByRole('textbox', { name: 'Note', exact: true }).fill(`Updated at ${width}`);
     await page.getByRole('button', { name: 'Close note' }).click();
-    const toast = page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem').filter({ hasText: 'Note updated' });
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: /Note (added|updated)/ })).toHaveCount(0);
+    await page.getByRole('button', { name: /^(Unpin|Pin) note: Position check$/ }).click();
+    const toast = page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem').filter({ hasText: /Note (unpinned|pinned)/ });
     await expect(toast).toBeVisible();
     await expect.poll(async () => {
       const toastBox = (await toast.boundingBox())!;

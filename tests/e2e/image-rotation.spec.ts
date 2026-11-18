@@ -46,7 +46,8 @@ for (const width of [1280, 390]) {
     await expect(card.getByRole('img')).toHaveAttribute('viewBox', '0 0 300 600');
     await expect.poll(async () => (await (await request.get('/api/notes')).json()).notes[0]?.images[0]?.rotation).toBe(270);
 
-    await expect.poll(() => localVersion(page)).toBe(1);
+    const syncedVersion = (await (await request.get('/api/notes')).json()).notes[0].version;
+    await expect.poll(() => localVersion(page)).toBe(syncedVersion);
     await context.setOffline(true);
     await card.click();
     await page.getByRole('button', { name: 'View image 1' }).click();

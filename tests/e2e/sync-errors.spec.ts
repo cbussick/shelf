@@ -68,16 +68,16 @@ test('keeps a rejected upload error when going offline and clears it after recon
   expect((await (await page.request.get('/api/notes')).json()).notes[0].title).toBe('Retry after reconnecting');
 });
 
-test('explains an unauthorized session rather than losing the error inside sync', async ({ page }) => {
+test('locks the workspace and requires sign-in after an unauthorized sync', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await page.route('**/api/notes', route => route.fulfill({ status: 401, json: { error: 'Authentication required.' } }));
   await page.getByRole('button', { name: 'Synced', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Sync now' }).click();
-  await expect(errorButton(page)).toBeVisible();
-  await errorButton(page).click();
-  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Sign in again');
-  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('HTTP 401');
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await expect(page.getByText('Your session expired.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your notes' })).not.toBeVisible();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
 });
 
 for (const thrown of ['error', 'non-error'] as const) {

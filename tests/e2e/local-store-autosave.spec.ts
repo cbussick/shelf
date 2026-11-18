@@ -245,8 +245,10 @@ test('session redirects fence continued text and stable media retries, including
       await gate;
       return decode(...args);
     };
-    // Preparation starts before the conflict transaction but writes afterward.
-    window.saving = window.storage.saveLocalNote({ ...window.draft, body: 'Prepared before conflict' });
+    // A fresh File instance bypasses the unchanged-file metadata cache, so
+    // preparation starts before the conflict transaction but writes afterward.
+    const newImages = window.draft.newImages.map(file => new File([file], file.name, { type: file.type }));
+    window.saving = window.storage.saveLocalNote({ ...window.draft, newImages, body: 'Prepared before conflict' });
   });
   const conflict = await page.evaluate(() => window.storage.syncNotes());
   const inFlight = await page.evaluate(async () => {

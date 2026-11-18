@@ -58,6 +58,13 @@ test('audio-only capture, card playback, seek, download, retention through pin/c
   await editorFor(page).getByRole('button', { name: 'Close note' }).click();
   await expect(editorFor(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  const remaining = (await (await page.request.get('/api/notes')).json()).notes;
+  expect(remaining).toHaveLength(1);
+  expect(remaining[0].audio).toEqual([]); // Removing the last attachment is not permanent note deletion.
+  await page.getByRole('button', { name: /^Open note:/ }).click();
+  await editorFor(page).getByRole('button', { name: 'Delete note', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
 });
 

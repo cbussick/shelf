@@ -1,13 +1,13 @@
 import * as stylex from '@stylexjs/stylex';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isVideo, VISUAL_ACCEPT, type NoteColor } from '../shared/contracts';
 import { validateVisualFile } from './visual-media';
-import { api, ApiError } from './api';
+import { api, ApiError, sessionEvents } from './api';
 import { styles } from './app.stylex';
 import { Auth, Brand } from './components/Auth';
-import { ConfirmDialog, Editor, type EditorValue } from './components/Editor';
+import { ConfirmDialog, Editor, type EditorValue, type EditorSyncState } from './components/Editor';
 import { Icon } from './components/Icon';
 import { LoadingBrand } from './components/LoadingBrand';
 import { AddAudio } from './components/AddAudio';
@@ -17,7 +17,7 @@ import { useNotePreparation } from './note-preparation';
 import { clearPreparedDocuments } from './prepared-documents';
 import { NoteContextMenu, type MenuTarget } from './components/NoteContextMenu';
 import { clearShares, discardShare, getShare } from './incoming-share';
-import { clearLocalData, deleteLocalNote, hasLocalData, localNotes, reorderLocalNotes, saveLocalNote, syncNotes, type LocalNote } from './local-store';
+import { clearLocalData, deleteLocalNote, hasLocalData, localNotes, noteSyncState, pendingLocalChanges, reorderLocalNotes, saveLocalNote, syncNotes, type LocalNote } from './local-store';
 
 type SyncState = 'connecting' | 'syncing' | 'synced' | 'local' | 'offline' | 'error';
 type EditorSession = { note?: LocalNote; files?: File[]; audio?: File[]; recording?: boolean; shareId?: string };
@@ -32,21 +32,57 @@ function readyNoteIdentity(note: LocalNote) {
 
 export function App() {
   const queryClient = useQueryClient();
+  const workspaceOpened = useRef(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const expireSession = useCallback(() => { setSessionExpired(true); queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false }); }, [queryClient]);
   // Attempt auth even offline so a paused query cannot trap startup on the splash.
   const auth = useQuery({ queryKey: ['auth'], queryFn: api.authStatus, retry: false, networkMode: 'always', refetchOnReconnect: true });
   const unreachable = auth.error instanceof ApiError && auth.error.status === 0;
-  const needsOfflineAccess = unreachable && !auth.data?.authenticated;
+  const needsOfflineAccess = unreachable && !auth.data?.authenticated && !workspaceOpened.current;
   const offlineAccess = useQuery({ queryKey: ['offline-access'], queryFn: hasLocalData, enabled: needsOfflineAccess, retry: false, networkMode: 'always' });
   // Cached authenticated access must keep the workspace/editor mounted even if
   // a background auth refetch fails while returning to an offline tab.
-  if (auth.isPending || (needsOfflineAccess && offlineAccess.isPending)) return <Loading/>;
-  if (auth.data?.authenticated || (unreachable && offlineAccess.data)) return <NotesApp offlineEntry={!auth.data?.authenticated} onLogout={() => { queryClient.setQueryData(['offline-access'], false); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>;
+  const confirmedExpiry = workspaceOpened.current && !unreachable && (auth.data?.authenticated === false || auth.error instanceof ApiError && auth.error.status === 401);
+  useLayoutEffect(() => { if (confirmedExpiry) setSessionExpired(true); }, [confirmedExpiry]);
+  const authenticated = async () => {
+    const result = await auth.refetch();
+    if (result.error || !result.data?.authenticated) throw new Error('Could not confirm your session. Check your connection and try signing in again.');
+    setSessionExpired(false);
+  };
+  if (!workspaceOpened.current && (auth.isPending || (needsOfflineAccess && offlineAccess.isPending))) return <Loading/>;
+  const allowed = auth.data?.authenticated || (unreachable && offlineAccess.data);
+  if (allowed) workspaceOpened.current = true;
+  if (workspaceOpened.current) {
+    const locked = sessionExpired || confirmedExpiry;
+    return <><NotesApp offlineEntry={!auth.data?.authenticated} locked={locked} onSessionExpired={expireSession} onLogout={() => { workspaceOpened.current = false; setSessionExpired(false); queryClient.setQueryData(['offline-access'], false); queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false }); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>{locked && <Auth setupRequired={false} sessionExpired onAuthenticated={authenticated}/>}</>;
+  }
   if (unreachable) return <main {...stylex.props(styles.loginPage)}><section role="alert" {...stylex.props(styles.loginCard)}><Brand/><h1 {...stylex.props(styles.loginTitle)}>Shelf is offline</h1><p {...stylex.props(styles.loginCopy)}>Connect to your server to open Shelf. Your notes could not be opened on this device.</p><button type="button" disabled={auth.isFetching} onClick={() => void auth.refetch()} {...stylex.props(styles.primary)}>Try again</button></section></main>;
-  if (auth.error) return <Auth setupRequired={false} onAuthenticated={() => void queryClient.invalidateQueries({ queryKey: ['auth'] })}/>;
-  return <Auth setupRequired={auth.data?.setupRequired ?? false} onAuthenticated={() => void queryClient.invalidateQueries({ queryKey: ['auth'] })}/>;
+  if (auth.error) return <Auth setupRequired={false} onAuthenticated={authenticated}/>;
+  return <Auth setupRequired={auth.data?.setupRequired ?? false} onAuthenticated={authenticated}/>;
 }
 
-function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout: () => void }) {
+function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlineEntry: boolean; locked: boolean; onSessionExpired: () => void; onLogout: () => void }) {
+  const workspace = useRef<HTMLDivElement>(null);
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+  const unsaved = useRef(false);
+  const setUnsaved = useCallback((dirty: boolean) => { unsaved.current = dirty; }, []);
+  const activeNoteId = useRef<string | undefined>(undefined);
+  const activeEditorSession = useRef<string | undefined>(undefined);
+  const [editorSync, setEditorSync] = useState<EditorSyncState>('syncing');
+  useLayoutEffect(() => {
+    if (locked) {
+      // Top-layer dialogs ignore an ancestor's hidden/inert styling.
+      workspace.current?.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach(dialog => dialog.close());
+      workspace.current?.querySelectorAll<HTMLMediaElement>('audio, video').forEach(media => media.pause());
+      window.getSelection()?.removeAllRanges();
+      toast.dismiss('note-notification');
+    }
+  }, [locked]);
+  useEffect(() => {
+    sessionEvents.addEventListener('expired', onSessionExpired);
+    return () => sessionEvents.removeEventListener('expired', onSessionExpired);
+  }, [onSessionExpired]);
   const [notes, setNotes] = useState<LocalNote[]>([]);
   const [query, setQuery] = useState('');
   const [editor, setEditor] = useState<EditorSession>();
@@ -87,40 +123,66 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     toast(message, { id: 'note-notification', duration: 3500 });
   }, []);
   useEffect(() => () => { toast.dismiss('note-notification'); }, []);
+  const updateEditorSync = useCallback(async (connection: EditorSyncState) => {
+    const id = activeNoteId.current;
+    if (!id) return;
+    try {
+      const state = await noteSyncState(id, activeEditorSession.current);
+      if (id === activeNoteId.current) {
+        if (state.note) activeNoteId.current = state.note.id;
+        setEditorSync(!state.pending && state.note?.version ? 'synced' : connection === 'synced' ? 'syncing' : connection);
+      }
+    } catch { if (id === activeNoteId.current) setEditorSync('error'); }
+  }, []);
+  useEffect(() => {
+    activeNoteId.current = editor?.note?.id;
+    activeEditorSession.current = undefined;
+    unsaved.current = false;
+    setEditorSync('syncing');
+    void updateEditorSync(navigator.onLine ? 'syncing' : 'offline');
+  }, [editor, updateEditorSync]);
   const synchronize = useCallback(async () => {
+    if (lockedRef.current) return;
     if (syncing.current) { syncRequested.current = true; return; }
     syncing.current = true;
+    void updateEditorSync(navigator.onLine ? 'syncing' : 'offline');
     try {
       do {
         syncRequested.current = false;
         setSyncState(navigator.onLine ? 'syncing' : 'offline');
         try {
           const result = await syncNotes();
+          if (result.connection === 'unauthorized') { onSessionExpired(); return; }
+          await updateEditorSync(!navigator.onLine ? 'offline' : result.connection === 'offline' ? 'error' : result.pending ? 'syncing' : 'synced');
           if (!syncRequested.current) {
             setNotes(result.notes); setPending(result.pending);
-            setSyncError(result.connection === 'unauthorized' ? 'Your session is no longer authorized. Sign in again to sync. (HTTP 401)' : result.connection === 'offline' ? 'The server is unreachable.' : undefined);
-            setSyncState(result.connection === 'offline' || !navigator.onLine ? 'offline' : result.connection === 'unauthorized' ? 'error' : result.pending ? 'local' : 'synced');
+            setSyncError(result.connection === 'offline' ? 'The server is unreachable.' : undefined);
+            setSyncState(result.connection === 'offline' || !navigator.onLine ? 'offline' : result.pending ? 'local' : 'synced');
           }
           if (result.missingAttachments.length) notify(`Both versions were kept, but ${result.missingAttachments.length} attachment(s) had already been removed from the server and could not be copied.`);
           else if (result.conflict) notify('Both versions were kept after a conflicting edit.');
+          if (result.conflict && result.pending) syncRequested.current = true;
         } catch (error) {
           setSyncError(syncErrorDetails(error));
-          setSyncState(error instanceof ApiError && error.status === 0 ? 'offline' : 'error');
+          const state = error instanceof ApiError && error.status === 0 ? 'offline' : 'error';
+          setSyncState(state);
+          await updateEditorSync(!navigator.onLine ? 'offline' : state === 'offline' ? 'error' : state);
         }
-      } while (syncRequested.current);
+      } while (syncRequested.current && !lockedRef.current);
     } finally { syncing.current = false; }
-  }, [notify]);
+  }, [notify, onSessionExpired, updateEditorSync]);
+  useEffect(() => { if (!locked) void synchronize(); }, [locked, synchronize]);
 
   useEffect(() => {
     void localNotes().then(setNotes).then(synchronize);
     const online = () => void synchronize();
-    const offline = () => setSyncState('offline');
+    const offline = () => { setSyncState('offline'); void updateEditorSync('offline'); };
     const visible = () => { if (document.visibilityState === 'visible') void synchronize(); };
     const interval = setInterval(() => { if (document.visibilityState === 'visible') void synchronize(); }, 15_000);
     addEventListener('online', online); addEventListener('offline', offline); document.addEventListener('visibilitychange', visible);
     void navigator.storage?.persist?.();
     return () => { clearInterval(interval); removeEventListener('online', online); removeEventListener('offline', offline); document.removeEventListener('visibilitychange', visible); };
-  }, [synchronize]);
+  }, [synchronize, updateEditorSync]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -145,6 +207,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      if (lockedRef.current) return;
       if (event.target instanceof HTMLElement && event.target.closest('input,textarea,[contenteditable]')) return;
       if (document.querySelector('dialog[open]') || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key.toLowerCase() === 'f') { event.preventDefault(); document.querySelector<HTMLInputElement>('#search')?.focus(); }
@@ -161,7 +224,7 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
 
   useEffect(() => {
     const paste = (event: ClipboardEvent) => {
-      if (event.defaultPrevented || editor || document.querySelector('dialog[open]')) return;
+      if (lockedRef.current || event.defaultPrevented || editor || document.querySelector('dialog[open]')) return;
       const files = [...(event.clipboardData?.items ?? [])]
         .filter(item => item.kind === 'file' && (item.type.startsWith('image/') || isVideo(item.type)))
         .flatMap(item => { const file = item.getAsFile(); return file ? [file] : []; });
@@ -192,20 +255,27 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
       return { value: { note }, read: note.id === preferredReadyNote.current };
     });
   }, [notes]);
-  useNotePreparation(filtered, Boolean(editor), warmReadyEditor, preferredReadyNote.current);
+  useNotePreparation(filtered, locked || Boolean(editor), warmReadyEditor, preferredReadyNote.current);
   // Opening a dialog must not rebuild every card or rerun masonry layout.
   const pinned = useMemo(() => filtered.filter(note => note.pinned), [filtered]);
   const others = useMemo(() => filtered.filter(note => !note.pinned), [filtered]);
 
   const save = async (value: EditorValue) => {
     const saved = await saveLocalNote(value);
-    if (editor) preferredReadyNote.current = saved.id;
-    setNotes(await localNotes()); setPending(count => count + 1);
-    notify(value.id ? 'Note updated' : 'Note added');
+    if (editor) {
+      preferredReadyNote.current = saved.id;
+      activeNoteId.current = saved.id;
+      activeEditorSession.current = value.editorSession;
+      setEditorSync(navigator.onLine ? 'syncing' : 'offline');
+    }
+    setNotes(current => [saved, ...current.filter(note => note.id !== saved.id)].sort((a, b) => a.position - b.position));
+    void pendingLocalChanges().then(setPending).catch(() => {});
+    // The local checkpoint is acknowledged independently of server availability.
     void synchronize();
+    return saved;
   };
-  const remove = async (note: LocalNote) => {
-    await deleteLocalNote(note); setEditor(undefined); setNotes(await localNotes()); setPending(count => count + 1);
+  const remove = async (note: LocalNote, editorSession?: string) => {
+    await deleteLocalNote(note, editorSession); setEditor(undefined); setNotes(await localNotes()); setPending(count => count + 1);
     notify('Note permanently deleted'); void synchronize();
   };
   const pin = useCallback(async (note: LocalNote) => {
@@ -260,12 +330,13 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     setEditor(undefined);
   };
   const logout = async () => {
-    if (pending) return notify('Wait for your notes to finish syncing before signing out.');
+    if (unsaved.current) return notify('Save your latest changes before signing out.');
+    if (await pendingLocalChanges()) return notify('Wait for your notes to finish syncing before signing out.');
     await api.logout(); clearPreparedDocuments(); await clearLocalData(); await clearShares(); onLogout();
   };
 
   const status = syncStatus(syncState, pending);
-  return <>
+  return <div ref={workspace} hidden={locked} inert={locked}>
     <a href="#main" {...stylex.props(styles.skipLink)}>Skip to notes</a>
     <header {...stylex.props(styles.header)}><a href="/" aria-label="Shelf home" {...stylex.props(styles.brand)}><Brand/></a>
       <search {...stylex.props(styles.search)}><Icon name="search"/><input id="search" type="search" aria-label="Search notes" placeholder="Search your notes" value={query} onChange={event => setQuery(event.target.value)} {...stylex.props(styles.searchInput)}/><kbd {...stylex.props(styles.searchKey)}>F</kbd></search>
@@ -280,9 +351,9 @@ function NotesApp({ offlineEntry, onLogout }: { offlineEntry: boolean; onLogout:
     <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
-    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} onSave={save} onDelete={remove} onClose={closeEditor}/>}
+    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} locked={locked} syncState={editorSync} onSave={save} onDelete={remove} onClose={closeEditor} onRetrySync={() => void synchronize()} onDirtyChange={setUnsaved}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
-  </>;
+  </div>;
 }
 
 function syncStatus(state: SyncState, pending: number): { label: string; copy: string; icon: 'offline' | 'cloud-check' | 'refresh' } {

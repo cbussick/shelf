@@ -5,7 +5,7 @@ import { api } from '../api';
 import { styles } from '../app.stylex';
 import { Icon } from './Icon';
 
-export function Auth({ setupRequired, onAuthenticated }: { setupRequired: boolean; onAuthenticated: () => void }) {
+export function Auth({ setupRequired, onAuthenticated, sessionExpired = false }: { setupRequired: boolean; onAuthenticated: () => void | Promise<void>; sessionExpired?: boolean }) {
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState('');
@@ -17,7 +17,8 @@ export function Auth({ setupRequired, onAuthenticated }: { setupRequired: boolea
     setBusy(true); setError('');
     try {
       if (setupRequired) await api.setup(password); else await api.login(password);
-      onAuthenticated();
+      await onAuthenticated();
+      setBusy(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not sign in.');
       setBusy(false);
@@ -26,6 +27,7 @@ export function Auth({ setupRequired, onAuthenticated }: { setupRequired: boolea
   return <main {...stylex.props(styles.loginPage)}><form onSubmit={submit} {...stylex.props(styles.loginCard)}>
     <Brand/>
     <h1 {...stylex.props(styles.loginTitle)}>{setupRequired ? 'Make Shelf yours' : 'Welcome back'}</h1>
+    {sessionExpired && <p role="status" {...stylex.props(styles.loginCopy)}>Your session expired. Sign in to continue. Keep this page open to preserve any unsaved changes.</p>}
     <p {...stylex.props(styles.loginCopy)}>{setupRequired ? 'Choose the password for this private instance. Use at least 12 characters.' : 'Enter your password to open your notes.'}</p>
     <div {...stylex.props(styles.passwordField)}>
       <label htmlFor="password" {...stylex.props(styles.passwordLabel)}>Password</label>
