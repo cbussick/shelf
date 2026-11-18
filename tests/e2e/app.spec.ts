@@ -558,7 +558,7 @@ test('a note image fits without horizontal scrolling', async ({ page }) => {
   }
 });
 
-test('image-only cards have no empty content section', async ({ page }) => {
+test('image-only cards reserve only the compact sync slot without an empty content section', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Add an image' }).click();
   await page.locator('input[type=file]').last().setInputFiles('tests/fixtures/image.jpg');
@@ -567,8 +567,9 @@ test('image-only cards have no empty content section', async ({ page }) => {
   const card = page.getByRole('button', { name: 'Open note: image.jpg' });
   await expect(card.getByRole('img')).toBeVisible();
   await expect(card.locator('span')).toHaveCount(0);
-  const dimensions = await card.evaluate(element => ({ card: element.getBoundingClientRect().height, image: element.querySelector('img')!.getBoundingClientRect().height }));
-  expect(dimensions.card - dimensions.image).toBeLessThanOrEqual(2);
+  const dimensions = await card.evaluate(element => ({ card: element.getBoundingClientRect().height, image: element.querySelector('img')!.getBoundingClientRect().height, statusSlot: parseFloat(getComputedStyle(element).paddingBottom) }));
+  expect(dimensions.statusSlot).toBe(20);
+  expect(dimensions.card - dimensions.image - dimensions.statusSlot).toBeLessThanOrEqual(2);
 
   await card.click();
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('A caption');
