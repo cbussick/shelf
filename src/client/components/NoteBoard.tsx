@@ -191,7 +191,7 @@ function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, o
       <AudioPlayer key={note.audio[0].id} audio={note.audio[0]} compact/>
       {note.audio.length > 1 && <button type="button" onClick={onCardClick} {...stylex.props(styles.audioMore)}>{note.audio.length - 1} more audio {note.audio.length === 2 ? 'file' : 'files'}</button>}
     </div>}
-    {sync && <span id={`note-sync-${note.id}`} data-testid="note-card-sync" {...stylex.props(styles.noteSyncStatus, Boolean(sync.error) && styles.saveStatusWarning)}><Icon name={sync.error ? 'cloud-warning' : 'clock'} width={15} {...stylex.props(styles.saveStatusIcon)}/><span>{sync.error ? 'Sync failed' : 'Waiting to sync'}</span></span>}
+    {sync && <span id={`note-sync-${note.id}`} data-testid="note-card-sync" {...stylex.props(styles.noteSyncStatus, Boolean(sync.error) && styles.saveStatusWarning)}><Icon name={sync.error ? 'cloud-warning' : 'clock'} width={14} {...stylex.props(styles.noteSyncIcon)}/><span {...stylex.props(styles.noteSyncLabel)}>{sync.error ? 'Sync failed' : 'Waiting to sync'}</span></span>}
   </>;
   const buttonProps = {
     type: 'button' as const, 'data-note-id': note.id,
