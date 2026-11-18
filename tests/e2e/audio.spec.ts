@@ -58,6 +58,13 @@ test('audio-only capture, card playback, seek, download, retention through pin/c
   await editorFor(page).getByRole('button', { name: 'Close note' }).click();
   await expect(editorFor(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  const remaining = (await (await page.request.get('/api/notes')).json()).notes;
+  expect(remaining).toHaveLength(1);
+  expect(remaining[0].audio).toEqual([]); // Removing the last attachment is not permanent note deletion.
+  await page.getByRole('button', { name: /^Open note:/ }).click();
+  await editorFor(page).getByRole('button', { name: 'Delete note', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
 });
 
@@ -115,7 +122,7 @@ test('audio added offline survives reload, syncs later, and remains playable loc
   await upload(editorFor(page), ['Offline sound.wav']);
   await editorFor(page).getByRole('button', { name: 'Close note' }).click();
   await expect(editorFor(page)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Saved on device', exact: true })).toBeVisible();
+  await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
   await page.reload();
   await page.getByRole('button', { name: 'Play Offline sound.wav' }).click();
   await expect(page.getByRole('button', { name: 'Pause Offline sound.wav' })).toBeVisible();
@@ -238,7 +245,7 @@ test('conflict copies retain audio and uploaded audio does not autoplay or downl
   await editorFor(page).getByRole('textbox', { name: 'Title' }).fill('Local version');
   await editorFor(page).getByRole('button', { name: 'Close note' }).click();
   await expect(page.getByRole('button', { name: 'Open note: Local version (conflict copy)', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /^(Saved on device|Syncing…|Synced|Sync needs attention)$/ }).click();
+  await page.getByRole('button', { name: /^(Saved on device|Syncing…|Synced|Sync needs attention|\d+ not synced)$/ }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   const notes = (await (await page.request.get('/api/notes')).json()).notes;

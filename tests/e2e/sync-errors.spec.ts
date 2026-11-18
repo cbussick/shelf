@@ -3,7 +3,7 @@ import { test, expect } from '../fixtures/isolated-test';
 import { editorFor } from '../fixtures/audio-ui';
 import AxeBuilder from '@axe-core/playwright';
 
-const errorButton = (page: Page) => page.getByRole('button', { name: 'Sync needs attention', exact: true });
+const errorButton = (page: Page) => page.getByRole('button', { name: /^(Sync needs attention|\d+ not synced)$/ });
 
 test('shows server errors as plain text on mobile and clears details after recovery', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -58,26 +58,26 @@ test('keeps a rejected upload error when going offline and clears it after recon
   await expect(editorFor(page)).toHaveCount(0);
   await expect(errorButton(page)).toBeVisible();
   await context.setOffline(true);
-  await expect(page.getByRole('button', { name: 'Saved on device', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Saved on device', exact: true }).click();
+  await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
+  await page.getByTestId('sync-overview').click();
   await expect(page.getByRole('dialog').getByRole('alert')).toHaveText('Choose a valid audio file. (HTTP 400)');
   await page.unroute('**/api/notes/*');
   await context.setOffline(false);
-  await expect(page.getByRole('dialog', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Synced', exact: true })).toBeVisible();
   await expect(page.getByRole('dialog').getByRole('alert')).toHaveCount(0);
   expect((await (await page.request.get('/api/notes')).json()).notes[0].title).toBe('Retry after reconnecting');
 });
 
-test('explains an unauthorized session rather than losing the error inside sync', async ({ page }) => {
+test('locks the workspace and requires sign-in after an unauthorized sync', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await page.route('**/api/notes', route => route.fulfill({ status: 401, json: { error: 'Authentication required.' } }));
   await page.getByRole('button', { name: 'Synced', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Sync now' }).click();
-  await expect(errorButton(page)).toBeVisible();
-  await errorButton(page).click();
-  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Sign in again');
-  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('HTTP 401');
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await expect(page.getByText('Your session expired.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your notes' })).not.toBeVisible();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
 });
 
 for (const thrown of ['error', 'non-error'] as const) {

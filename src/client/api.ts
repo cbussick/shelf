@@ -8,6 +8,16 @@ export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly body?: unknown) { super(message); }
 }
 
+export function syncErrorDetails(error: unknown): string {
+  const message = error instanceof Error && error.message.trim() ? error.message : 'An unexpected error prevented syncing.';
+  const status = error instanceof ApiError && error.status > 0 ? ` (HTTP ${error.status})` : '';
+  const available = 4000 - status.length;
+  // Keep the useful status even when bounding an unusually long server message.
+  return `${message.length > available ? `${message.slice(0, available - 1)}…` : message}${status}`;
+}
+
+export const sessionEvents = new EventTarget();
+
 async function request<T>(url: string, schema: ZodType<T>, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -17,6 +27,7 @@ async function request<T>(url: string, schema: ZodType<T>, init?: RequestInit): 
   }
   const body: unknown = response.status === 204 ? { ok: true } : await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401) sessionEvents.dispatchEvent(new Event('expired'));
     const parsed = errorResponseSchema.safeParse(body);
     throw new ApiError(parsed.success ? parsed.data.error : 'Request failed.', response.status, body);
   }

@@ -41,12 +41,13 @@ for (const width of [1280, 390]) {
     await expect(preview.getByRole('status')).toHaveText('Image rotation: 270 degrees');
     await preview.getByRole('button', { name: 'Close image preview' }).click();
     await page.getByRole('button', { name: 'Close note' }).click();
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
     const card = page.getByRole('button', { name: 'Open note: Rotated image', exact: true });
     await expect(card.getByRole('img')).toHaveAttribute('viewBox', '0 0 300 600');
     await expect.poll(async () => (await (await request.get('/api/notes')).json()).notes[0]?.images[0]?.rotation).toBe(270);
 
-    await expect.poll(() => localVersion(page)).toBe(1);
+    const syncedVersion = (await (await request.get('/api/notes')).json()).notes[0].version;
+    await expect.poll(() => localVersion(page)).toBe(syncedVersion);
     await context.setOffline(true);
     await card.click();
     await page.getByRole('button', { name: 'View image 1' }).click();
@@ -60,7 +61,7 @@ for (const width of [1280, 390]) {
     await page.reload();
     await expect(card.locator('image')).toHaveAttribute('transform', /rotate\(90\)/);
     await context.setOffline(false);
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
     await expect.poll(async () => (await (await request.get('/api/notes')).json()).notes[0]?.images[0]?.rotation).toBe(90);
     const note = (await (await request.get('/api/notes')).json()).notes[0];
     expect(await (await request.get(note.images[0].url)).body()).toEqual(bytes);
@@ -97,7 +98,7 @@ test('keeps rotations with their images when navigating and removing draft galle
   const mosaic = page.getByRole('button', { name: 'View image 1' }).getByRole('img');
   await expect(mosaic).toHaveAttribute('preserveAspectRatio', 'xMidYMid slice');
   await page.getByRole('button', { name: 'Close note' }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await expect.poll(async () => (await (await request.get('/api/notes')).json()).notes[0]?.images.map((image: { rotation: number }) => image.rotation)).toEqual([270, 0]);
 });
 
@@ -131,7 +132,7 @@ for (const acknowledgeBeforeSave of [false, true]) {
     await preview.getByRole('button', { name: 'Close image preview' }).click();
     await page.getByRole('button', { name: 'Close note' }).click();
     if (!acknowledgeBeforeSave) release();
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
     await expect.poll(async () => (await (await request.get('/api/notes')).json()).notes[0]?.images[0]?.rotation).toBe(90);
     const notes = (await (await request.get('/api/notes')).json()).notes;
     expect(notes).toHaveLength(1);

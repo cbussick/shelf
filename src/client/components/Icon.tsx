@@ -2,13 +2,16 @@ import {
   AudioLines, Mic, Play, Pause, Square, Download, Upload, Search, Eye, EyeOff,
   ChevronLeft, ChevronRight, Plus, ListChecks, List, ListOrdered, ListIndentIncrease,
   ListIndentDecrease, Undo2, Redo2, Quote, Code, Link, Image, FileText, CloudCheck,
-  CloudOff, RotateCcw, RotateCw, RefreshCw, X, Trash2, Pin, Palette, Heading, Bold, Italic,
+  CloudOff, RotateCcw, RotateCw, RefreshCw, X, Trash2, Pin, Palette, Heading, Bold, Italic, Check, Clock, TriangleAlert, CloudAlert,
 } from 'lucide-react';
 import type { SVGProps } from 'react';
 
 // Explicit imports keep the bundle tree-shakable. Copyright and license notices
 // for Lucide and Feather ship in public/THIRD_PARTY_NOTICES.txt.
 const icons = {
+  check: Check,
+  clock: Clock,
+  warning: TriangleAlert,
   audio: AudioLines,
   microphone: Mic,
   play: Play,
@@ -35,6 +38,7 @@ const icons = {
   image: Image,
   note: FileText,
   'cloud-check': CloudCheck,
+  'cloud-warning': CloudAlert,
   offline: CloudOff,
   'rotate-left': RotateCcw,
   'rotate-right': RotateCw,

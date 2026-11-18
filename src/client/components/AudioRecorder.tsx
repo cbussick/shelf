@@ -9,11 +9,13 @@ import { Icon } from './Icon';
 type Phase = 'ready' | 'requesting' | 'recording' | 'stopping' | 'preview';
 const recordingTypes = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm'];
 
-export function AudioRecorder({ onKeep, onClose }: { onKeep: (file: File) => void; onClose: () => void }) {
+export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: (file: File) => void; onClose: () => void; suspended?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const active = useRef(true);
+  const suspendedRef = useRef(suspended);
+  suspendedRef.current = suspended;
   const startedAt = useRef(0);
   const [phase, setPhase] = useState<Phase>('ready');
   const [seconds, setSeconds] = useState(0);
@@ -26,7 +28,6 @@ export function AudioRecorder({ onKeep, onClose }: { onKeep: (file: File) => voi
   };
   useEffect(() => {
     active.current = true;
-    dialog.current?.showModal();
     return () => {
       active.current = false;
       if (recorder.current?.state === 'recording') recorder.current.stop();
@@ -34,6 +35,20 @@ export function AudioRecorder({ onKeep, onClose }: { onKeep: (file: File) => voi
       dialog.current?.close();
     };
   }, []);
+  useEffect(() => {
+    let cancelled = false;
+    if (suspended) {
+      dialog.current?.close();
+      if (recorder.current?.state === 'recording') {
+        setNotice('Recording stopped because your session expired. Review it before keeping.');
+        stop();
+      }
+    } else {
+      // Reopen above the parent editor after its own reveal effect has run.
+      queueMicrotask(() => { if (!cancelled) dialog.current?.showModal(); });
+    }
+    return () => { cancelled = true; };
+  }, [suspended]);
   useEffect(() => {
     if (phase !== 'recording') return;
     const tick = () => {
@@ -60,9 +75,9 @@ export function AudioRecorder({ onKeep, onClose }: { onKeep: (file: File) => voi
       const microphone = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (!active.current) { microphone.getTracks().forEach(track => track.stop()); return; }
       stream.current = microphone;
-      if (document.visibilityState !== 'visible') {
+      if (suspendedRef.current || document.visibilityState !== 'visible') {
         microphone.getTracks().forEach(track => track.stop());
-        setNotice('Recording did not start because Shelf left the foreground. Return here and try again.');
+        setNotice(suspendedRef.current ? 'Recording did not start because Shelf is locked. Sign in and try again.' : 'Recording did not start because Shelf left the foreground. Return here and try again.');
         setPhase('ready');
         return;
       }

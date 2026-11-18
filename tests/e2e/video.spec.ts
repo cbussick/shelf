@@ -23,7 +23,7 @@ for (const [width, extension] of [[1280, 'webm'], [390, 'webm'], [1280, 'mp4'], 
     await preview.getByRole('button', { name: 'Close image preview' }).click();
     await editor.getByRole('button', { name: 'Close note' }).click();
     await expect(editor).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Saved on device', exact: true })).toBeVisible();
+    await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
     const card = page.getByRole('button', { name: 'Open note: A little video', exact: true });
     await expect(card.locator('video')).toBeVisible();
     await card.click();

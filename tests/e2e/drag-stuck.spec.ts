@@ -10,7 +10,7 @@ test('release after a reordered card loses capture clears the floating preview',
     await page.getByRole('textbox', { name: 'Title' }).fill(title);
     await page.getByRole('button', { name: 'Close note' }).click();
     await expect(page.getByRole('button', { name: `Open note: ${title}` })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   }
   const board = page.getByRole('list', { name: 'Notes' });
   const order = async () => (await board.locator('[data-note-id]').allTextContents()).map(text => text.split('Today')[0]).filter(text => [first, second, third].includes(text));

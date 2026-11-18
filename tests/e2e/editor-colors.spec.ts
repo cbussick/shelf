@@ -26,7 +26,7 @@ for (const width of [1440, 320]) {
     }
     await page.getByRole('button', { name: 'Close note' }).click();
     await expect(editor).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
     expect((await (await request.get('/api/notes')).json()).notes[0].color).toBe('rose');
     await page.reload();
     const card = page.getByRole('button', { name: 'Open note: Expanded palette' });

@@ -10,7 +10,7 @@ async function saveAndSync(page: Page) {
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
 }
 async function syncConflictCopy(page: Page) {
-  await page.getByRole('button', { name: /^(Saved on device|Syncing…|Synced|Sync needs attention)$/ }).click();
+  await page.getByRole('button', { name: /^(Saved on device|Syncing…|Synced|Sync needs attention|\d+ not synced)$/ }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
 }
@@ -131,7 +131,7 @@ test('identically named draft files retain separate players after one is removed
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }, [Array.from(wavAudio(1)), Array.from(wavAudio(2))]);
   const editor = editorFor(page);
-  await expect(editor.getByRole('status')).toContainText('Audio changes are not saved yet');
+  await expect(editor.getByTestId('note-save-status')).toHaveText(/Saving…|Syncing…|Saved/);
   const firstDownload = page.waitForEvent('download');
   await editor.getByRole('button', { name: 'Download Same name.wav' }).first().click();
   await firstDownload;

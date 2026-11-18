@@ -22,7 +22,7 @@ async function openExistingNote(page: Page) {
   await page.getByRole('textbox', { name: 'Title' }).fill('Recoverable note');
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Original text');
   await page.getByRole('button', { name: 'Close note' }).click();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open note: Recoverable note' }).click();
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Unsaved changes');
   return page.getByRole('dialog', { name: 'Edit note' });
@@ -35,7 +35,7 @@ test('reopens a closed local database and saves the edited note', async ({ page 
   await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Open note: Recoverable note' })).toContainText('Unsaved changes');
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
 });
 
 for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
@@ -49,7 +49,7 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
     await editor.getByRole('button', { name: 'Close note' }).click();
     await expect(editor.getByRole('alert')).not.toBeEmpty();
     await expect(editor.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Unsaved changes');
-    await expect(editor.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
+    await expect(editor.getByRole('button', { name: 'Retry save', exact: true })).toBeVisible();
     const close = async () => {
       if (closeMethod === 'button') await editor.getByRole('button', { name: 'Close', exact: true }).click();
       else if (closeMethod === 'header') await editor.getByRole('button', { name: 'Close note' }).click();
@@ -88,7 +88,7 @@ test('reconnects when the local database closes during image decoding', async ({
   const card = page.getByRole('button', { name: 'Open note: Recoverable note' });
   await expect(card).toContainText('Unsaved changes');
   await expect(card.locator('img')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
 });
 
 test('reconnects when the local database closes while syncing a save', async ({ page }) => {
@@ -101,7 +101,7 @@ test('reconnects when the local database closes while syncing a save', async ({ 
   });
   await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await page.unroute('**/api/notes');
   await page.reload();
   await expect(page.getByRole('button', { name: 'Open note: Recoverable note' })).toContainText('Unsaved changes');
@@ -117,7 +117,10 @@ test('can retry a failed save without losing the edits', async ({ page }) => {
   await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor.getByRole('alert')).not.toBeEmpty();
   await page.evaluate(() => (window as unknown as { restoreTransactions: () => void }).restoreTransactions());
-  await editor.getByRole('button', { name: 'Try again', exact: true }).click();
+  await editor.getByRole('button', { name: 'Retry save', exact: true }).click();
+  await expect(editor.getByTestId('note-save-status')).toHaveText('Saved');
+  await expect(editor).toBeVisible();
+  await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Open note: Recoverable note' })).toContainText('Unsaved changes');
 });

@@ -10,7 +10,7 @@ test('two notes can be dragged to swap and dragged back', async ({ page }) => {
     await page.getByRole('textbox', { name: 'Title' }).fill(title);
     await page.getByRole('button', { name: 'Close note' }).click();
     await expect(page.getByRole('button', { name: `Open note: ${title}` })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Synced' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
   }
   const board = page.getByRole('list', { name: 'Notes' });
   const firstId = await page.getByRole('button', { name: `Open note: ${first}` }).getAttribute('data-note-id');
