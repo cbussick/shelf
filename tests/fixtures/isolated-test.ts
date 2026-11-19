@@ -1,10 +1,12 @@
-import { test as base, expect, request, type StorageState } from '@playwright/test';
+import { test as base, expect, request, type APIRequestContext } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+
+type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>;
 
 async function unusedPort(): Promise<number> {
   const server = createServer();
@@ -21,6 +23,8 @@ async function unusedPort(): Promise<number> {
 // Each test gets its own server, database, image directory and authenticated session.
 // A fresh browser context is already provided by Playwright for each test.
 export const test = base.extend<{ isolatedServer: { url: string; storageState: StorageState } }>({
+  // Playwright requires an object destructuring pattern to discover fixture dependencies.
+  // oxlint-disable-next-line eslint/no-empty-pattern
   isolatedServer: async ({}, use) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'shelf-e2e-'));
     const port = await unusedPort();

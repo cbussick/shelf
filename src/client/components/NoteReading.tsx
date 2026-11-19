@@ -98,18 +98,21 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
       return cell;
     }
     case 'footnote_reference': {
-      const reference = wrap('sup', dom.createTextNode(String(attrs.label ?? '')));
-      reference.dataset.type = 'footnote_reference'; reference.dataset.label = String(attrs.label ?? '');
+      const label = typeof attrs.label === 'string' ? attrs.label : '';
+      const reference = wrap('sup', dom.createTextNode(label));
+      reference.dataset.type = 'footnote_reference'; reference.dataset.label = label;
       return atom(reference);
     }
     case 'footnote_definition': {
       const definition = dom.createElement('dl');
-      definition.dataset.type = 'footnote_definition'; definition.dataset.label = String(attrs.label ?? '');
-      definition.append(wrap('dt', dom.createTextNode(String(attrs.label ?? ''))), wrap('dd'));
+      const label = typeof attrs.label === 'string' ? attrs.label : '';
+      definition.dataset.type = 'footnote_definition'; definition.dataset.label = label;
+      definition.append(wrap('dt', dom.createTextNode(label)), wrap('dd'));
       return definition;
     }
     case 'image': {
-      const image = wrap('span', dom.createTextNode(`[Image: ${String(attrs.alt || 'use Attach an image')}]`));
+      const alt = typeof attrs.alt === 'string' && attrs.alt ? attrs.alt : 'use Attach an image';
+      const image = wrap('span', dom.createTextNode(`[Image: ${alt}]`));
       image.className = 'note-inline-image';
       return atom(image);
     }

@@ -8,14 +8,14 @@ import { chromium } from 'playwright';
 import sharp from 'sharp';
 
 const root = new URL('../../../', import.meta.url);
-const server = createServer(async (request, response) => {
-  try {
+const server = createServer((request, response) => {
+  void (async () => {
     const url = new URL(`.${new URL(request.url, 'http://localhost').pathname}`, root);
     if (!url.href.startsWith(root.href)) { response.writeHead(403).end(); return; }
     const content = await readFile(url);
     response.setHeader('Content-Type', url.pathname.endsWith('.html') ? 'text/html' : 'application/octet-stream');
     response.end(content);
-  } catch { response.writeHead(404).end(); }
+  })().catch(() => { response.writeHead(404).end(); });
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 let browser;

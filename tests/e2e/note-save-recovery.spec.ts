@@ -5,6 +5,8 @@ const closingError = "Failed to execute 'transaction' on 'IDBDatabase': The data
 
 async function trackDatabase(page: Page) {
   await page.addInitScript(() => {
+    // Save the unbound method; the wrapper calls it with the original receiver.
+    // oxlint-disable-next-line typescript/unbound-method
     const open = IDBFactory.prototype.open;
     IDBFactory.prototype.open = function (...args) {
       const request = open.apply(this, args);
@@ -42,6 +44,8 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
   test(`can safely close after a persistent save failure via ${closeMethod}`, async ({ page }) => {
     const editor = await openExistingNote(page);
     await page.evaluate(message => {
+      // Keep the unbound original solely to restore the prototype after fault injection.
+      // oxlint-disable-next-line typescript/unbound-method
       const transaction = IDBDatabase.prototype.transaction;
       (window as unknown as { restoreTransactions: () => void }).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };
       IDBDatabase.prototype.transaction = function () { throw new DOMException(message, 'InvalidStateError'); };
@@ -110,6 +114,8 @@ test('reconnects when the local database closes while syncing a save', async ({ 
 test('can retry a failed save without losing the edits', async ({ page }) => {
   const editor = await openExistingNote(page);
   await page.evaluate(() => {
+    // Keep the unbound original solely to restore the prototype after fault injection.
+    // oxlint-disable-next-line typescript/unbound-method
     const transaction = IDBDatabase.prototype.transaction;
     IDBDatabase.prototype.transaction = function () { throw new DOMException('Storage unavailable', 'UnknownError'); };
     (window as unknown as { restoreTransactions: () => void }).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };

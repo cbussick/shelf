@@ -56,7 +56,7 @@ describe('privacy-safe request logging', () => {
     expect(lines[2]).toMatchObject({ level: 40, route: '(unmatched)', status: 404 });
     expect(new Set(lines.map(line => line.requestId)).size).toBe(3);
     const output = JSON.stringify(lines);
-    for (const secret of [password, id, 'query-sentinel', 'authorization-sentinel', 'untrusted-id-sentinel', '192.0.2.123', 'title-sentinel', 'body-sentinel', 'private-path-sentinel', ...setup.headers['set-cookie']]) {
+    for (const secret of [password, id, 'query-sentinel', 'authorization-sentinel', 'untrusted-id-sentinel', '192.0.2.123', 'title-sentinel', 'body-sentinel', 'private-path-sentinel', ...[setup.headers['set-cookie']].flat()]) {
       expect(output).not.toContain(secret);
     }
   });

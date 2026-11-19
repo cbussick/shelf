@@ -13,6 +13,8 @@ test('a local edit queued while remote notes are merged is not overwritten', asy
   await page.route('**/api/notes', async route => {
     const response = await route.fetch();
     await page.evaluate(() => {
+      // Save the unbound method for restoration and explicit .apply(this, args) below.
+      // oxlint-disable-next-line typescript/unbound-method
       const getAll = IDBObjectStore.prototype.getAll;
       IDBObjectStore.prototype.getAll = function (...args) {
         const request = getAll.apply(this, args);
