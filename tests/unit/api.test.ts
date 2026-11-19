@@ -235,7 +235,7 @@ describe('audio attachments', () => {
     const input = payload();
     const responses = await Promise.all(['one', 'two'].map(name => agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, title: name }))
       .attach('audio', wavAudio(), { filename: `${name}.wav`, contentType: 'audio/wav' })));
-    expect(responses.map(response => response.status).sort()).toEqual([201, 409]);
+    expect(responses.map(response => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
     expect(await readdir(join(directory, 'audio'))).toHaveLength(1);
     await expect.poll(() => readdir(join(directory, 'uploads'))).toEqual([]);
     expect((await agent.get('/api/notes')).body.notes[0].version).toBe(1);

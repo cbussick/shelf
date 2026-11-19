@@ -69,6 +69,8 @@ for (const width of [390, 1024]) {
 
     // Fault the browser database, not the DOM or application's displayed status.
     await page.evaluate(() => {
+      // Save the unbound method for restoration and explicit .apply(this, args) below.
+      // oxlint-disable-next-line typescript/unbound-method
       const original = IDBDatabase.prototype.transaction;
       IDBDatabase.prototype.transaction = function (...args: Parameters<IDBDatabase['transaction']>) {
         if (args[1] === 'readwrite' && Array.from(typeof args[0] === 'string' ? [args[0]] : args[0]).includes('notes')) throw new DOMException('Storage quota exceeded.', 'QuotaExceededError');

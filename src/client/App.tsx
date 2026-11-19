@@ -327,10 +327,12 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     await persist(() => deleteLocalNote(note, editorSession)); setEditor(undefined); setNotes(await localNotes());
     notify('Note permanently deleted'); void synchronize();
   };
-  const pin = useCallback(async (note: LocalNote) => {
-    await persist(() => saveLocalNote({ ...note, pinned: !note.pinned, retainedImages: note.images, newImages: [], retainedAudio: note.audio, newAudio: [] }));
-    setNotes(await localNotes()); notify(note.pinned ? 'Note unpinned' : 'Note pinned'); void synchronize();
-    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-pin-id="${note.id}"]`)?.focus({ preventScroll: true }));
+  const pin = useCallback((note: LocalNote) => {
+    void (async () => {
+      await persist(() => saveLocalNote({ ...note, pinned: !note.pinned, retainedImages: note.images, newImages: [], retainedAudio: note.audio, newAudio: [] }));
+      setNotes(await localNotes()); notify(note.pinned ? 'Note unpinned' : 'Note pinned'); void synchronize();
+      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-pin-id="${note.id}"]`)?.focus({ preventScroll: true }));
+    })().catch(() => notify('Could not pin note. Try again.'));
   }, [notify, synchronize, persist]);
   const changeColor = async (note: LocalNote, color: NoteColor) => {
     try {
@@ -339,7 +341,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       await save({ ...current, color, retainedImages: current.images, newImages: [], retainedAudio: current.audio, newAudio: [] });
     } catch { notify('Could not change note color. Try again.'); }
   };
-  const reorder = useCallback(async (source: string, target: string) => {
+  const reorder = useCallback((source: string, target: string) => {
     const moving = notes.find(note => note.id === source);
     if (!moving || moving.pinned !== notes.find(note => note.id === target)?.pinned) return;
     const group = notes.filter(note => note.pinned === moving.pinned);
@@ -350,10 +352,12 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     let index = 0;
     const ordered = notes.map(note => note.pinned === moving.pinned ? group[index++] : note);
     setNotes(ordered);
-    try {
-      await persist(() => reorderLocalNotes(ordered.map(note => note.id)));
-      void synchronize();
-    } catch { setNotes(await localNotes()); notify('Could not reorder notes. Try again.'); }
+    void (async () => {
+      try {
+        await persist(() => reorderLocalNotes(ordered.map(note => note.id)));
+        void synchronize();
+      } catch { setNotes(await localNotes()); notify('Could not reorder notes. Try again.'); }
+    })().catch(() => notify('Could not reorder notes. Try again.'));
   }, [notes, notify, synchronize, persist]);
   const chooseImages = (files: FileList | null) => {
     if (!files?.length) return;
@@ -400,9 +404,9 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       {filtered.length === 0 && <section {...stylex.props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...stylex.props(styles.secondary)}>Clear search</button>}</section>}
     </main>
     <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
-    {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={changeColor}/>}
+    {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={(note, color) => { void changeColor(note, color); }}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
-    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} locked={locked} syncState={editorSync} syncError={editorSyncError} onSave={save} onDelete={remove} onClose={closeEditor} onRetrySync={() => void synchronize()} onDirtyChange={setUnsaved}/>}
+    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} locked={locked} syncState={editorSync} syncError={editorSyncError} onSave={save} onDelete={remove} onClose={retainReady => { void closeEditor(retainReady); }} onRetrySync={() => void synchronize()} onDirtyChange={setUnsaved}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
   </div>;
 }

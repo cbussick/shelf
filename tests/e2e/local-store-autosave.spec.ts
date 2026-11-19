@@ -241,10 +241,11 @@ test('session redirects fence continued text and stable media retries, including
   await page.evaluate(() => {
     const decode = window.createImageBitmap;
     const gate = new Promise<void>(resolve => { window.releaseMedia = resolve; });
-    window.createImageBitmap = async (...args: Parameters<typeof createImageBitmap>) => {
+    // Forward either overload unchanged; Parameters models only the last overload.
+    window.createImageBitmap = (async (...args: Parameters<typeof createImageBitmap>) => {
       await gate;
       return decode(...args);
-    };
+    }) as typeof createImageBitmap;
     // A fresh File instance bypasses the unchanged-file metadata cache, so
     // preparation starts before the conflict transaction but writes afterward.
     const newImages = window.draft.newImages.map(file => new File([file], file.name, { type: file.type }));
@@ -274,7 +275,7 @@ test('session redirects fence continued text and stable media retries, including
           const request = database.transaction('blobs').objectStore('blobs').getAllKeys();
           request.onsuccess = () => resolve(request.result);
         });
-        return keys.filter(key => String(key).startsWith('blob:'));
+        return keys.filter(key => typeof key === 'string' && key.startsWith('blob:'));
       } finally { database.close(); }
     };
     const pendingBlobs = await uploadBlobKeys();

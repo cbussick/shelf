@@ -170,6 +170,8 @@ for (const key of ['Tab', 'Shift+Tab']) {
 test('reports a failed color save and allows another attempt', async ({ page }) => {
   const card = await createNote(page);
   await page.evaluate(() => {
+    // Save the unbound method for restoration and explicit .apply(this, args) below.
+    // oxlint-disable-next-line typescript/unbound-method
     const put = IDBObjectStore.prototype.put;
     (window as unknown as { restoreWrites: () => void }).restoreWrites = () => { IDBObjectStore.prototype.put = put; };
     IDBObjectStore.prototype.put = function (...args) {
@@ -189,6 +191,30 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
   await menu.getByRole('menuitemradio', { name: 'Mint' }).click();
   await expect(card).toHaveCSS('background-color', 'rgb(219, 235, 225)');
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+});
+
+test('reports a failed pin save without an unhandled rejection and allows retry', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await createNote(page);
+  await page.evaluate(() => {
+    // Save the unbound method for restoration and explicit .apply(this, args) below.
+    // oxlint-disable-next-line typescript/unbound-method
+    const put = IDBObjectStore.prototype.put;
+    Object.assign(window, { restorePinWrites: () => { IDBObjectStore.prototype.put = put; } });
+    IDBObjectStore.prototype.put = function (...args) {
+      if (this.name === 'notes') throw new DOMException('Storage unavailable', 'UnknownError');
+      return put.apply(this, args);
+    };
+  });
+  const pin = page.getByRole('button', { name: 'Pin note: Color target', exact: true });
+  await pin.click();
+  await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toHaveText('Could not pin note. Try again.');
+  await expect(pin).toBeVisible();
+  expect(errors).toEqual([]);
+  await page.evaluate(() => (window as unknown as { restorePinWrites: () => void }).restorePinWrites());
+  await pin.click();
+  await expect(page.getByRole('button', { name: 'Unpin note: Color target', exact: true })).toBeVisible();
 });
 
 test('saves context-menu color changes offline and syncs after reconnecting', async ({ page, context, request }) => {

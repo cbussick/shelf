@@ -24,7 +24,7 @@ export function Auth({ setupRequired, onAuthenticated, sessionExpired = false }:
       setBusy(false);
     }
   };
-  return <main {...stylex.props(styles.loginPage)}><form onSubmit={submit} {...stylex.props(styles.loginCard)}>
+  return <main {...stylex.props(styles.loginPage)}><form onSubmit={event => { void submit(event); }} {...stylex.props(styles.loginCard)}>
     <Brand/>
     <h1 {...stylex.props(styles.loginTitle)}>{setupRequired ? 'Make Shelf yours' : 'Welcome back'}</h1>
     {sessionExpired && <p role="status" {...stylex.props(styles.loginCopy)}>Your session expired. Sign in to continue. Keep this page open to preserve any unsaved changes.</p>}

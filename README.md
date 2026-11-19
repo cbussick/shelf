@@ -52,6 +52,7 @@ Open `http://localhost:4273`. The first visit asks you to create the owner passw
 Useful checks:
 
 ```bash
+npm run lint
 npm run typecheck
 npm run knip
 npm run knip:production
@@ -59,6 +60,15 @@ npm test
 npm run build
 npm run audit
 ```
+
+Lint uses Oxlint with the tsrs backend for correctness and type-aware checks, including
+floating promises, misused async callbacks, and awaiting non-promises. It also reports
+type errors in linted files. Keep `npm run typecheck` and `npm run build`: lint ignores
+build output and dependencies, does not check every project/global diagnostic, and does
+not compile the server. `src/server/tsconfig.json` lets lint discover the existing
+NodeNext server configuration; the compiler/build scripts still use `tsconfig.server.json`.
+Tests and other files outside a discovered project use the backend's inferred program.
+See [the setup findings](docs/oxlint-audit.md) for versions, checks, and limitations.
 
 Both Knip modes check unused code and dependencies. See [the audit notes](docs/knip-audit.md)
 for runtime roots, retained APIs, and verification limitations.

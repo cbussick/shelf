@@ -211,6 +211,8 @@ function inertPastedHTML(html: string): string {
   }
   template.content.querySelectorAll('script,style,iframe,object,embed,link,meta,base,video,audio,source,svg,math').forEach(element => element.remove());
   for (const element of template.content.querySelectorAll('*')) {
+    // Snapshot the live NamedNodeMap before removing attributes.
+    // oxlint-disable-next-line unicorn/no-useless-spread
     for (const attribute of [...element.attributes]) {
       if (/^on/i.test(attribute.name) || ['src', 'srcset', 'style', 'background', 'poster', 'autofocus'].includes(attribute.name.toLowerCase())) element.removeAttribute(attribute.name);
     }

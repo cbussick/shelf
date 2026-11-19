@@ -36,7 +36,7 @@ for (const width of [390, 820, 1280]) {
     }));
     const initialGeometry = await geometry();
     await audioCard.getByRole('button', { name: 'Play A sound.wav' }).click();
-    await expect.poll(() => audioCard.locator('audio').evaluate(element => !!element.error)).toBe(true);
+    await expect.poll(() => audioCard.locator('audio').evaluate(element => element instanceof HTMLAudioElement && !!element.error)).toBe(true);
     expect(await geometry()).toEqual(initialGeometry);
     const notifications = page.getByRole('region', { name: 'Notifications alt+T' });
     await expect(notifications).toHaveAttribute('aria-live', 'polite');

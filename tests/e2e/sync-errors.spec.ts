@@ -85,6 +85,8 @@ for (const thrown of ['error', 'non-error'] as const) {
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
     await page.evaluate(kind => {
+      // Keep the unbound original solely to restore the prototype after fault injection.
+      // oxlint-disable-next-line typescript/unbound-method
       const transaction = IDBDatabase.prototype.transaction;
       (window as unknown as { restoreTransactions: () => void }).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };
       IDBDatabase.prototype.transaction = function () { throw kind === 'error' ? new Error('Local storage is unavailable.') : null; };
