@@ -89,7 +89,8 @@ export default defineConfig({
     { files: ['tests/e2e/{audio-conflicts,audio,autosave-conflicts,board-previews,image-rotation,video}.spec.ts', 'tests/unit/{api,video}.test.ts'], rules: { 'typescript/no-unsafe-call': 'off' } },
     // Test-only window hooks/readonly viewport overrides and the worker's dual DOM lib bridge.
     { files: ['src/client/sw.ts', 'tests/e2e/{diagnostics-cleanup,mobile-editor-keyboard,note-save-recovery,note-context-color,async-callbacks,note-autosave,sync-errors,audio}.spec.ts'], rules: { 'quality/no-chained-type-assertions': 'off' } },
-    { files: ['**/*'], rules: { 'import/no-namespace': 'off' } },
+    // StyleX's compiler recognizes its documented namespace import; retain other namespace checks.
+    { files: ['**/*'], rules: { 'import/no-namespace': ['error', { ignore: ['@stylexjs/stylex'] }] } },
     { files: ['**/*'], rules: { '@nkzw/no-instanceof': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-assignment': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-return': 'off' } },
