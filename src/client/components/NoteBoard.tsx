@@ -139,6 +139,8 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   };
   // Captured pointers can be lost when React moves a card in the masonry grid.
   // Listen at the document so release and cancellation still finish the drag.
+  // Rebind after every commit: move/end close over the current note order and callbacks.
+  // oxlint-disable-next-line @nkzw/require-use-effect-arguments
   useEffect(() => {
     const onCancel = () => { cancel(); suppressClick.current = undefined; };
     document.addEventListener('pointermove', move);
