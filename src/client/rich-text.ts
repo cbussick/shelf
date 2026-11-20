@@ -69,7 +69,7 @@ function checklist(): Command {
       if (dispatch) {apply(state.tr);}
       return true;
     }
-    return wrapInList(state.schema.nodes.bullet_list!)(state, dispatch && apply);
+    return wrapInList(state.schema.nodes.bullet_list)(state, dispatch && apply);
   };
 }
 
@@ -90,16 +90,16 @@ export function formatCommand(format: Format, state: EditorState): Command {
   const { nodes, marks } = state.schema;
   switch (format) {
     case 'heading': return state.selection.$from.parent.type === nodes.heading
-      ? setBlockType(nodes.paragraph!) : setBlockType(nodes.heading!, { level: 2 });
-    case 'bold': return toggleMark(marks.strong!);
-    case 'italic': return toggleMark(marks.emphasis!);
-    case 'code': return toggleMark(marks.inlineCode!);
-    case 'quote': return wrapIn(nodes.blockquote!);
-    case 'bullet': return listItem(state) ? liftListItem(nodes.list_item!) : wrapInList(nodes.bullet_list!);
-    case 'ordered': return listItem(state) ? liftListItem(nodes.list_item!) : wrapInList(nodes.ordered_list!);
+      ? setBlockType(nodes.paragraph) : setBlockType(nodes.heading, { level: 2 });
+    case 'bold': return toggleMark(marks.strong);
+    case 'italic': return toggleMark(marks.emphasis);
+    case 'code': return toggleMark(marks.inlineCode);
+    case 'quote': return wrapIn(nodes.blockquote);
+    case 'bullet': return listItem(state) ? liftListItem(nodes.list_item) : wrapInList(nodes.bullet_list);
+    case 'ordered': return listItem(state) ? liftListItem(nodes.list_item) : wrapInList(nodes.ordered_list);
     case 'task': return checklist();
-    case 'indent': return sinkListItem(nodes.list_item!);
-    case 'outdent': return liftListItem(nodes.list_item!);
+    case 'indent': return sinkListItem(nodes.list_item);
+    case 'outdent': return liftListItem(nodes.list_item);
     case 'undo': return undo;
     case 'redo': return redo;
   }
@@ -145,7 +145,7 @@ export function setNoteLink(href: string | null): Command {
   return (state, dispatch) => {
     let { from, to } = state.selection;
     const { $from, empty } = state.selection;
-    const type = state.schema.marks.link!;
+    const type = state.schema.marks.link;
     const current = type.isInSet($from.marks());
     if (empty && current) {
       // Expand only the contiguous run of the existing link under the cursor.
@@ -175,7 +175,7 @@ export function activeFormats(state: EditorState): Array<Format> {
   const { from, to, empty, $from } = state.selection;
   const active: Array<Format> = [];
   for (const [format, name] of [['bold', 'strong'], ['italic', 'emphasis'], ['code', 'inlineCode']] as const) {
-    const type = state.schema.marks[name]!;
+    const type = state.schema.marks[name];
     if (empty ? type.isInSet(state.storedMarks ?? $from.marks()) : state.doc.rangeHasMark(from, to, type)) {active.push(format);}
   }
   for (let depth = $from.depth; depth > 0; depth--) {
@@ -340,7 +340,7 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
         toDOM: node => ['span', imagePlaceholderAttributes(node.attrs), `[Image: ${node.attrs.alt || 'use Attach an image'}]`],
         parseDOM: [{
           tag: 'span[data-note-image-src]',
-          getAttrs: dom => ({ src: (dom as HTMLElement).dataset.noteImageSrc ?? '', alt: (dom as HTMLElement).dataset.noteImageAlt ?? '', title: (dom as HTMLElement).dataset.noteImageTitle ?? '' }),
+          getAttrs: dom => ({ src: (dom).dataset.noteImageSrc ?? '', alt: (dom).dataset.noteImageAlt ?? '', title: (dom).dataset.noteImageTitle ?? '' }),
         }, ...(original(ctx).parseDOM ?? [])],
       }));
       // Tab is handled above so failed list commands never navigate focus.

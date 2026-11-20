@@ -77,8 +77,6 @@ export default defineConfig({
     // Imperative editor/recorder callbacks and retained checkpoint state intentionally use refs.
     // These components are not React-Compiler optimized; preserve tested save/lifecycle ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,AudioRecorder,RichTextEditor,Editor}.tsx'], rules: { 'react/refs': 'off' } },
-    // Schema/DOM assertions record invariants even when inferred programs omit nullability.
-    { files: ['src/client/rich-text.ts', 'tests/e2e/{app,audio-conflicts,loading,local-store-autosave,ready-note-dialog,rich-text-safety,rich-text}.spec.ts'], rules: { 'typescript/no-unnecessary-type-assertion': 'off' } },
     // Test-only window hooks/readonly viewport overrides and the worker's dual DOM lib bridge.
     { files: ['src/client/sw.ts', 'tests/e2e/{diagnostics-cleanup,mobile-editor-keyboard,note-save-recovery,note-context-color,async-callbacks,note-autosave,sync-errors,audio}.spec.ts'], rules: { 'quality/no-chained-type-assertions': 'off' } },
     // Same-realm DOM/File guards and trusted error subclasses must not become duck typing.

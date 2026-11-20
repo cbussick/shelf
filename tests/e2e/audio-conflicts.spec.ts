@@ -142,5 +142,5 @@ test('identically named draft files retain separate players after one is removed
   const secondDownload = page.waitForEvent('download');
   await editor.getByRole('button', { name: 'Download Same name.wav' }).click();
   const downloaded = await secondDownload;
-  expect((await readFile((await downloaded.path())!)).length).toBe(wavAudio(2).length);
+  expect((await readFile((await downloaded.path()))).length).toBe(wavAudio(2).length);
 });

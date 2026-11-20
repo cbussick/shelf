@@ -17,7 +17,7 @@ async function savedBody(page: Page) {
   await expect(page.getByRole('dialog', { name: /^(Add|Edit) note$/ })).toHaveCount(0);
   await expect.poll(async () => ((await (await page.request.get('/api/notes')).json()).notes as Array<unknown>).length).toBe(1);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  return ((await (await page.request.get('/api/notes')).json()).notes as Array<{ body: string }>)[0]!.body;
+  return ((await (await page.request.get('/api/notes')).json()).notes as Array<{ body: string }>)[0].body;
 }
 
 test('rich text formats and saves the latest keystroke without a debounce race', async ({ page }) => {
@@ -68,10 +68,10 @@ for (const marker of ['-', '1.', '- [ ]']) {
     const body = noteBody(page);
     await body.locator('p').filter({ hasText: 'Second' }).click();
     for (const [indent, outdent] of [['Tab', 'Shift+Tab'], ['Alt+ArrowRight', 'Alt+ArrowLeft']]) {
-      await page.keyboard.press(indent!);
+      await page.keyboard.press(indent);
       await expect(body.locator('li li')).toHaveText('Second');
       await expect(body).toBeFocused();
-      await page.keyboard.press(outdent!);
+      await page.keyboard.press(outdent);
       await expect(body.locator('li li')).toHaveCount(0);
       await expect(body.locator('li > .note-list-content > p')).toHaveText(['First', 'Second', 'Third']);
     }

@@ -33,7 +33,7 @@ test('an unchanged note reopens fully editable without rebuilding its dialog or 
   const original = await body(page).elementHandle();
   await body(page).evaluate(element => { element.scrollTop = 200; });
   await closeNote(page);
-  expect(await original!.evaluate(element => element.isConnected)).toBe(true);
+  expect(await original.evaluate(element => element.isConnected)).toBe(true);
   await pause(page);
   await card.dispatchEvent('click');
   await expect(body(page)).toBeVisible(); // No rAF/timer advancement needed.
@@ -86,7 +86,7 @@ test('undoing edits back to the original still discards the edited session', asy
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(body(page)).toHaveText('Original');
   await closeNote(page);
-  expect(await original!.evaluate(element => element.isConnected)).toBe(false);
+  expect(await original.evaluate(element => element.isConnected)).toBe(false);
   await card.click();
   await expect(body(page)).toHaveText('Original');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
@@ -104,7 +104,7 @@ test('edited notes discard the ready instance and do not retain old undo history
   await body(page).fill('Saved new body');
   await closeNote(page);
   await expect(card).toBeVisible();
-  expect(await original!.evaluate(element => element.isConnected)).toBe(false);
+  expect(await original.evaluate(element => element.isConnected)).toBe(false);
   await card.click();
   await expect(body(page)).toHaveText('Saved new body');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -125,7 +125,7 @@ test('a synced source change invalidates the parked dialog and uses the current 
   }) } })).ok()).toBe(true);
   await page.getByRole('button', { name: 'Synced', exact: true }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
-  await expect.poll(() => original!.evaluate(element => element.isConnected)).toBe(false);
+  await expect.poll(() => original.evaluate(element => element.isConnected)).toBe(false);
   await card.click();
   await expect(body(page)).toHaveText('Remote replacement');
   await body(page).fill('Saved after remote update');
@@ -157,7 +157,7 @@ test('switching notes disposes the prior dialog and never mixes document state',
   await closeNote(page);
   await page.getByRole('button', { name: 'Open note: Other note', exact: true }).click();
   await expect(body(page)).toHaveText('Other content');
-  expect(await original!.evaluate(element => element.isConnected)).toBe(false);
+  expect(await original.evaluate(element => element.isConnected)).toBe(false);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(body(page)).toHaveText('Other content');
 });

@@ -25,7 +25,7 @@ test('pasted Markdown and HTML images stay inert, including intermediate clipboa
   ]) {
     await body(page).evaluate((element, { type, value }) => {
       const data = new DataTransfer();
-      data.setData(type!, value!);
+      data.setData(type, value);
       element.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
     }, { type, value });
     await page.keyboard.press('End');

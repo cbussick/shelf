@@ -427,7 +427,7 @@ test('overview counts visible pending saves, not deletions or reorder work, and 
     await storage.reorderLocalNotes([draft.id!]);
     const overview = await storage.localSyncOverview();
     if (overview.pending !== 3 || Object.keys(overview.notes).join() !== draft.id) {throw new Error('Overview must count notes separately from other work');}
-    return draft.id!;
+    return draft.id;
   });
   await page.route(`**/api/notes/${id}`, route => route.fulfill({ status: 503, json: { error: 'Try this upload again later.' } }));
   await page.evaluate(async () => { try { await window.storage.syncNotes(); } catch { /* Expected server failure. */ } });

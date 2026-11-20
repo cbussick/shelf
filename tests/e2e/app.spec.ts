@@ -967,7 +967,7 @@ test('receives an Android share as a draft and saves it on close', async ({ page
       document.body.append(input);
       return input;
     });
-    await chooser.asElement()!.setInputFiles('tests/fixtures/image.jpg');
+    await chooser.asElement().setInputFiles('tests/fixtures/image.jpg');
     return page.evaluate(async () => {
       const input = document.querySelector('body > input[type=file]') as HTMLInputElement;
       const form = new FormData();
@@ -1015,7 +1015,7 @@ test('can receive and save a shared screenshot offline', async ({ page, context 
     document.body.append(input);
     return input;
   });
-  await picker.asElement()!.setInputFiles('tests/fixtures/image.jpg');
+  await picker.asElement().setInputFiles('tests/fixtures/image.jpg');
   await context.setOffline(true);
   await page.evaluate(() => {
     const picker = document.querySelector('body > input[type=file]') as HTMLInputElement;
