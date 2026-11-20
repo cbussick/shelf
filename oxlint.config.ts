@@ -104,7 +104,8 @@ export default defineConfig({
     { files: ['**/*'], rules: { 'unicorn/catch-error-name': 'off' } },
     // Conditional omission is intentional for optional sync/error metadata and browser options.
     { files: ['src/client/local-store.ts', 'src/server/logging.ts', 'tests/e2e/{audio-error-layout,sync-layout}.spec.ts'], rules: { 'quality/no-conditional-empty-object-spread': 'off' } },
-    { files: ['**/*'], rules: { 'typescript/consistent-type-imports': 'off' } },
+    // Browser evaluate() type annotations may name app modules without a runtime import.
+    { files: ['**/*'], rules: { 'typescript/consistent-type-imports': ['error', { disallowTypeAnnotations: false }] } },
     { files: ['**/*'], rules: { 'no-promise-executor-return': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-unsafe-dictionary-type': 'off' } },
     { files: ['**/*'], rules: { 'eqeqeq': 'off' } },
