@@ -112,7 +112,8 @@ export default defineConfig({
     // `value == null` intentionally matches null AND undefined in optional task attrs.
     // Keep strict equality everywhere else; do not change unchecked tasks' runtime behavior.
     { files: ['**/*'], rules: { 'eqeqeq': ['error', 'always', { null: 'ignore' }] } },
-    { files: ['**/*'], rules: { 'react/set-state-in-effect': 'off' } },
+    // Synchronize external audio/dialog/auth/sync lifecycles; moving these updates changes ordering.
+    { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,Editor}.tsx'], rules: { 'react/set-state-in-effect': 'off' } },
     { files: ['**/*'], rules: { 'unicorn/consistent-function-scoping': 'off' } },
     { files: ['**/*'], rules: { 'react/rules-of-hooks': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-member-access': 'off' } },
