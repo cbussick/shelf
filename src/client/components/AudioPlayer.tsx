@@ -48,7 +48,7 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       }
       if (player.current) player.current.src = url;
       return url;
-    }).catch(caught => { source.current = undefined; throw caught; });
+    }).catch((caught: unknown) => { source.current = undefined; throw caught; });
     return source.current;
   };
   const toggle = async () => {

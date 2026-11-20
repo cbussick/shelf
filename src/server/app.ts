@@ -262,7 +262,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
           .run(audio.id, id, audio.filename, audio.name, audio.mimeType, audio.size, audio.duration, audioPosition++);
         return [...removed.map(image => join(imageDirectory, image.filename)), ...removedAudio.map(audio => join(audioDirectory, audio.filename))];
       })();
-      await Promise.all(removedFiles.map(path => rm(path, { force: true }))).catch(error => requestLogger(response).error({ error: safeError(error) }, 'Could not remove replaced attachment files.'));
+      await Promise.all(removedFiles.map(path => rm(path, { force: true }))).catch((error: unknown) => requestLogger(response).error({ error: safeError(error) }, 'Could not remove replaced attachment files.'));
       response.status(current ? 200 : 201).json({ note: readNote(database, id) });
     } catch (error) {
       await Promise.all(writtenPaths.map(path => rm(path, { force: true })));
@@ -280,7 +280,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     const audioFilenames = database.prepare('SELECT filename FROM audio WHERE note_id=?').all(id) as { filename: string }[];
     database.prepare('DELETE FROM notes WHERE id=?').run(id);
     void Promise.all([...filenames.map(file => join(imageDirectory, file.filename)), ...audioFilenames.map(file => join(audioDirectory, file.filename))].map(path => rm(path, { force: true })))
-      .catch(error => requestLogger(response).error({ error: safeError(error) }, 'Could not remove deleted attachment files.'));
+      .catch((error: unknown) => requestLogger(response).error({ error: safeError(error) }, 'Could not remove deleted attachment files.'));
     response.status(204).end();
   });
 
