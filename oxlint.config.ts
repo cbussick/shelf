@@ -121,7 +121,6 @@ export default defineConfig({
 
     // Keep readable byte/sample-rate constants; separator grouping is not a safety check.
     { files: ['**/*'], rules: { 'unicorn/numeric-separators-style': 'off' } },
-    { files: ['**/*'], rules: { 'typescript/no-unsafe-argument': 'off' } },
     { files: ['**/*'], rules: { 'react/exhaustive-deps': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-import-type-side-effects': 'off' } },
     { files: ['**/*'], rules: { 'no-console': 'off' } },

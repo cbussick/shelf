@@ -8,8 +8,9 @@ import { stageShare } from './incoming-share';
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
 // Workbox replaces this exact expression with the precache manifest at build time.
+// The build replaces this untyped expression with Workbox's generated manifest.
 // @ts-expect-error __WB_MANIFEST is injected by Workbox
-precacheAndRoute(self.__WB_MANIFEST);
+precacheAndRoute(self.__WB_MANIFEST); // oxlint-disable-line typescript/no-unsafe-argument
 registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
   denylist: [/^\/api\//, /^\/share-target$/],
 }));

@@ -246,6 +246,8 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       },
       view(view) {
         initialDoc = view.state.doc;
+        // ProseMirror owns this document; its toJSON() declaration returns any.
+        // oxlint-disable-next-line typescript/no-unsafe-argument
         rememberDocument(markdown, initialDoc.toJSON(), generation);
         // Capture the pure parser, not the editor/context being destroyed. This
         // lets idle preparation reuse its schema without retaining a live view.
