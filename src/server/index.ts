@@ -17,7 +17,7 @@ if (existsSync(clientDirectory)) {
     index: false,
     maxAge: environment.NODE_ENV === 'production' ? '1h' : 0,
     setHeaders(response, path) {
-      if (path.endsWith('/sw.js') || path.endsWith('/index.html')) response.setHeader('Cache-Control', 'no-store');
+      if (path.endsWith('/sw.js') || path.endsWith('/index.html')) {response.setHeader('Cache-Control', 'no-store');}
     },
   }));
   app.get(/^(?!\/api\/).*/, (_request, response) => {

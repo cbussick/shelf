@@ -87,7 +87,7 @@ for (const width of [390, 1024]) {
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
     await page.route(`**/api/notes/${shopping}`, async route => {
-      if (route.request().method() === 'PUT') await held;
+      if (route.request().method() === 'PUT') {await held;}
       await route.continue();
     });
     rejectWeekend = false;

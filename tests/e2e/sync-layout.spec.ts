@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/isolated-test';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
 import { audioFile } from '../fixtures/audio-ui';
+import type { NoteMultipart } from '../fixtures/audio-ui';
 
 async function positions(page: Page) {
   return page.evaluate(() => new Promise<Record<string, { x: number; y: number; width: number; height: number }>>(resolve => {
@@ -34,7 +35,7 @@ for (const width of [1506, 834, 390, 320]) {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/api/notes/*', async route => {
-      if (route.request().method() === 'PUT') await gate;
+      if (route.request().method() === 'PUT') {await gate;}
       await route.continue();
     });
     try {
@@ -70,24 +71,24 @@ for (const width of [1506, 834, 390, 320]) {
       { name: 'Audio', title: '', body: '', image: false, audio: true },
       { name: 'Mixed', title: 'Mixed', body: 'Text and attachments.', image: true, audio: true },
     ];
-    const ids: string[] = [];
+    const ids: Array<string> = [];
     for (const variant of variants) {
       const id = crypto.randomUUID(); ids.push(id);
-      const multipart = {
+      const multipart: NoteMultipart = {
         payload: JSON.stringify({ id, title: variant.title, body: variant.body, color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [], newImageIds: variant.image ? [crypto.randomUUID()] : [], newAudio: variant.audio ? [{ id: crypto.randomUUID(), duration: 1 }] : [] }),
-        ...(variant.image ? { images: { name: 'synthetic.png', mimeType: 'image/png', buffer: image } } : {}),
-        ...(variant.audio ? { audio: audioFile('Test.wav', 1) } : {}),
       };
+      if (variant.image) { multipart.images = { name: 'synthetic.png', mimeType: 'image/png', buffer: image }; }
+      if (variant.audio) { multipart.audio = audioFile('Test.wav', 1); }
       expect((await request.put(`/api/notes/${id}`, { multipart })).ok()).toBe(true);
     }
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     let blockedId: string | undefined;
-    let release = () => {};
+    let release: (() => void) | undefined;
     let gate = Promise.resolve();
     await page.route('**/api/notes/*', async route => {
-      if (route.request().method() === 'PUT' && route.request().url().endsWith(`/${blockedId}`)) await gate;
+      if (route.request().method() === 'PUT' && route.request().url().endsWith(`/${blockedId}`)) {await gate;}
       await route.continue();
     });
     try {
@@ -114,11 +115,11 @@ for (const width of [1506, 834, 390, 320]) {
           return { content: status.top < previous.bottom - 0.5, outside: status.bottom > card.bottom + 0.5 || status.left < card.left || status.right > card.right, overflow: element.scrollWidth > element.clientWidth };
         });
         expect(overlap).toEqual({ content: false, outside: false, overflow: false });
-        release();
+        release?.();
         await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
         await expect(status).toHaveCount(0);
         samePositions(before, await positions(page));
       }
-    } finally { release(); }
+    } finally { release?.(); }
   });
 }

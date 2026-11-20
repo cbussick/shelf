@@ -1,3 +1,4 @@
+import { readNotes, requireNote } from '../fixtures/note-responses';
 import { test, expect } from '../fixtures/isolated-test';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
@@ -35,9 +36,9 @@ test('full-board cards and labels are bounded while search/open/reorder preserve
   await expect(page.getByRole('dialog', { name: 'Edit note', exact: true })).not.toBeVisible();
   await page.getByRole('searchbox', { name: 'Search notes' }).fill('');
   await expect(tinyCard).toBeVisible();
-  const notes = (await (await page.request.get('/api/notes')).json()).notes;
-  expect(notes.find((note: { id: string }) => note.id === long).body).toBe(source);
-  expect(notes.find((note: { id: string }) => note.id === tiny).body).toBe('ab\n');
+  const notes = (await readNotes(page.request));
+  expect(requireNote(notes, (note: { id: string }) => note.id === long).body).toBe(source);
+  expect(requireNote(notes, (note: { id: string }) => note.id === tiny).body).toBe('ab\n');
 });
 
 test('a clipped preview link retains its full target and never mounts the rest of the body', async ({ page }) => {

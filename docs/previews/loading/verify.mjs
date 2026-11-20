@@ -17,7 +17,7 @@ const server = createServer((request, response) => {
     response.end(content);
   })().catch(() => { response.writeHead(404).end(); });
 });
-await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+await new Promise(resolve => { server.listen(0, '127.0.0.1', resolve); });
 let browser;
 try {
   browser = await chromium.launch({ headless: true });
@@ -64,7 +64,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []);
-  console.log('PASS: mobile/desktop layout, fast completion, interruption, replay, reduced-motion toggle and OS preference, no browser errors.');
+  process.stdout.write('PASS: mobile/desktop layout, fast completion, interruption, replay, reduced-motion toggle and OS preference, no browser errors.\n');
 
   if (process.argv.includes('--render')) {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -82,9 +82,9 @@ try {
     const output = fileURLToPath(new URL('preview.gif', import.meta.url));
     await sharp(Buffer.concat(frames), { raw: { width: 390, height: 400 * frames.length, channels: 4, pageHeight: 400 } })
       .gif({ loop: 0, delay: 80 }).toFile(output);
-    console.log(`Rendered ${output}`);
+    process.stdout.write(`Rendered ${output}\n`);
   }
 } finally {
   await browser?.close();
-  await new Promise(resolve => server.close(resolve));
+  await new Promise(resolve => { server.close(resolve); });
 }

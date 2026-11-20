@@ -6,9 +6,16 @@ import multer from 'multer';
 import { MAX_AUDIO_BYTES } from '../shared/contracts.js';
 import { requestLogger, safeError } from './logging.js';
 
+// Multer.fields() installs a grouped file bag; reject an unexpected array rather
+// than pretending every Request.files union member has that shape.
+export function noteUploadFiles(request: Request) {
+  if (Array.isArray(request.files)) { throw new Error('Expected grouped note upload fields.'); }
+  return request.files ?? {};
+}
+
 // Stream every attachment to a private, per-request directory. No audio file
 // count limit: only the six-photo/video limit and per-file byte limits apply.
-export function withNoteUploads(directory: string, handler: (request: Request, response: Response) => Promise<unknown>) {
+export function withNoteUploads(directory: string, handler: (request: Request, response: Response) => Promise<Response | void>) {
   return async (request: Request, response: Response) => {
     const temporary = await mkdtemp(join(directory, 'note-'));
     const upload = multer({
@@ -16,12 +23,12 @@ export function withNoteUploads(directory: string, handler: (request: Request, r
       limits: { fileSize: MAX_AUDIO_BYTES, fields: 1, fieldSize: 1024 * 1024 },
     }).fields([{ name: 'images', maxCount: 6 }, { name: 'audio' }]);
     try {
-      await new Promise<void>((resolve, reject) => upload(request, response, error => error ? reject(error) : resolve()));
-      const files = (request.files ?? {}) as Record<string, Express.Multer.File[]>;
-      for (const group of Object.values(files)) for (const file of group) await chmod(file.path, 0o600);
+      await new Promise<void>((resolve, reject) => { upload(request, response, error => error ? reject(error) : resolve()); });
+      const files = noteUploadFiles(request);
+      for (const group of Object.values(files)) {for (const file of group) {await chmod(file.path, 0o600);}}
       return await handler(request, response);
     } finally {
-      await rm(temporary, { recursive: true, force: true }).catch(error => requestLogger(response).error({ error: safeError(error) }, 'Could not remove temporary upload files.'));
+      await rm(temporary, { recursive: true, force: true }).catch((error: unknown) => requestLogger(response).error({ error: safeError(error) }, 'Could not remove temporary upload files.'));
     }
   };
 }

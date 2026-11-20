@@ -65,9 +65,12 @@ for (const [engine, width] of [[chromium, 412], [chromium, 320], [webkit, 390]] 
       await expect(page.getByRole('dialog', { name: 'Edit note' })).toBeVisible();
       await expect(body).toBeFocused();
       await page.evaluate(() => {
-        delete (window.visualViewport as unknown as Record<string, unknown>).height;
-        delete (window.visualViewport as unknown as Record<string, unknown>).offsetTop;
-        window.visualViewport!.dispatchEvent(new Event('resize'));
+        const viewport = window.visualViewport;
+        if (!viewport) { throw new Error('Visual viewport is unavailable'); }
+        if (!Reflect.deleteProperty(viewport, 'height') || !Reflect.deleteProperty(viewport, 'offsetTop')) {
+          throw new Error('Could not remove the simulated keyboard viewport');
+        }
+        viewport.dispatchEvent(new Event('resize'));
       });
       await expect.poll(async () => (await page.getByRole('dialog', { name: 'Edit note' }).boundingBox())!.height).toBe(915);
     } finally { await browser.close(); }

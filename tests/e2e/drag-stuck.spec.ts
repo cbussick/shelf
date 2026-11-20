@@ -25,7 +25,7 @@ test('release after a reordered card loses capture clears the floating preview',
   await expect.poll(order).toEqual([second, first, third]);
   // Reparenting a captured card can drop capture (notably on Safari).
   await source.evaluate(button => {
-    if (button.hasPointerCapture(1)) button.releasePointerCapture(1);
+    if (button.hasPointerCapture(1)) {button.releasePointerCapture(1);}
   });
   // Release at the current position: moving through other cards can change the proposed slot.
   await page.mouse.up();

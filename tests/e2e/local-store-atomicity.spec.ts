@@ -18,7 +18,7 @@ test('a local edit queued while remote notes are merged is not overwritten', asy
       const getAll = IDBObjectStore.prototype.getAll;
       IDBObjectStore.prototype.getAll = function (...args) {
         const request = getAll.apply(this, args);
-        if (this.name !== 'outbox') return request;
+        if (this.name !== 'outbox') {return request;}
         IDBObjectStore.prototype.getAll = getAll;
         const database = this.transaction.db;
         request.addEventListener('success', () => {

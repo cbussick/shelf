@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import type { PreparedNode } from '../prepared-documents';
 import { safeNoteLink } from '../rich-text';
 
-const markTags: Readonly<Record<string, string>> = { strong: 'strong', emphasis: 'em', inlineCode: 'code', strike_through: 'del' };
+const markTags = new Map(Object.entries({ strong: 'strong', emphasis: 'em', inlineCode: 'code', strike_through: 'del' }));
 
 // This immutable surface needs no React reconciliation per paragraph. Building
 // plain DOM keeps the first frame cheap on phones. Only known tags/attributes
@@ -10,7 +10,8 @@ const markTags: Readonly<Record<string, string>> = { strong: 'strong', emphasis:
 export function NoteReading({ document }: { document: PreparedNode }) {
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const element = root.current!;
+    const element = root.current;
+    if (!element) { throw new Error('The note reading surface is not mounted.'); }
     element.dataset.noteDocumentSize = String(nodeSize(document));
     element.replaceChildren(renderNode(element.ownerDocument, document));
     return () => element.replaceChildren();
@@ -23,8 +24,8 @@ function text(node: PreparedNode): string {
 }
 
 function nodeSize(node: PreparedNode): number {
-  if (node.type === 'text') return node.text?.length ?? 0;
-  if (['hardbreak', 'hr', 'image', 'html', 'footnote_reference'].includes(node.type)) return 1;
+  if (node.type === 'text') {return node.text?.length ?? 0;}
+  if (['hardbreak', 'hr', 'image', 'html', 'footnote_reference'].includes(node.type)) {return 1;}
   return (node.type === 'doc' ? 0 : 2) + (node.content?.reduce((size, child) => size + nodeSize(child), 0) ?? 0);
 }
 
@@ -36,11 +37,13 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     fragment.append(renderNode(dom, child, childPosition));
     childPosition += nodeSize(child);
   }
-  const wrap = (tag: string, content: Node = fragment) => {
+  function wrap<K extends keyof HTMLElementTagNameMap>(tag: K, content?: Node): HTMLElementTagNameMap[K];
+  function wrap(tag: string, content?: Node): HTMLElement;
+  function wrap(tag: string, content: Node = fragment) {
     const element = dom.createElement(tag);
     element.append(content);
     return element;
-  };
+  }
   const atom = (element: HTMLElement) => {
     element.dataset.noteAtomStart = String(position);
     element.dataset.noteAtomEnd = String(position + nodeSize(node));
@@ -51,12 +54,12 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     case 'text': {
       let content: Node = dom.createTextNode(node.text ?? '');
       for (const mark of node.marks ?? []) {
-        const tag = markTags[mark.type];
-        if (typeof tag === 'string') content = wrap(tag, content);
+        const tag = markTags.get(mark.type);
+        if (typeof tag === 'string') {content = wrap(tag, content);}
         else if (mark.type === 'link' && typeof mark.attrs?.href === 'string') {
           const href = safeNoteLink(mark.attrs.href);
           if (href) {
-            const link = wrap('a', content) as HTMLAnchorElement;
+            const link = wrap('a', content);
             link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer';
             content = link;
           }
@@ -70,16 +73,16 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     case 'heading': return wrap(`h${Math.min(6, Math.max(1, Number(attrs.level) || 1))}`);
     case 'bullet_list': return wrap('ul');
     case 'ordered_list': {
-      const list = wrap('ol') as HTMLOListElement;
+      const list = wrap('ol');
       list.start = Number(attrs.order) || 1;
       return list;
     }
     case 'list_item': {
       const item = dom.createElement('li');
-      item.dataset.task = String(attrs.checked != null);
+      item.dataset.task = String(attrs.checked !== null && attrs.checked !== undefined);
       item.dataset.checked = String(attrs.checked === true);
       const checkbox = dom.createElement('input');
-      checkbox.type = 'checkbox'; checkbox.hidden = attrs.checked == null;
+      checkbox.type = 'checkbox'; checkbox.hidden = attrs.checked === null || attrs.checked === undefined;
       checkbox.checked = attrs.checked === true; checkbox.disabled = true;
       checkbox.setAttribute('aria-label', text(node.content?.[0] ?? node) || 'Task');
       const content = wrap('div'); content.className = 'note-list-content';

@@ -3,7 +3,8 @@ import { commonmark, imageSchema, listItemKeymap, listItemSchema } from '@milkdo
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
 import { clipboard } from '@milkdown/kit/plugin/clipboard';
-import { EditorState, Plugin, TextSelection, type Command, type Transaction } from '@milkdown/kit/prose/state';
+import { EditorState, Plugin, TextSelection } from '@milkdown/kit/prose/state';
+import type { Command, Transaction } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/kit/prose/commands';
 import { liftListItem, sinkListItem, wrapInList } from '@milkdown/kit/prose/schema-list';
@@ -14,7 +15,7 @@ import { Fragment } from '@milkdown/kit/prose/model';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
 import { $prose, $view } from '@milkdown/kit/utils';
 
-import { documentGeneration, getPreparedDocument, installDocumentParser, rememberDocument } from './prepared-documents';
+import { documentGeneration, getPreparedDocument, installDocumentParser, parsePreparedNode, rememberDocument } from './prepared-documents';
 
 export const MAX_NOTE_BODY = 20_000;
 export type Format = 'heading' | 'bold' | 'italic' | 'bullet' | 'ordered' | 'task' | 'indent' | 'outdent' | 'quote' | 'code' | 'undo' | 'redo';
@@ -22,17 +23,17 @@ export type Format = 'heading' | 'bold' | 'italic' | 'bullet' | 'ordered' | 'tas
 // Join only neighboring sibling lists, including inside list items and quotes.
 // Working right-to-left keeps earlier boundary positions valid after each join.
 function mergeAdjacentLists(tr: Transaction) {
-  const boundaries: number[] = [];
+  const boundaries: Array<number> = [];
   tr.doc.descendants((node, pos) => {
-    if (node.type.name === 'bullet_list' || node.type.name === 'ordered_list') boundaries.push(pos);
+    if (node.type.name === 'bullet_list' || node.type.name === 'ordered_list') {boundaries.push(pos);}
   });
   for (const pos of boundaries.reverse()) {
     const { nodeBefore: before, nodeAfter: after } = tr.doc.resolve(pos);
-    if (!before || !after || before.type !== after.type) continue;
+    if (!before || !after || before.type !== after.type) {continue;}
     // A non-default ordered start is intentional unless it continues the list.
-    if (after.type.name === 'ordered_list' && after.attrs.order !== 1 && after.attrs.order !== before.attrs.order + before.childCount) continue;
-    if (!canJoin(tr.doc, pos)) continue;
-    const spread = before.attrs.spread || after.attrs.spread;
+    if (after.type.name === 'ordered_list' && after.attrs.order !== 1 && after.attrs.order !== before.attrs.order + before.childCount) {continue;}
+    if (!canJoin(tr.doc, pos)) {continue;}
+    const spread: unknown = before.attrs.spread || after.attrs.spread;
     tr.join(pos);
     if (spread !== before.attrs.spread) {
       tr.setNodeMarkup(pos - before.nodeSize, undefined, { ...before.attrs, spread });
@@ -44,30 +45,31 @@ function mergeAdjacentLists(tr: Transaction) {
 function listItem(state: EditorState) {
   const { $from } = state.selection;
   for (let depth = $from.depth; depth > 0; depth--) {
-    if ($from.node(depth).type.name === 'list_item') return $from.node(depth);
+    if ($from.node(depth).type.name === 'list_item') {return $from.node(depth);}
   }
   return null;
 }
 
 function checklist(): Command {
   return (state, dispatch) => {
-    const checked = listItem(state)?.attrs.checked == null ? false : null;
+    const current: unknown = listItem(state)?.attrs.checked;
+    const checked = current === null || current === undefined ? false : null;
     const apply: NonNullable<typeof dispatch> = tr => {
       const { from, to, $from } = tr.selection;
       let depth = $from.depth;
-      while (depth > 0 && $from.node(depth).type.name !== 'list_item') depth--;
+      while (depth > 0 && $from.node(depth).type.name !== 'list_item') {depth--;}
       tr.doc.nodesBetween(from, to, (node, pos) => {
-        if (node.type.name !== 'list_item' || tr.doc.resolve(pos).depth + 1 !== depth) return;
+        if (node.type.name !== 'list_item' || tr.doc.resolve(pos).depth + 1 !== depth) {return;}
         tr.setNodeMarkup(pos, undefined, { ...node.attrs, checked });
         return false; // Format selected peers, never ancestors or their children.
       });
       dispatch?.(tr);
     };
     if (listItem(state)) {
-      if (dispatch) apply(state.tr);
+      if (dispatch) {apply(state.tr);}
       return true;
     }
-    return wrapInList(state.schema.nodes.bullet_list!)(state, dispatch && apply);
+    return wrapInList(state.schema.nodes.bullet_list)(state, dispatch && apply);
   };
 }
 
@@ -77,10 +79,10 @@ function checklist(): Command {
 export function syncNoteSelection(view: EditorView) {
   const selection = view.dom.ownerDocument.getSelection();
   if (view.composing || !selection?.anchorNode || !selection.focusNode ||
-    !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) return;
+    !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) {return;}
   const anchor = view.posAtDOM(selection.anchorNode, selection.anchorOffset);
   const head = view.posAtDOM(selection.focusNode, selection.focusOffset);
-  if (anchor === view.state.selection.anchor && head === view.state.selection.head) return;
+  if (anchor === view.state.selection.anchor && head === view.state.selection.head) {return;}
   view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head))).setMeta('addToHistory', false));
 }
 
@@ -88,16 +90,16 @@ export function formatCommand(format: Format, state: EditorState): Command {
   const { nodes, marks } = state.schema;
   switch (format) {
     case 'heading': return state.selection.$from.parent.type === nodes.heading
-      ? setBlockType(nodes.paragraph!) : setBlockType(nodes.heading!, { level: 2 });
-    case 'bold': return toggleMark(marks.strong!);
-    case 'italic': return toggleMark(marks.emphasis!);
-    case 'code': return toggleMark(marks.inlineCode!);
-    case 'quote': return wrapIn(nodes.blockquote!);
-    case 'bullet': return listItem(state) ? liftListItem(nodes.list_item!) : wrapInList(nodes.bullet_list!);
-    case 'ordered': return listItem(state) ? liftListItem(nodes.list_item!) : wrapInList(nodes.ordered_list!);
+      ? setBlockType(nodes.paragraph) : setBlockType(nodes.heading, { level: 2 });
+    case 'bold': return toggleMark(marks.strong);
+    case 'italic': return toggleMark(marks.emphasis);
+    case 'code': return toggleMark(marks.inlineCode);
+    case 'quote': return wrapIn(nodes.blockquote);
+    case 'bullet': return listItem(state) ? liftListItem(nodes.list_item) : wrapInList(nodes.bullet_list);
+    case 'ordered': return listItem(state) ? liftListItem(nodes.list_item) : wrapInList(nodes.ordered_list);
     case 'task': return checklist();
-    case 'indent': return sinkListItem(nodes.list_item!);
-    case 'outdent': return liftListItem(nodes.list_item!);
+    case 'indent': return sinkListItem(nodes.list_item);
+    case 'outdent': return liftListItem(nodes.list_item);
     case 'undo': return undo;
     case 'redo': return redo;
   }
@@ -113,17 +115,17 @@ export function moveRows(direction: -1 | 1): Command {
       if ($from.node(depth).type.name === 'list_item') { listDepth = depth - 1; break; }
     }
     const range = $from.blockRange($to, listDepth ? node => node === $from.node(listDepth) : undefined);
-    if (!range) return false;
+    if (!range) {return false;}
     const { parent, startIndex, endIndex, start, end } = range;
     const siblingIndex = direction < 0 ? startIndex - 1 : endIndex;
-    if (siblingIndex < 0 || siblingIndex >= parent.childCount) return false;
+    if (siblingIndex < 0 || siblingIndex >= parent.childCount) {return false;}
     const sibling = parent.child(siblingIndex);
-    const rows: ProseNode[] = [];
-    for (let index = startIndex; index < endIndex; index++) rows.push(parent.child(index));
+    const rows: Array<ProseNode> = [];
+    for (let index = startIndex; index < endIndex; index++) {rows.push(parent.child(index));}
     const replacement = Fragment.fromArray(direction < 0 ? [...rows, sibling] : [sibling, ...rows]);
     const from = direction < 0 ? start - sibling.nodeSize : start;
     const to = direction < 0 ? end : end + sibling.nodeSize;
-    if (!parent.canReplace(direction < 0 ? siblingIndex : startIndex, direction < 0 ? endIndex : siblingIndex + 1, replacement)) return false;
+    if (!parent.canReplace(direction < 0 ? siblingIndex : startIndex, direction < 0 ? endIndex : siblingIndex + 1, replacement)) {return false;}
     if (dispatch) {
       const tr = closeHistory(state.tr).replaceWith(from, to, replacement);
       // Map the original selection inside the moved content, not through the
@@ -133,7 +135,7 @@ export function moveRows(direction: -1 | 1): Command {
       tr.setSelection(bookmark.map(new Mapping([StepMap.offset(offset)])).resolve(tr.doc));
       dispatch(tr.scrollIntoView());
       // Subsequent typing should undo independently from this row move.
-      if (view) dispatch(closeHistory(view.state.tr));
+      if (view) {dispatch(closeHistory(view.state.tr));}
     }
     return true;
   };
@@ -143,7 +145,7 @@ export function setNoteLink(href: string | null): Command {
   return (state, dispatch) => {
     let { from, to } = state.selection;
     const { $from, empty } = state.selection;
-    const type = state.schema.marks.link!;
+    const type = state.schema.marks.link;
     const current = type.isInSet($from.marks());
     if (empty && current) {
       // Expand only the contiguous run of the existing link under the cursor.
@@ -151,39 +153,40 @@ export function setNoteLink(href: string | null): Command {
       let runFrom = start, runTo = start;
       $from.parent.forEach((node, offset) => {
         if (!current.isInSet(node.marks)) { runTo = -1; return; }
-        if (runTo !== start + offset) runFrom = start + offset;
+        if (runTo !== start + offset) {runFrom = start + offset;}
         runTo = start + offset + node.nodeSize;
         if (runFrom <= cursor && runTo >= cursor) { from = runFrom; to = runTo; }
       });
     }
-    if (!dispatch) return from !== to || href !== null;
+    if (!dispatch) {return from !== to || href !== null;}
     const tr = closeHistory(state.tr);
     if (from === to && href) {
       tr.insertText(href, from).addMark(from, from + href.length, type.create({ href }));
     } else {
       tr.removeMark(from, to, type);
-      if (href) tr.addMark(from, to, type.create({ href }));
+      if (href) {tr.addMark(from, to, type.create({ href }));}
     }
     dispatch(tr);
     return true;
   };
 }
 
-export function activeFormats(state: EditorState): Format[] {
+export function activeFormats(state: EditorState): Array<Format> {
   const { from, to, empty, $from } = state.selection;
-  const active: Format[] = [];
+  const active: Array<Format> = [];
   for (const [format, name] of [['bold', 'strong'], ['italic', 'emphasis'], ['code', 'inlineCode']] as const) {
-    const type = state.schema.marks[name]!;
-    if (empty ? type.isInSet(state.storedMarks ?? $from.marks()) : state.doc.rangeHasMark(from, to, type)) active.push(format);
+    const type = state.schema.marks[name];
+    if (empty ? type.isInSet(state.storedMarks ?? $from.marks()) : state.doc.rangeHasMark(from, to, type)) {active.push(format);}
   }
   for (let depth = $from.depth; depth > 0; depth--) {
     const name = $from.node(depth).type.name;
-    if (name === 'heading') active.push('heading');
-    if (name === 'blockquote') active.push('quote');
-    if (name === 'bullet_list') active.push('bullet');
-    if (name === 'ordered_list') active.push('ordered');
+    if (name === 'heading') {active.push('heading');}
+    if (name === 'blockquote') {active.push('quote');}
+    if (name === 'bullet_list') {active.push('bullet');}
+    if (name === 'ordered_list') {active.push('ordered');}
   }
-  if (listItem(state)?.attrs.checked != null) active.push('task');
+  const checked: unknown = listItem(state)?.attrs.checked;
+  if (checked !== null && checked !== undefined) {active.push('task');}
   return active;
 }
 
@@ -205,7 +208,7 @@ function inertPastedHTML(html: string): string {
   template.innerHTML = html;
   for (const image of template.content.querySelectorAll('img')) {
     const span = document.createElement('span');
-    for (const [key, value] of Object.entries(imagePlaceholderAttributes({ src: image.getAttribute('src') ?? '', alt: image.alt, title: image.title }))) span.setAttribute(key, value);
+    for (const [key, value] of Object.entries(imagePlaceholderAttributes({ src: image.getAttribute('src') ?? '', alt: image.alt, title: image.title }))) {span.setAttribute(key, value);}
     span.textContent = `[Image: ${image.alt || 'use Attach an image'}]`;
     image.replaceWith(span);
   }
@@ -214,7 +217,7 @@ function inertPastedHTML(html: string): string {
     // Snapshot the live NamedNodeMap before removing attributes.
     // oxlint-disable-next-line unicorn/no-useless-spread
     for (const attribute of [...element.attributes]) {
-      if (/^on/i.test(attribute.name) || ['src', 'srcset', 'style', 'background', 'poster', 'autofocus'].includes(attribute.name.toLowerCase())) element.removeAttribute(attribute.name);
+      if (/^on/i.test(attribute.name) || ['src', 'srcset', 'style', 'background', 'poster', 'autofocus'].includes(attribute.name.toLowerCase())) {element.removeAttribute(attribute.name);}
     }
   }
   return template.innerHTML;
@@ -224,7 +227,7 @@ function inertPastedHTML(html: string): string {
 // and closing a note must not rewrite its whitespace or Markdown conventions.
 export function createNoteEditor({ root, markdown, onChange, onLimit, onSelection, editable }: {
   root: HTMLElement; markdown: string; onChange: (value: string) => void;
-  onLimit: () => void; onSelection: (formats: Format[]) => void; editable: () => boolean;
+  onLimit: () => void; onSelection: (formats: Array<Format>) => void; editable: () => boolean;
 }) {
   const generation = documentGeneration();
   let initialDoc: ProseNode | undefined;
@@ -233,33 +236,34 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
     const serialize = (doc: ProseNode) => ctx.get(serializerCtx)(doc);
     return new Plugin({
       appendTransaction(transactions, _oldState, state) {
-        if (!transactions.some(tr => tr.docChanged)) return null;
+        if (!transactions.some(tr => tr.docChanged)) {return null;}
         const tr = mergeAdjacentLists(state.tr);
         return tr.docChanged ? tr : null;
       },
       filterTransaction(tr) {
-        if (!tr.docChanged) return true;
+        if (!tr.docChanged) {return true;}
         const size = initialDoc && tr.doc.eq(initialDoc) ? markdown.length : serialize(tr.doc).length;
-        if (size <= MAX_NOTE_BODY) return true;
+        if (size <= MAX_NOTE_BODY) {return true;}
         onLimit();
         return false;
       },
       view(view) {
-        initialDoc = view.state.doc;
-        rememberDocument(markdown, initialDoc.toJSON(), generation);
+        const originalDocument = view.state.doc;
+        initialDoc = originalDocument;
+        rememberDocument(markdown, parsePreparedNode(initialDoc.toJSON()), generation);
         // Capture the pure parser, not the editor/context being destroyed. This
         // lets idle preparation reuse its schema without retaining a live view.
         const parse = ctx.get(parserCtx);
         installDocumentParser(source => {
           const doc = parse(source);
-          return mergeAdjacentLists(EditorState.create({ schema: doc.type.schema, doc }).tr).doc.toJSON();
+          return parsePreparedNode(mergeAdjacentLists(EditorState.create({ schema: doc.type.schema, doc }).tr).doc.toJSON());
         }, generation);
         onSelection(activeFormats(view.state));
-        read = () => view.state.doc.eq(initialDoc!) ? markdown : serialize(view.state.doc);
+        read = () => view.state.doc.eq(originalDocument) ? markdown : serialize(view.state.doc);
         return {
           update(current, previous) {
             onSelection(activeFormats(current.state));
-            if (!current.state.doc.eq(previous.doc)) onChange(read());
+            if (!current.state.doc.eq(previous.doc)) {onChange(read());}
           },
         };
       },
@@ -276,9 +280,9 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
     contentDOM.className = 'note-list-content';
     dom.append(checkbox, contentDOM);
     const update = (next: ProseNode) => {
-      if (next.type !== node.type) return false;
+      if (next.type !== node.type) {return false;}
       current = next;
-      const task = next.attrs.checked != null;
+      const task = next.attrs.checked !== null && next.attrs.checked !== undefined;
       checkbox.hidden = !task;
       checkbox.checked = next.attrs.checked === true;
       checkbox.setAttribute('aria-label', next.firstChild?.textContent || 'Task');
@@ -315,9 +319,9 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
           const structural = event.key === 'Tab' ||
             (event.altKey && ['ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft'].includes(event.key)) ||
             ((event.ctrlKey || event.metaKey) && ['[', ']'].includes(event.key));
-          if (view.editable && structural) syncNoteSelection(view);
+          if (view.editable && structural) {syncNoteSelection(view);}
           if (event.key === 'Tab') {
-            if (view.editable) formatCommand(event.shiftKey ? 'outdent' : 'indent', view.state)(view.state, view.dispatch, view);
+            if (view.editable) {formatCommand(event.shiftKey ? 'outdent' : 'indent', view.state)(view.state, view.dispatch, view);}
             // Always consume Tab, even when the list command cannot apply.
             return true;
           }
@@ -337,7 +341,7 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
         toDOM: node => ['span', imagePlaceholderAttributes(node.attrs), `[Image: ${node.attrs.alt || 'use Attach an image'}]`],
         parseDOM: [{
           tag: 'span[data-note-image-src]',
-          getAttrs: dom => ({ src: (dom as HTMLElement).dataset.noteImageSrc ?? '', alt: (dom as HTMLElement).dataset.noteImageAlt ?? '', title: (dom as HTMLElement).dataset.noteImageTitle ?? '' }),
+          getAttrs: dom => ({ src: (dom).dataset.noteImageSrc ?? '', alt: (dom).dataset.noteImageAlt ?? '', title: (dom).dataset.noteImageTitle ?? '' }),
         }, ...(original(ctx).parseDOM ?? [])],
       }));
       // Tab is handled above so failed list commands never navigate focus.

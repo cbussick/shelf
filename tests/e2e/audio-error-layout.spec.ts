@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/isolated-test';
 import { audioFile, editorFor, openCard } from '../fixtures/audio-ui';
+import type { NoteMultipart } from '../fixtures/audio-ui';
 import AxeBuilder from '@axe-core/playwright';
 
 for (const width of [390, 820, 1280]) {
@@ -7,12 +8,11 @@ for (const width of [390, 820, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     for (let index = 0; index < 8; index++) {
       const id = crypto.randomUUID();
-      const response = await page.request.put(`/api/notes/${id}`, {
-        multipart: {
-          payload: JSON.stringify({ id, title: index === 7 ? '' : `Neighbor ${index}`, body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] }),
-          ...(index === 7 ? { audio: audioFile() } : {}),
-        },
-      });
+      const multipart: NoteMultipart = {
+        payload: JSON.stringify({ id, title: index === 7 ? '' : `Neighbor ${index}`, body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] }),
+      };
+      if (index === 7) { multipart.audio = audioFile(); }
+      const response = await page.request.put(`/api/notes/${id}`, { multipart });
       expect(response.ok()).toBe(true);
     }
     await page.route('**/api/audio/**', route => route.abort('connectionfailed'));
@@ -26,7 +26,7 @@ for (const width of [390, 820, 1280]) {
     });
     await expect.poll(overlaps).toBe(false);
     const audioCard = cards.filter({ has: page.locator('audio') });
-    const rowSpan = () => audioCard.evaluate(element => (element.parentElement as HTMLElement).style.gridRowEnd);
+    const rowSpan = () => audioCard.evaluate(element => element.parentElement!.style.gridRowEnd);
     await expect.poll(rowSpan).toMatch(/^span \d+$/);
     const initialSpan = await rowSpan();
     await page.evaluate(() => document.fonts.ready);
@@ -36,6 +36,8 @@ for (const width of [390, 820, 1280]) {
     }));
     const initialGeometry = await geometry();
     await audioCard.getByRole('button', { name: 'Play A sound.wav' }).click();
+    // Keep the regression's native audio-element check before reading media errors.
+    // oxlint-disable-next-line @nkzw/no-instanceof
     await expect.poll(() => audioCard.locator('audio').evaluate(element => element instanceof HTMLAudioElement && !!element.error)).toBe(true);
     expect(await geometry()).toEqual(initialGeometry);
     const notifications = page.getByRole('region', { name: 'Notifications alt+T' });

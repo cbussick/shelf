@@ -1,4 +1,5 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import type { Ref } from 'react';
 import { AllSelection, EditorState, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
 import { editorStateCtx } from '@milkdown/kit/core';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
@@ -6,18 +7,19 @@ import { getPreparedDocument } from '../prepared-documents';
 import { afterNotePaint } from '../note-scheduling';
 import { NoteReading } from './NoteReading';
 import { closeHistory } from '@milkdown/kit/prose/history';
-import { createNoteEditor, formatCommand, MAX_NOTE_BODY, safeNoteLink, setNoteLink, syncNoteSelection, type Format } from '../rich-text';
+import { createNoteEditor, formatCommand, MAX_NOTE_BODY, safeNoteLink, setNoteLink, syncNoteSelection } from '../rich-text';
+import type { Format } from '../rich-text';
 import { Icon } from './Icon';
 import './rich-text.css';
 
 // Text spans carry positions in the same normalized document used for editing.
 // DOM references never survive the handoff; only logical positions do.
 function readingPosition(root: HTMLElement, node: Node | null, offset: number, bias: number): number | undefined {
-  if (!node) return;
+  if (!node) {return;}
   const documentRoot = root.querySelector<HTMLElement>('[data-note-document-size]');
   if (node === root || node === documentRoot) {
-    if (offset === 0) return 0;
-    if (offset === node.childNodes.length) return Number(documentRoot?.dataset.noteDocumentSize);
+    if (offset === 0) {return 0;}
+    if (offset === node.childNodes.length) {return Number(documentRoot?.dataset.noteDocumentSize);}
   }
   let previous: number | undefined;
   for (const span of root.querySelectorAll<HTMLElement>('[data-note-position],[data-note-atom-start]')) {
@@ -27,9 +29,9 @@ function readingPosition(root: HTMLElement, node: Node | null, offset: number, b
     const isAtom = span.dataset.noteAtomStart !== undefined;
     const start = Number(isAtom ? span.dataset.noteAtomStart : span.dataset.notePosition);
     const end = isAtom ? Number(span.dataset.noteAtomEnd) : start + (span.textContent?.length ?? 0);
-    if (comparison < 0) return bias < 0 && previous !== undefined ? previous : start;
+    if (comparison < 0) {return bias < 0 && previous !== undefined ? previous : start;}
     if (comparison === 0) {
-      if (isAtom) return bias > 0 ? start : end;
+      if (isAtom) {return bias > 0 ? start : end;}
       range.setEnd(node, offset);
       return start + range.toString().length;
     }
@@ -40,20 +42,20 @@ function readingPosition(root: HTMLElement, node: Node | null, offset: number, b
 
 function previewSelection(doc: ProseNode, anchor: number, head: number) {
   const from = Math.min(anchor, head), to = Math.max(anchor, head);
-  if (from < 0 || to > doc.content.size) return;
-  if (from === 0 && to === doc.content.size) return new AllSelection(doc);
+  if (from < 0 || to > doc.content.size) {return;}
+  if (from === 0 && to === doc.content.size) {return new AllSelection(doc);}
   const node = doc.nodeAt(from);
-  if (node?.isAtom && NodeSelection.isSelectable(node) && to === from + node.nodeSize) return NodeSelection.create(doc, from);
+  if (node?.isAtom && NodeSelection.isSelectable(node) && to === from + node.nodeSize) {return NodeSelection.create(doc, from);}
   const selection = TextSelection.between(doc.resolve(anchor), doc.resolve(head));
   // ProseMirror cannot express every native range (for example, from before a
   // block rule into half a paragraph). Never silently shrink such a selection.
-  if (selection.anchor === anchor && selection.head === head) return selection;
+  if (selection.anchor === anchor && selection.head === head) {return selection;}
 }
 
 type NoteEditor = ReturnType<typeof createNoteEditor>;
 export type RichTextHandle = { read: () => string; isReady: () => boolean; restartReading: () => void };
 
-const tools: { format: Format; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+const tools: Array<{ format: Format; label: string; icon: Parameters<typeof Icon>[0]['name'] }> = [
   { format: 'heading', label: 'Heading', icon: 'heading' },
   { format: 'bold', label: 'Bold', icon: 'bold' },
   { format: 'italic', label: 'Italic', icon: 'italic' },
@@ -74,7 +76,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const root = useRef<HTMLDivElement>(null);
   const instance = useRef<NoteEditor | null>(null);
   const callbacks = useRef({ onChange, disabled });
-  callbacks.current = { onChange, disabled };
+  useLayoutEffect(() => { callbacks.current = { onChange, disabled }; }, [onChange, disabled]);
   const initial = useRef({ initialValue, autoFocus });
   const fallback = useRef<HTMLTextAreaElement>(null);
   const fallbackAutoFocus = useRef(false);
@@ -90,7 +92,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const [blockedSelection, setBlockedSelection] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [ready, setReady] = useState(false);
-  const [active, setActive] = useState<Format[]>([]);
+  const [active, setActive] = useState<Array<Format>>([]);
   const [failed, setFailed] = useState(false);
   const [limit, setLimit] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -101,7 +103,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     isReady: () => Boolean(instance.current && visible.current),
     restartReading: () => {
       const current = instance.current;
-      if (!current || !visible.current) return;
+      if (!current || !visible.current) {return;}
       const view = current.view();
       // Only unchanged, unedited sessions are retained. Keep their DOM, but
       // start with fresh plugin/history and selection state on every opening.
@@ -109,22 +111,23 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       current.editor.ctx.set(editorStateCtx, state);
       view.updateState(state);
       const selection = view.dom.ownerDocument.getSelection();
-      if (selection?.anchorNode && view.dom.contains(selection.anchorNode)) selection.removeAllRanges();
+      if (selection?.anchorNode && view.dom.contains(selection.anchorNode)) {selection.removeAllRanges();}
       view.dom.scrollTop = 0;
     },
   }), []);
 
   const reveal = (explicit = false) => {
-    if (!instance.current || visible.current || gesture.current) return;
+    if (!instance.current || visible.current || gesture.current) {return;}
     const selection = window.getSelection();
-    const selecting = selection && !selection.isCollapsed && reading.current?.contains(selection.anchorNode);
-    if (selecting && !explicit) return;
+    const readingElement = reading.current;
+    const selecting = selection && !selection.isCollapsed && readingElement?.contains(selection.anchorNode);
+    if (selecting && !explicit) {return;}
     restore.current.scroll = reading.current?.scrollTop ?? 0;
-    if (selecting && selection) {
+    if (selecting && selection && readingElement) {
       const range = selection.getRangeAt(0);
       const forward = range.startContainer === selection.anchorNode && range.startOffset === selection.anchorOffset;
-      const anchor = readingPosition(reading.current!, selection.anchorNode, selection.anchorOffset, forward ? 1 : -1);
-      const head = readingPosition(reading.current!, selection.focusNode, selection.focusOffset, forward ? -1 : 1);
+      const anchor = readingPosition(readingElement, selection.anchorNode, selection.anchorOffset, forward ? 1 : -1);
+      const head = readingPosition(readingElement, selection.focusNode, selection.focusOffset, forward ? -1 : 1);
       if (anchor === undefined || head === undefined || !previewSelection(instance.current.view().state.doc, anchor, head)) {
         setBlockedSelection(true);
         return;
@@ -132,7 +135,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       restore.current.selection = { anchor, head };
     }
     setBlockedSelection(false);
-    if (explicit || document.activeElement === reading.current) focusOnReveal.current = true;
+    if (explicit || document.activeElement === reading.current) {focusOnReveal.current = true;}
     visible.current = true;
     setReady(true);
   };
@@ -140,6 +143,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   useEffect(() => {
     let cancelled = false, interacted = false;
     const noticeInteraction = (event: Event) => {
+      // contains() requires a real DOM Node, not an asserted or property-shaped EventTarget.
+      // oxlint-disable-next-line @nkzw/no-instanceof
       if (event.target instanceof Node && root.current?.closest('dialog')?.contains(event.target)) {
         if (event.type !== 'focusin') {
           interacted = true;
@@ -152,14 +157,16 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       }
     };
     const stopNoticing = () => {
-      for (const type of ['pointerdown', 'keydown', 'input', 'focusin']) document.removeEventListener(type, noticeInteraction, true);
+      for (const type of ['pointerdown', 'keydown', 'input', 'focusin']) {document.removeEventListener(type, noticeInteraction, true);}
     };
     stopInteraction.current = stopNoticing;
-    for (const type of ['pointerdown', 'keydown', 'input', 'focusin']) document.addEventListener(type, noticeInteraction, true);
+    for (const type of ['pointerdown', 'keydown', 'input', 'focusin']) {document.addEventListener(type, noticeInteraction, true);}
     // Each effect owns its host. StrictMode's cancelled asynchronous mount can
     // finish safely without ever attaching a second editor to the live host.
     const host = document.createElement('div');
-    root.current!.append(host);
+    const element = root.current;
+    if (!element) { throw new Error('The editor host is not mounted.'); }
+    element.append(host);
     let noteEditor: NoteEditor | undefined;
     let mounting: Promise<unknown> | undefined;
     const fail = () => {
@@ -170,24 +177,25 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       }
     };
     const cancelStart = afterNotePaint(() => {
-      if (cancelled) return;
+      if (cancelled) {return;}
       try {
-        noteEditor = createNoteEditor({
+        const created = createNoteEditor({
           root: host,
           markdown: initial.current.initialValue,
           onChange: value => {
-            if (cancelled) return;
+            if (cancelled) {return;}
             setLimit(false);
             callbacks.current.onChange(value);
           },
-          onLimit: () => { if (!cancelled) setLimit(true); },
-          onSelection: formats => { if (!cancelled) setActive(previous => previous.join() === formats.join() ? previous : formats); },
+          onLimit: () => { if (!cancelled) {setLimit(true);} },
+          onSelection: formats => { if (!cancelled) {setActive(previous => previous.join() === formats.join() ? previous : formats);} },
           editable: () => visible.current && !callbacks.current.disabled,
         });
-        mounting = noteEditor.editor.create();
+        noteEditor = created;
+        mounting = created.editor.create();
         void mounting.then(() => {
-          if (cancelled) return;
-          instance.current = noteEditor!;
+          if (cancelled) {return;}
+          instance.current = created;
           setMounted(true);
         }).catch(fail);
       } catch { fail(); }
@@ -195,11 +203,11 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     const selectionChanged = () => reveal();
     document.addEventListener('selectionchange', selectionChanged);
     let endTask = 0;
-    const endGesture = (event: Event) => {
+    const endGesture = (event: TouchEvent | PointerEvent) => {
       if (event.type.startsWith('touch')) {
-        if ((event as TouchEvent).touches?.length) return;
+        if ('touches' in event && event.touches.length) {return;}
         touching.current = false;
-      } else if ((event as PointerEvent).pointerType === 'touch' && touching.current) {
+      } else if ('pointerType' in event && event.pointerType === 'touch' && touching.current) {
         // Pointer cancellation starts native panning; touchend, not that
         // cancellation, tells us the finger has actually left the document.
         return;
@@ -207,7 +215,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       gesture.current = false;
       // Let the click handler record caret intent before an automatic reveal.
       clearTimeout(endTask);
-      endTask = window.setTimeout(() => { if (!cancelled) reveal(); }, 0);
+      endTask = window.setTimeout(() => { if (!cancelled) {reveal();} }, 0);
     };
     document.addEventListener('pointerup', endGesture);
     document.addEventListener('pointercancel', endGesture);
@@ -227,25 +235,26 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       host.remove();
       // Milkdown 7.23 leaves a rejected create() in OnCreate; destroy() would
       // poll forever in that state. Destroy only successfully mounted editors.
-      if (noteEditor && mounting) void mounting.then(() => noteEditor!.editor.destroy()).catch(() => {});
+      const closing = noteEditor;
+      if (closing && mounting) {void mounting.then(() => closing.editor.destroy()).catch(() => {});}
     };
   }, []);
 
-  useEffect(() => { if (mounted) reveal(); }, [mounted]);
+  useEffect(() => { if (mounted) {reveal();} }, [mounted]);
   useLayoutEffect(() => {
-    if (!ready || !instance.current) return;
+    if (!ready || !instance.current) {return;}
     const view = instance.current.view();
     view.setProps({ editable: () => !callbacks.current.disabled });
     view.dom.scrollTop = restore.current.scroll;
     const selection = restore.current.selection;
     if (selection && selection.anchor <= view.state.doc.content.size && selection.head <= view.state.doc.content.size) {
       const transferred = previewSelection(view.state.doc, selection.anchor, selection.head);
-      if (transferred) view.dispatch(view.state.tr.setSelection(transferred));
+      if (transferred) {view.dispatch(view.state.tr.setSelection(transferred));}
     } else if (restore.current.point) {
       const position = view.posAtCoords(restore.current.point)?.pos;
-      if (position !== undefined) view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(position))));
+      if (position !== undefined) {view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(position))));}
     }
-    if (focusOnReveal.current || (initial.current.autoFocus && !userInteracted.current)) view.focus();
+    if (focusOnReveal.current || (initial.current.autoFocus && !userInteracted.current)) {view.focus();}
     stopInteraction.current();
     view.dom.scrollTop = restore.current.scroll;
   }, [ready]);
@@ -257,22 +266,22 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     }
   }, [disabled, ready]);
   useEffect(() => {
-    if (failed && fallbackAutoFocus.current) fallback.current?.focus();
+    if (failed && fallbackAutoFocus.current) {fallback.current?.focus();}
   }, [failed]);
 
   const run = (format: Format) => {
     const view = instance.current?.view();
-    if (!view || disabled) return;
+    if (!view || disabled) {return;}
     syncNoteSelection(view);
-    if (format !== 'undo' && format !== 'redo') view.dispatch(closeHistory(view.state.tr));
+    if (format !== 'undo' && format !== 'redo') {view.dispatch(closeHistory(view.state.tr));}
     formatCommand(format, view.state)(view.state, view.dispatch, view);
     view.focus();
   };
   const finishLink = () => {
     const href = safeNoteLink(link);
-    if (!href) return setLinkError('Enter an http, https or mailto link.');
+    if (!href) {return setLinkError('Enter an http, https or mailto link.');}
     const view = instance.current?.view();
-    if (!view || disabled) return;
+    if (!view || disabled) {return;}
     setNoteLink(href)(view.state, view.dispatch, view);
     setLinkOpen(false);
     setLinkError('');
@@ -285,7 +294,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       <button type="button" disabled={!ready || disabled} onMouseDown={event => event.preventDefault()} onClick={() => {
         setLinkOpen(value => !value);
         const state = instance.current?.view().state;
-        setLink(state?.selection.$from.marks().find(mark => mark.type.name === 'link')?.attrs.href ?? '');
+        const href: unknown = state?.selection.$from.marks().find(mark => mark.type.name === 'link')?.attrs.href;
+        setLink(typeof href === 'string' ? href : '');
         setLinkError('');
       }} title="Link" aria-label="Link" aria-expanded={linkOpen}><Icon name="link"/></button>
     </div>}
@@ -305,7 +315,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     </div>}
     {failed ? <>
       <p role="status">Rich-text editing could not load. You can still edit the Markdown below.</p>
-      <textarea ref={fallback} id="note-body" aria-label="Note" spellCheck={false} disabled={disabled} defaultValue={initialValue} maxLength={MAX_NOTE_BODY} onKeyDown={event => { if (event.key === 'Tab') event.preventDefault(); }} onChange={event => onChange(event.target.value)}/>
+      <textarea ref={fallback} id="note-body" aria-label="Note" spellCheck={false} disabled={disabled} defaultValue={initialValue} maxLength={MAX_NOTE_BODY} onKeyDown={event => { if (event.key === 'Tab') {event.preventDefault();} }} onChange={event => onChange(event.target.value)}/>
     </> : <div className="note-surfaces">
       {!ready && prepared && <div className="note-rich-host note-reading-host">
         <div ref={reading} className="note-reading" role="region" aria-label="Note preview" tabIndex={0}
@@ -313,9 +323,11 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
           onTouchStart={() => { gesture.current = true; touching.current = true; }}
           onKeyDown={event => { if (event.key === 'Enter' && mounted) { event.preventDefault(); reveal(true); } }}
           onClick={event => {
-            if ((event.target as HTMLElement).closest('a')) return;
+            // EventTarget must really be an Element before calling closest(); do not replace this guard with a cast.
+            // oxlint-disable-next-line @nkzw/no-instanceof
+            if (event.target instanceof Element && event.target.closest('a')) {return;}
             restore.current.point = { left: event.clientX, top: event.clientY };
-            if (!window.getSelection()?.isCollapsed) return;
+            if (!window.getSelection()?.isCollapsed) {return;}
             focusOnReveal.current = true;
             reveal();
           }}><NoteReading document={prepared}/></div>

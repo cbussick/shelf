@@ -2,23 +2,24 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
 import { link, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import express, { type NextFunction, type Request, type Response } from 'express';
+import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { fileTypeFromFile } from 'file-type';
 import helmet from 'helmet';
-import multer from 'multer';
+import { MulterError } from 'multer';
 import type { Logger } from 'pino';
-import sharp, { type Metadata } from 'sharp';
+import sharp from 'sharp';
+import type { Metadata } from 'sharp';
 import { ZodError } from 'zod';
-import {
-  authStatusSchema, credentialsSchema, deleteNoteSchema, noteIdParamsSchema, noteWriteSchema, reorderNotesSchema,
-  isVideo, MAX_VIDEO_BYTES, type Environment, type Note,
-} from '../shared/contracts.js';
+import { authStatusSchema, credentialsSchema, deleteNoteSchema, noteIdParamsSchema, noteWriteSchema, reorderNotesSchema, isVideo, MAX_VIDEO_BYTES } from '../shared/contracts.js';
+import type { Environment, Note } from '../shared/contracts.js';
 import { createOwner, createSession, destroySession, hasOwner, isAuthenticated, requireAuthentication, verifyOwner } from './auth.js';
-import { type AppDatabase, readNote, readNotes } from './database.js';
+import { readNote, readNotes } from './database.js';
+import type { AppDatabase } from './database.js';
 import { inspectAudio } from './audio-files.js';
 import { inspectVideo } from './video-files.js';
-import { withNoteUploads } from './note-uploads.js';
+import { noteUploadFiles, withNoteUploads } from './note-uploads.js';
 import { logger, recordRequestError, requestLogger, requestLogging, safeError } from './logging.js';
 
 const acceptedTypes = new Map([
@@ -33,7 +34,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
   const uploadDirectory = join(environment.DATA_DIR, 'uploads');
   // Incomplete request files from a stopped process are never note attachments.
   rmSync(uploadDirectory, { recursive: true, force: true });
-  for (const directory of [imageDirectory, audioDirectory, uploadDirectory]) mkdirSync(directory, { recursive: true, mode: 0o700 });
+  for (const directory of [imageDirectory, audioDirectory, uploadDirectory]) {mkdirSync(directory, { recursive: true, mode: 0o700 });}
 
   app.set('trust proxy', 'loopback');
   app.disable('x-powered-by');
@@ -70,12 +71,12 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     response.json(authStatusSchema.parse({ authenticated: isAuthenticated(database, request), setupRequired: !hasOwner(database) }));
   });
   app.post('/api/auth/setup', authLimiter, async (request, response) => {
-    if (hasOwner(database)) return response.status(409).json({ error: 'Owner setup is already complete.' });
+    if (hasOwner(database)) {return response.status(409).json({ error: 'Owner setup is already complete.' });}
     const { password } = credentialsSchema.parse(request.body);
     try {
       await createOwner(database, password);
     } catch (error) {
-      if (hasOwner(database)) return response.status(409).json({ error: 'Owner setup is already complete.' });
+      if (hasOwner(database)) {return response.status(409).json({ error: 'Owner setup is already complete.' });}
       throw error;
     }
     createSession(database, environment, response, environment.NODE_ENV === 'production' || request.secure);
@@ -83,7 +84,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
   });
   app.post('/api/auth/login', authLimiter, async (request, response) => {
     const { password } = credentialsSchema.parse(request.body);
-    if (!(await verifyOwner(database, password))) return response.status(401).json({ error: 'Incorrect password.' });
+    if (!(await verifyOwner(database, password))) {return response.status(401).json({ error: 'Incorrect password.' });}
     createSession(database, environment, response, environment.NODE_ENV === 'production' || request.secure);
     response.json({ ok: true });
   });
@@ -97,9 +98,9 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
   app.get('/api/notes', (_request, response) => response.json({ notes: readNotes(database) }));
   app.put('/api/notes/order', (request, response) => {
     const { ids } = reorderNotesSchema.parse(request.body);
-    const existing = database.prepare('SELECT id FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all() as { id: string }[];
+    const existing = database.prepare<Array<unknown>, { id: string }>('SELECT id FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all();
     const known = new Set(existing.map(note => note.id));
-    if (ids.some(id => !known.has(id))) return response.status(409).json({ error: 'The notes changed. Try reordering again.' });
+    if (ids.some(id => !known.has(id))) {return response.status(409).json({ error: 'The notes changed. Try reordering again.' });}
     const requested = new Set(ids);
     const ordered = [...ids, ...existing.filter(note => !requested.has(note.id)).map(note => note.id)];
     const update = database.prepare('UPDATE notes SET position = ? WHERE id = ?');
@@ -108,34 +109,36 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
   });
   app.get('/api/images/:id', (request, response) => {
     const { id } = noteIdParamsSchema.parse(request.params);
-    const image = database.prepare('SELECT filename, mime_type FROM images WHERE id = ?').get(id) as { filename: string; mime_type: string } | undefined;
-    if (!image) return response.status(404).json({ error: 'Image not found.' });
-    if (isVideo(image.mime_type)) response.setHeader('Cache-Control', 'private, no-store');
+    const image = database.prepare<Array<unknown>, { filename: string; mime_type: string }>('SELECT filename, mime_type FROM images WHERE id = ?').get(id);
+    if (!image) {return response.status(404).json({ error: 'Image not found.' });}
+    if (isVideo(image.mime_type)) {response.setHeader('Cache-Control', 'private, no-store');}
     response.type(image.mime_type).sendFile(image.filename, { root: imageDirectory, dotfiles: 'deny' });
   });
 
   app.get('/api/audio/:id', (request, response) => {
     const { id } = noteIdParamsSchema.parse(request.params);
-    const audio = database.prepare('SELECT filename, mime_type, name FROM audio WHERE id = ?').get(id) as { filename: string; mime_type: string; name: string } | undefined;
-    if (!audio) return response.status(404).json({ error: 'Audio not found.' });
+    const audio = database.prepare<Array<unknown>, { filename: string; mime_type: string; name: string }>('SELECT filename, mime_type, name FROM audio WHERE id = ?').get(id);
+    if (!audio) {return response.status(404).json({ error: 'Audio not found.' });}
     response.setHeader('Cache-Control', 'private, no-store');
-    if (request.query.download === '1') response.attachment(audio.name);
+    if (request.query.download === '1') {response.attachment(audio.name);}
     response.type(audio.mime_type).sendFile(audio.filename, { root: audioDirectory, dotfiles: 'deny' });
   });
 
   app.put('/api/notes/:id', withNoteUploads(uploadDirectory, async (request, response) => {
     const { id } = noteIdParamsSchema.parse(request.params);
-    const attachments = (request.files ?? {}) as Record<string, Express.Multer.File[]>;
+    const attachments = noteUploadFiles(request);
     const files = attachments.images ?? [];
     const audioFiles = attachments.audio ?? [];
     let rawPayload: unknown;
-    try { rawPayload = JSON.parse(String(request.body.payload)); }
+    const fields: unknown = request.body;
+    const payload = typeof fields === 'object' && fields !== null && 'payload' in fields ? fields.payload : undefined;
+    try { rawPayload = JSON.parse(String(payload)); }
     catch { return response.status(400).json({ error: 'Invalid note payload.' }); }
     const input = noteWriteSchema.parse(rawPayload);
-    if (input.newImageIds && input.newImageIds.length !== files.length) return response.status(400).json({ error: 'Image IDs do not match the uploaded files.' });
-    if (input.newAudio && input.newAudio.length !== audioFiles.length) return response.status(400).json({ error: 'Audio metadata does not match the uploaded files.' });
-    if (input.id !== id) return response.status(400).json({ error: 'Note ID does not match the URL.' });
-    if (input.retainedImageIds.length + files.length > 6) return response.status(400).json({ error: 'Up to 6 images or videos per note.' });
+    if (input.newImageIds && input.newImageIds.length !== files.length) {return response.status(400).json({ error: 'Image IDs do not match the uploaded files.' });}
+    if (input.newAudio && input.newAudio.length !== audioFiles.length) {return response.status(400).json({ error: 'Audio metadata does not match the uploaded files.' });}
+    if (input.id !== id) {return response.status(400).json({ error: 'Note ID does not match the URL.' });}
+    if (input.retainedImageIds.length + files.length > 6) {return response.status(400).json({ error: 'Up to 6 images or videos per note.' });}
 
     const current = readNote(database, id);
     const retainedAudioIds = input.retainedAudioIds ?? current?.audio.map(audio => audio.id) ?? [];
@@ -171,39 +174,39 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
       return response.status(400).json({ error: 'An uploaded audio ID is already in use.' });
     }
 
-    const prepared: { id: string; filename: string; alt: string; mimeType: string; width: number; height: number; size: number }[] = [];
-    const preparedAudio: { id: string; filename: string; name: string; mimeType: string; size: number; duration: number | null }[] = [];
-    const writtenPaths: string[] = [];
+    const prepared: Array<{ id: string; filename: string; alt: string; mimeType: string; width: number; height: number; size: number }> = [];
+    const preparedAudio: Array<{ id: string; filename: string; name: string; mimeType: string; size: number; duration: number | null }> = [];
+    const writtenPaths: Array<string> = [];
     try {
       for (const [index, file] of files.entries()) {
         const detected = await fileTypeFromFile(file.path);
-        if (!detected) throw new ClientError('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');
+        if (!detected) {throw new ClientError('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');}
         let extension = acceptedTypes.get(detected.mime);
         let width: number;
         let height: number;
         if (isVideo(detected.mime)) {
-          if (file.size > MAX_VIDEO_BYTES) throw new ClientError('Videos must be under 100 MB.');
+          if (file.size > MAX_VIDEO_BYTES) {throw new ClientError('Videos must be under 100 MB.');}
           let metadata: Awaited<ReturnType<typeof inspectVideo>>;
           try { metadata = await inspectVideo(file.path); }
           catch { throw new ClientError('Choose a valid MP4, WebM or MOV video up to 40 megapixels.'); }
           ({ extension, width, height } = metadata);
         } else {
-          if (file.size > 20 * 1024 * 1024) throw new ClientError('Images must be under 20 MB.');
-          if (!extension) throw new ClientError('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');
+          if (file.size > 20 * 1024 * 1024) {throw new ClientError('Images must be under 20 MB.');}
+          if (!extension) {throw new ClientError('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');}
           let metadata: Metadata;
           try { metadata = await sharp(file.path, { animated: true, limitInputPixels: 40_000_000 }).metadata(); }
           catch { throw new ClientError('Choose a valid JPG, PNG, WebP or GIF image up to 40 megapixels.'); }
           width = metadata.width ?? 0;
           height = metadata.height ?? 0;
-          if (!width || !height || width * height * (metadata.pages ?? 1) > 40_000_000) throw new ClientError('Images may contain up to 40 megapixels.');
+          if (!width || !height || width * height * (metadata.pages ?? 1) > 40_000_000) {throw new ClientError('Images may contain up to 40 megapixels.');}
         }
         const imageId = input.newImageIds?.[index] ?? randomUUID();
-        if (isVideo(detected.mime) && input.imageRotations?.some(image => image.id === imageId && image.rotation !== 0)) throw new ClientError('Videos cannot be rotated.');
+        if (isVideo(detected.mime) && input.imageRotations?.some(image => image.id === imageId && image.rotation !== 0)) {throw new ClientError('Videos cannot be rotated.');}
         const filename = `${imageId}.${extension}`;
         const path = join(imageDirectory, filename);
         try { await link(file.path, path); }
         catch (error) {
-          if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new ClientError('An uploaded image ID is already in use.');
+          if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'EEXIST') {throw new ClientError('An uploaded image ID is already in use.');}
           throw error;
         }
         writtenPaths.push(path);
@@ -219,7 +222,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
         const path = join(audioDirectory, filename);
         try { await link(file.path, path); }
         catch (error) {
-          if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new ClientError('An uploaded audio ID is already in use.');
+          if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'EEXIST') {throw new ClientError('An uploaded audio ID is already in use.');}
           throw error;
         }
         writtenPaths.push(path);
@@ -230,37 +233,38 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
       const removedFiles = database.transaction(() => {
         // File inspection yields to other requests. Recheck the version at commit.
         const latest = readNote(database, id);
-        if ((latest?.version ?? 0) !== input.expectedVersion) throw new NoteConflict(latest);
-        if (prepared.some(image => database.prepare('SELECT id FROM images WHERE id=?').get(image.id))) throw new ClientError('An uploaded image ID is already in use.');
-        if (preparedAudio.some(audio => database.prepare('SELECT id FROM audio WHERE id=?').get(audio.id))) throw new ClientError('An uploaded audio ID is already in use.');
+        if ((latest?.version ?? 0) !== input.expectedVersion) {throw new NoteConflictError(latest);}
+        if (prepared.some(image => database.prepare('SELECT id FROM images WHERE id=?').get(image.id))) {throw new ClientError('An uploaded image ID is already in use.');}
+        if (preparedAudio.some(audio => database.prepare('SELECT id FROM audio WHERE id=?').get(audio.id))) {throw new ClientError('An uploaded audio ID is already in use.');}
         if (current) {
           database.prepare('UPDATE notes SET title=?, body=?, color=?, pinned=?, updated_at=?, version=version+1 WHERE id=?')
             .run(input.title, input.body, input.color, Number(input.pinned), now, id);
         } else {
-          const first = database.prepare('SELECT MIN(position) AS position FROM notes').get() as { position: number | null };
+          const first = database.prepare<Array<unknown>, { position: number | null }>('SELECT MIN(position) AS position FROM notes').get();
+          if (!first) { throw new Error('The note position aggregate returned no row.'); }
           database.prepare('INSERT INTO notes (id,title,body,color,pinned,created_at,updated_at,version,position) VALUES (?,?,?,?,?,?,?,1,?)')
             .run(id, input.title, input.body, input.color, Number(input.pinned), now, now, (first.position ?? 0) - 1);
         }
-        const oldImages = database.prepare('SELECT id, filename FROM images WHERE note_id=?').all(id) as { id: string; filename: string }[];
+        const oldImages = database.prepare<Array<unknown>, { id: string; filename: string }>('SELECT id, filename FROM images WHERE note_id=?').all(id);
         const removed = oldImages.filter(image => !retained.has(image.id));
-        for (const image of removed) database.prepare('DELETE FROM images WHERE id=?').run(image.id);
+        for (const image of removed) {database.prepare('DELETE FROM images WHERE id=?').run(image.id);}
         let position = 0;
-        for (const imageId of input.retainedImageIds) database.prepare('UPDATE images SET position=? WHERE id=?').run(position++, imageId);
+        for (const imageId of input.retainedImageIds) {database.prepare('UPDATE images SET position=? WHERE id=?').run(position++, imageId);}
         for (const image of prepared) {
           database.prepare('INSERT INTO images (id,note_id,filename,alt,mime_type,width,height,size,position) VALUES (?,?,?,?,?,?,?,?,?)')
             .run(image.id, id, image.filename, image.alt, image.mimeType, image.width, image.height, image.size, position++);
         }
-        for (const image of input.imageRotations ?? []) database.prepare('UPDATE images SET rotation=? WHERE id=? AND note_id=?').run(image.rotation, image.id, id);
-        const oldAudio = database.prepare('SELECT id, filename FROM audio WHERE note_id=?').all(id) as { id: string; filename: string }[];
+        for (const image of input.imageRotations ?? []) {database.prepare('UPDATE images SET rotation=? WHERE id=? AND note_id=?').run(image.rotation, image.id, id);}
+        const oldAudio = database.prepare<Array<unknown>, { id: string; filename: string }>('SELECT id, filename FROM audio WHERE note_id=?').all(id);
         const removedAudio = oldAudio.filter(audio => !retainedAudio.has(audio.id));
-        for (const audio of removedAudio) database.prepare('DELETE FROM audio WHERE id=?').run(audio.id);
+        for (const audio of removedAudio) {database.prepare('DELETE FROM audio WHERE id=?').run(audio.id);}
         let audioPosition = 0;
-        for (const audioId of retainedAudioIds) database.prepare('UPDATE audio SET position=? WHERE id=?').run(audioPosition++, audioId);
-        for (const audio of preparedAudio) database.prepare('INSERT INTO audio (id,note_id,filename,name,mime_type,size,duration,position) VALUES (?,?,?,?,?,?,?,?)')
-          .run(audio.id, id, audio.filename, audio.name, audio.mimeType, audio.size, audio.duration, audioPosition++);
+        for (const audioId of retainedAudioIds) {database.prepare('UPDATE audio SET position=? WHERE id=?').run(audioPosition++, audioId);}
+        for (const audio of preparedAudio) {database.prepare('INSERT INTO audio (id,note_id,filename,name,mime_type,size,duration,position) VALUES (?,?,?,?,?,?,?,?)')
+          .run(audio.id, id, audio.filename, audio.name, audio.mimeType, audio.size, audio.duration, audioPosition++);}
         return [...removed.map(image => join(imageDirectory, image.filename)), ...removedAudio.map(audio => join(audioDirectory, audio.filename))];
       })();
-      await Promise.all(removedFiles.map(path => rm(path, { force: true }))).catch(error => requestLogger(response).error({ error: safeError(error) }, 'Could not remove replaced attachment files.'));
+      await Promise.all(removedFiles.map(path => rm(path, { force: true }))).catch((error: unknown) => requestLogger(response).error({ error: safeError(error) }, 'Could not remove replaced attachment files.'));
       response.status(current ? 200 : 201).json({ note: readNote(database, id) });
     } catch (error) {
       await Promise.all(writtenPaths.map(path => rm(path, { force: true })));
@@ -272,23 +276,23 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     const { id } = noteIdParamsSchema.parse(request.params);
     const { expectedVersion } = deleteNoteSchema.parse(request.body);
     const current = readNote(database, id);
-    if (!current) return response.status(204).end();
-    if (current.version !== expectedVersion) return response.status(409).json({ error: 'This note changed on another device.', note: current });
-    const filenames = database.prepare('SELECT filename FROM images WHERE note_id=?').all(id) as { filename: string }[];
-    const audioFilenames = database.prepare('SELECT filename FROM audio WHERE note_id=?').all(id) as { filename: string }[];
+    if (!current) {return response.status(204).end();}
+    if (current.version !== expectedVersion) {return response.status(409).json({ error: 'This note changed on another device.', note: current });}
+    const filenames = database.prepare<Array<unknown>, { filename: string }>('SELECT filename FROM images WHERE note_id=?').all(id);
+    const audioFilenames = database.prepare<Array<unknown>, { filename: string }>('SELECT filename FROM audio WHERE note_id=?').all(id);
     database.prepare('DELETE FROM notes WHERE id=?').run(id);
     void Promise.all([...filenames.map(file => join(imageDirectory, file.filename)), ...audioFilenames.map(file => join(audioDirectory, file.filename))].map(path => rm(path, { force: true })))
-      .catch(error => requestLogger(response).error({ error: safeError(error) }, 'Could not remove deleted attachment files.'));
+      .catch((error: unknown) => requestLogger(response).error({ error: safeError(error) }, 'Could not remove deleted attachment files.'));
     response.status(204).end();
   });
 
   app.use('/api', (_request, response) => response.status(404).json({ error: 'Not found.' }));
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
-    if (error instanceof NoteConflict) return response.status(409).json({ error: 'This note changed on another device.', note: error.note });
-    if (error instanceof ClientError) return response.status(400).json({ error: error.message });
+    if (error instanceof NoteConflictError) {return response.status(409).json({ error: 'This note changed on another device.', note: error.note });}
+    if (error instanceof ClientError) {return response.status(400).json({ error: error.message });}
     recordRequestError(response, error);
-    if (error instanceof ZodError) return response.status(400).json({ error: 'Invalid request.', issues: error.issues });
-    if (error instanceof multer.MulterError) return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Audio and videos must be under 100 MB; images must be under 20 MB.' : error.message });
+    if (error instanceof ZodError) {return response.status(400).json({ error: 'Invalid request.', issues: error.issues });}
+    if (error instanceof MulterError) {return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Audio and videos must be under 100 MB; images must be under 20 MB.' : error.message });}
     response.status(500).json({ error: 'Something went wrong.' });
   });
   return app;
@@ -296,7 +300,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
 
 function rejectCrossSiteRequests(request: Request, response: Response, next: NextFunction) {
   response.vary('Sec-Fetch-Site');
-  if (request.get('Sec-Fetch-Site') === 'cross-site') return response.status(403).json({ error: 'Cross-site requests are not allowed.' });
+  if (request.get('Sec-Fetch-Site') === 'cross-site') {return response.status(403).json({ error: 'Cross-site requests are not allowed.' });}
   if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
     const origin = request.get('Origin');
     const host = request.get('host');
@@ -315,6 +319,6 @@ function rejectCrossSiteRequests(request: Request, response: Response, next: Nex
 }
 
 class ClientError extends Error {}
-class NoteConflict extends Error {
+class NoteConflictError extends Error {
   constructor(readonly note: Note | undefined) { super('This note changed on another device.'); }
 }

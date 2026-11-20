@@ -6,9 +6,10 @@ import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { stageShare } from './incoming-share';
 
-const worker = self as unknown as ServiceWorkerGlobalScope;
-// Workbox replaces this exact expression with the precache manifest at build time.
-// @ts-expect-error __WB_MANIFEST is injected by Workbox
+// This module is the service-worker entry, not a Window script. Workbox replaces
+// this exact self.__WB_MANIFEST expression with its generated manifest at build time.
+declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Parameters<typeof precacheAndRoute>[0] };
+const worker = self;
 precacheAndRoute(self.__WB_MANIFEST);
 registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
   denylist: [/^\/api\//, /^\/share-target$/],
@@ -28,21 +29,24 @@ registerRoute(
 );
 
 worker.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') void worker.skipWaiting();
+  const data: unknown = event.data;
+  if (typeof data === 'object' && data !== null && 'type' in data && data.type === 'SKIP_WAITING') {void worker.skipWaiting();}
 });
 
 worker.addEventListener('fetch', event => {
-  if (event.request.method !== 'POST' || new URL(event.request.url).pathname !== '/share-target') return;
+  if (event.request.method !== 'POST' || new URL(event.request.url).pathname !== '/share-target') {return;}
   event.respondWith((async () => {
     try {
       const form = await event.request.formData();
       const files = form.getAll('images');
-      if (!files.length || files.length > 6 || files.some(value =>
-        !(value instanceof File) ||
-        !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(value.type) ||
-        value.size > 20 * 1024 * 1024 || value.size === 0
-      )) return Response.redirect('/?shareError=invalid', 303);
-      const id = await stageShare(files as File[]);
+      if (!files.length || files.length > 6 || !files.every((value): value is File =>
+        // FormData can contain strings; require a real File before validating MIME type and byte limits.
+        // oxlint-disable-next-line @nkzw/no-instanceof
+        value instanceof File &&
+        ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(value.type) &&
+        value.size <= 20 * 1024 * 1024 && value.size !== 0
+      )) {return Response.redirect('/?shareError=invalid', 303);}
+      const id = await stageShare(files);
       return Response.redirect(`/?share=${encodeURIComponent(id)}`, 303);
     } catch {
       return Response.redirect('/?shareError=storage', 303);

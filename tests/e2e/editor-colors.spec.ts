@@ -17,7 +17,7 @@ for (const width of [1440, 320]) {
     ]) {
       await trigger.click();
       await expect(editor.getByRole('radio')).toHaveCount(options.length);
-      for (const option of options) await expect(editor.getByRole('radio', { name: option, exact: true })).toBeInViewport({ ratio: 1 });
+      for (const option of options) {await expect(editor.getByRole('radio', { name: option, exact: true })).toBeInViewport({ ratio: 1 });}
       expect((await new AxeBuilder({ page }).include('#note-color-choices').analyze()).violations).toEqual([]);
       await editor.getByRole('radio', { name, exact: true }).click();
       await expect(editor).toHaveCSS('background-color', background);
