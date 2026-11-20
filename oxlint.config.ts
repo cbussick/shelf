@@ -63,6 +63,7 @@ export default defineConfig({
     // Temporary migration disables; evaluate each in its own commit.
     // Existing compact guards/loops are intentional; a brace-only rewrite adds noise.
     { files: ['**/*'], rules: { 'curly': 'off' } },
+    // Both T[] and Array<T> are readable; do not rewrite 117 existing annotations.
     { files: ['**/*'], rules: { 'typescript/array-type': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
     { files: ['**/*'], rules: { 'import/consistent-type-specifier-style': 'off' } },
