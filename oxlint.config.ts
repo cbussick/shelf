@@ -96,7 +96,8 @@ export default defineConfig({
     // IDB reads are parsed after retrieval; ProseMirror attrs and Express route metadata are untyped.
     // Do not invent a typed storage schema that pretends persisted bytes have been validated.
     { files: ['src/client/{local-store,rich-text}.ts', 'src/server/logging.ts'], rules: { 'typescript/no-unsafe-assignment': 'off' } },
-    { files: ['**/*'], rules: { 'typescript/no-unsafe-return': 'off' } },
+    // ProseMirror's toJSON() returns any; test API/IDB fixtures intentionally inspect raw payloads.
+    { files: ['src/client/rich-text.ts', 'tests/e2e/{app,autosave-conflicts,image-rotation,video}.spec.ts'], rules: { 'typescript/no-unsafe-return': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-known-value-widening': 'off' } },
     { files: ['**/*'], rules: { 'unicorn/catch-error-name': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-conditional-empty-object-spread': 'off' } },
