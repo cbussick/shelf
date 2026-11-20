@@ -118,13 +118,13 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
       startedAt.current = Date.now(); setSeconds(0);
       document.querySelectorAll('audio').forEach(player => player.pause());
       capture.start(1000); setPhase('recording');
-    } catch (caught) {
+    } catch (error_) {
       stream.current?.getTracks().forEach(track => track.stop());
       if (!active.current) {return;}
-      setError(caught instanceof DOMException && caught.name === 'NotAllowedError'
+      setError(error_ instanceof DOMException && error_.name === 'NotAllowedError'
         ? 'Microphone access was denied. Allow it in your browser’s site settings, or upload a recording.'
-        : caught instanceof DOMException && caught.name === 'NotFoundError' ? 'No microphone was found. Connect one, or upload a recording.'
-        : caught instanceof Error ? caught.message : 'Could not start recording.');
+        : error_ instanceof DOMException && error_.name === 'NotFoundError' ? 'No microphone was found. Connect one, or upload a recording.'
+        : error_ instanceof Error ? error_.message : 'Could not start recording.');
       setPhase('ready');
     }
   };

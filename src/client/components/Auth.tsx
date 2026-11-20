@@ -19,8 +19,8 @@ export function Auth({ setupRequired, onAuthenticated, sessionExpired = false }:
       if (setupRequired) {await api.setup(password);} else {await api.login(password);}
       await onAuthenticated();
       setBusy(false);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not sign in.');
+    } catch (error_) {
+      setError(error_ instanceof Error ? error_.message : 'Could not sign in.');
       setBusy(false);
     }
   };

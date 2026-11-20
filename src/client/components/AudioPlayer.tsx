@@ -49,7 +49,7 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       }
       if (player.current) {player.current.src = url;}
       return url;
-    }).catch((caught: unknown) => { source.current = undefined; throw caught; });}
+    }).catch((error_: unknown) => { source.current = undefined; throw error_; });}
     return source.current;
   };
   const toggle = async () => {

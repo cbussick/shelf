@@ -90,7 +90,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     try {
       if (dirty) {latest.current.value = { ...latest.current.value, body: bodyInput.current?.read() ?? body };}
       return writer.flush();
-    } catch (caught) { writer.error = caught; writer.changed(); return Promise.resolve(false); }
+    } catch (error_) { writer.error = error_; writer.changed(); return Promise.resolve(false); }
   };
   const flushRef = useRef(flush);
   flushRef.current = flush;
@@ -179,7 +179,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     const accepted: Array<File> = [];
     for (const file of files) {
       try { validateVisualFile(file); accepted.push(file); }
-      catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not attach this file.'); }
+      catch (error_) { setError(error_ instanceof Error ? error_.message : 'Could not attach this file.'); }
     }
     if (retainedImages.length + newImages.length + accepted.length > 6) {return setError('Up to 6 images or videos per note.');}
     setNewImages(current => [...current, ...accepted]);
@@ -189,7 +189,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
       files.forEach(validateAudioFile);
       setNewAudio(current => [...current, ...files]);
       setError('');
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not attach this audio.'); }
+    } catch (error_) { setError(error_ instanceof Error ? error_.message : 'Could not attach this audio.'); }
   };
   const requestAudioRemoval = (audio: NonNullable<typeof audioToRemove.current>) => {
     audioToRemove.current = audio;
@@ -222,8 +222,8 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     try {
       if (committedNote.current) {await onDelete(committedNote.current, editorSession.current);}
       else {onClose();}
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not delete this note.');
+    } catch (error_) {
+      setError(error_ instanceof Error ? error_.message : 'Could not delete this note.');
       writer.resume(); setDeleting(false);
     }
   };

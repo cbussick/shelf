@@ -286,7 +286,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       try {
         if (files.length > 6) {throw new Error('Up to 6 images or videos per note.');}
         files.forEach(validateVisualFile);
-      } catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach these files.'); return; }
+      } catch (error) { notify(error instanceof Error ? error.message : 'Could not attach these files.'); return; }
       setEditor({ files });
     };
     document.addEventListener('paste', paste);
@@ -369,11 +369,11 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       if (files.length > 6) {throw new Error('Up to 6 images or videos per note.');}
       [...files].forEach(validateVisualFile);
       setEditor({ files: [...files] });
-    } catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach these files.'); }
+    } catch (error) { notify(error instanceof Error ? error.message : 'Could not attach these files.'); }
   };
   const chooseAudio = (files: Array<File>) => {
     try { files.forEach(validateAudioFile); setEditor({ audio: files }); }
-    catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach this audio.'); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Could not attach this audio.'); }
   };
   const closeEditor = async (retainReady = false) => {
     if (editor?.shareId) {
