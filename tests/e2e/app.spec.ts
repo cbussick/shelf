@@ -600,7 +600,7 @@ test('pasting an image from the overview opens a new note with the image attache
       const canvas = document.createElement('canvas');
       canvas.width = image.width; canvas.height = image.height;
       canvas.getContext('2d')!.drawImage(image, 0, 0);
-      const png = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'));
+      const png = await new Promise<Blob>(resolve => { canvas.toBlob(blob => resolve(blob!), 'image/png'); });
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
     } finally { URL.revokeObjectURL(url); }
   }, [...jpeg]);
@@ -645,7 +645,7 @@ test('pastes clipboard images into new and existing notes without disrupting tex
       const canvas = document.createElement('canvas');
       canvas.width = image.width; canvas.height = image.height;
       canvas.getContext('2d')!.drawImage(image, 0, 0);
-      const png = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'));
+      const png = await new Promise<Blob>(resolve => { canvas.toBlob(blob => resolve(blob!), 'image/png'); });
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
     } finally { URL.revokeObjectURL(url); }
   }, [...jpeg]);

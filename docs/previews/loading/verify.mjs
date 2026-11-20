@@ -17,7 +17,7 @@ const server = createServer((request, response) => {
     response.end(content);
   })().catch(() => { response.writeHead(404).end(); });
 });
-await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+await new Promise(resolve => { server.listen(0, '127.0.0.1', resolve); });
 let browser;
 try {
   browser = await chromium.launch({ headless: true });
@@ -86,5 +86,5 @@ try {
   }
 } finally {
   await browser?.close();
-  await new Promise(resolve => server.close(resolve));
+  await new Promise(resolve => { server.close(resolve); });
 }

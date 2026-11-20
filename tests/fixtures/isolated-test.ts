@@ -44,7 +44,7 @@ export const test = base.extend<{ isolatedServer: { url: string; storageState: S
         try {
           if ((await fetch(`${url}/healthz`)).ok) break;
         } catch { /* Server is still starting. */ }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => { setTimeout(resolve, 50); });
       }
       if (Date.now() >= deadline) throw new Error(`Test server did not start: ${output}`);
       const context = await request.newContext({ baseURL: url });

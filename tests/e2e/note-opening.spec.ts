@@ -145,7 +145,7 @@ test('native touch panning keeps the preview until the finger is released', asyn
   await page.clock.resume();
   await expect(page.getByRole('button', { name: 'Edit text', exact: true })).toBeEnabled();
   await preview.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'touch' });
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0))));
+  await page.evaluate(() => new Promise(resolve => { requestAnimationFrame(() => setTimeout(resolve, 0)); }));
   await expect(preview).toBeVisible();
   await preview.evaluate(element => { element.scrollTop = 240; });
   await preview.dispatchEvent('touchend');

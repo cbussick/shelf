@@ -16,7 +16,7 @@ export function withNoteUploads(directory: string, handler: (request: Request, r
       limits: { fileSize: MAX_AUDIO_BYTES, fields: 1, fieldSize: 1024 * 1024 },
     }).fields([{ name: 'images', maxCount: 6 }, { name: 'audio' }]);
     try {
-      await new Promise<void>((resolve, reject) => upload(request, response, error => error ? reject(error) : resolve()));
+      await new Promise<void>((resolve, reject) => { upload(request, response, error => error ? reject(error) : resolve()); });
       const files = (request.files ?? {}) as Record<string, Express.Multer.File[]>;
       for (const group of Object.values(files)) for (const file of group) await chmod(file.path, 0o600);
       return await handler(request, response);
