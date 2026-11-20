@@ -39,6 +39,32 @@ test('an active drag commits through the latest callback after notes refresh', a
   await expect.poll(async () => (await readNotes(page.request)).map(note => note.title)).toEqual([remote, second, first, third]);
 });
 
+test('a consumed toolbar recording intent stays consumed across session lock and unlock', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add audio', exact: true }).click();
+  await page.getByRole('button', { name: 'Record with microphone' }).click();
+  const recorder = page.getByRole('dialog', { name: 'Record audio', exact: true });
+  await expect(recorder).toBeVisible();
+  await recorder.getByRole('button', { name: 'Close audio recorder' }).click();
+  await expect(recorder).toHaveCount(0);
+  const body = page.getByRole('textbox', { name: 'Note', exact: true });
+  await body.fill('The same draft survives reauthentication.');
+  const original = await body.elementHandle();
+  await page.request.post('/api/auth/logout');
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill('correct horse battery staple');
+  await page.getByRole('button', { name: 'Open Shelf', exact: true }).click();
+  await expect(body).toBeVisible();
+  await expect(body).toHaveText('The same draft survives reauthentication.');
+  expect(await body.evaluate((element, previous) => element === previous, original)).toBe(true);
+  await expect(recorder).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close note', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
+  expect((await readNotes(page.request)).map(note => note.body)).toEqual(['The same draft survives reauthentication.\n']);
+});
+
 test('microphone permission resolving after the committed session lock cannot start recording', async ({ isolatedServer }) => {
   const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   try {

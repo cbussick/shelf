@@ -120,15 +120,17 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     return () => removeEventListener('beforeunload', warn);
   }, [open, dirty, checkpoint.saving]);
 
+  // Reopening a pristine parked editor resets history. Reauthentication merely
+  // restores visibility: restarting a live edited document resets its reader baseline.
+  useEffect(() => { if (open) { bodyInput.current?.restartReading(); } }, [open]);
   useEffect(() => {
     const element = dialog.current;
     if (open && !locked) {
-      bodyInput.current?.restartReading();
       element?.showModal();
       if (element) {element.scrollTop = 0;}
     } else {element?.close();}
     return () => element?.close();
-  }, [open, note, locked]);
+  }, [open, locked]);
   useEffect(() => {
     const viewport = window.visualViewport;
     const element = dialog.current;
