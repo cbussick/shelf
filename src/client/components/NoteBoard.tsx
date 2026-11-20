@@ -1,5 +1,5 @@
 import { props } from '@stylexjs/stylex';
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { LocalImage, LocalNote, PendingNoteSync } from '../local-store';
 import { imageSource } from '../local-store';
 import { styles } from '../app.stylex';
@@ -108,7 +108,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
     const item = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-item-id]');
     return item && board.current?.contains(item) ? item.dataset.itemId : undefined;
   };
-  const move = (event: PointerEvent) => {
+  const move = useEffectEvent((event: PointerEvent) => {
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) {return;}
     if (!active.active) {
@@ -135,8 +135,8 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
       preview.current = { source: active.source, target: id };
       setPlacement(preview.current);
     }
-  };
-  const end = (event: PointerEvent) => {
+  });
+  const end = useEffectEvent((event: PointerEvent) => {
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) {return;}
     const id = active.active && !within(event, active.origin) ? noteAt(event) : undefined;
@@ -146,13 +146,11 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
     cancel();
     if (destination && destination !== active.source) {onReorder(active.source, destination);}
     if (active.active) {setTimeout(() => { if (suppressClick.current === active.source) {suppressClick.current = undefined;} }, 0);}
-  };
+  });
+  const onCancel = useEffectEvent(() => { cancel(); suppressClick.current = undefined; });
   // Captured pointers can be lost when React moves a card in the masonry grid.
   // Listen at the document so release and cancellation still finish the drag.
-  // Rebind after every commit: move/end close over the current note order and callbacks.
-  // oxlint-disable-next-line @nkzw/require-use-effect-arguments
   useEffect(() => {
-    const onCancel = () => { cancel(); suppressClick.current = undefined; };
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', end);
     document.addEventListener('pointercancel', onCancel);
@@ -161,7 +159,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
       document.removeEventListener('pointerup', end);
       document.removeEventListener('pointercancel', onCancel);
     };
-  });
+  }, []);
   return <section {...props(styles.section)}>
     {heading && <h2 {...props(styles.sectionHeading)}>{heading}</h2>}
     <ul ref={board} aria-label={label} {...props(styles.board)}>
