@@ -5,6 +5,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { isVideo, VISUAL_ACCEPT } from '../shared/contracts';
 import type { NoteColor } from '../shared/contracts';
 import { validateVisualFile } from './visual-media';
+import { workspaceAccess } from './workspace-access';
+import type { WorkspaceAccess } from './workspace-access';
 import { api, ApiError, sessionEvents, syncErrorDetails } from './api';
 import { styles } from './app.stylex';
 import { Auth, Brand } from './components/Auth';
@@ -36,33 +38,30 @@ function readyNoteIdentity(note: LocalNote) {
 
 export function App() {
   const queryClient = useQueryClient();
-  const workspaceOpened = useRef(false);
-  const [sessionExpired, setSessionExpired] = useState(false);
+  const [access, setAccess] = useState<WorkspaceAccess>('gate');
   const expireSession = useCallback(() => {
-    setSessionExpired(true);
+    setAccess(current => workspaceAccess(current, { type: 'expired' }));
     // Repeated 401s must not keep resetting the auth query's freshness window.
     if (queryClient.getQueryData<{ authenticated: boolean }>(['auth'])?.authenticated !== false) {queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false });}
   }, [queryClient]);
   // Attempt auth even offline so a paused query cannot trap startup on the splash.
   const auth = useQuery({ queryKey: ['auth'], queryFn: api.authStatus, retry: false, networkMode: 'always', refetchOnReconnect: true });
   const unreachable = auth.error instanceof ApiError && auth.error.status === 0;
-  const needsOfflineAccess = unreachable && !auth.data?.authenticated && !workspaceOpened.current;
+  const needsOfflineAccess = unreachable && !auth.data?.authenticated && access === 'gate';
   const offlineAccess = useQuery({ queryKey: ['offline-access'], queryFn: hasLocalData, enabled: needsOfflineAccess, retry: false, networkMode: 'always' });
   // Cached authenticated access must keep the workspace/editor mounted even if
   // a background auth refetch fails while returning to an offline tab.
-  const confirmedExpiry = workspaceOpened.current && !unreachable && (auth.data?.authenticated === false || auth.error instanceof ApiError && auth.error.status === 401);
-  useLayoutEffect(() => { if (confirmedExpiry) {setSessionExpired(true);} }, [confirmedExpiry]);
+  const observedAccess = workspaceAccess(access, { type: 'observed', authenticated: auth.data?.authenticated, unreachable, unauthorized: auth.error instanceof ApiError && auth.error.status === 401, offline: offlineAccess.data });
+  if (observedAccess !== access) { setAccess(observedAccess); }
   const authenticated = async () => {
     const result = await auth.refetch();
     if (result.error || !result.data?.authenticated) {throw new Error('Could not confirm your session. Check your connection and try signing in again.');}
-    setSessionExpired(false);
+    setAccess(current => workspaceAccess(current, { type: 'authenticated' }));
   };
-  if (!workspaceOpened.current && (auth.isPending || (needsOfflineAccess && offlineAccess.isPending))) {return <Loading/>;}
-  const allowed = auth.data?.authenticated || (unreachable && offlineAccess.data);
-  if (allowed) {workspaceOpened.current = true;}
-  if (workspaceOpened.current) {
-    const locked = sessionExpired || confirmedExpiry;
-    return <><NotesApp offlineEntry={!auth.data?.authenticated} locked={locked} onSessionExpired={expireSession} onLogout={() => { workspaceOpened.current = false; setSessionExpired(false); queryClient.setQueryData(['offline-access'], false); queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false }); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>{locked && <Auth setupRequired={false} sessionExpired onAuthenticated={authenticated}/>}</>;
+  if (access === 'gate' && (auth.isPending || (needsOfflineAccess && offlineAccess.isPending))) {return <Loading/>;}
+  if (access !== 'gate') {
+    const locked = access === 'locked';
+    return <><NotesApp offlineEntry={!auth.data?.authenticated} locked={locked} onSessionExpired={expireSession} onLogout={() => { setAccess(current => workspaceAccess(current, { type: 'logout' })); queryClient.setQueryData(['offline-access'], false); queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false }); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>{locked && <Auth setupRequired={false} sessionExpired onAuthenticated={authenticated}/>}</>;
   }
   if (unreachable) {return <main {...props(styles.loginPage)}><section role="alert" {...props(styles.loginCard)}><Brand/><h1 {...props(styles.loginTitle)}>Shelf is offline</h1><p {...props(styles.loginCopy)}>Connect to your server to open Shelf. Your notes could not be opened on this device.</p><button type="button" disabled={auth.isFetching} onClick={() => void auth.refetch()} {...props(styles.primary)}>Try again</button></section></main>;}
   if (auth.error) {return <Auth setupRequired={false} onAuthenticated={authenticated}/>;}
