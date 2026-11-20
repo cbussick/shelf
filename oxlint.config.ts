@@ -65,7 +65,13 @@ export default defineConfig({
     { files: ['**/*'], rules: { 'curly': 'off' } },
     // Both T[] and Array<T> are readable; do not rewrite 117 existing annotations.
     { files: ['**/*'], rules: { 'typescript/array-type': 'off' } },
-    { files: ['**/*'], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
+    // Trusted SQLite/Multer rows, DOM targets, IDB records and test fault injection.
+    // Keep runtime/schema validation; replacing these assertions is a separate boundary audit.
+    { files: [
+      'src/server/{app,auth,database,note-uploads}.ts',
+      'src/client/components/{AddAudio,Editor,NoteBoard,NoteContextMenu,NoteReading,RichTextEditor}.tsx',
+      'src/client/{incoming-share,local-store,note-preparation,sw}.ts', 'tests/**/*.ts',
+    ], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
     { files: ['**/*'], rules: { 'import/consistent-type-specifier-style': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-non-null-assertion': 'off' } },
     { files: ['**/*'], rules: { 'react/refs': 'off' } },
