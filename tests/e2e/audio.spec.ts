@@ -5,22 +5,22 @@ import { chromium, webkit } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const recordingTest = test.extend({
-  page: async ({ isolatedServer }, use) => {
+  page: async ({ isolatedServer }, provide) => {
     const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
     try {
       const context = await browser.newContext({ baseURL: isolatedServer.url, storageState: isolatedServer.storageState, permissions: ['microphone'] });
-      await use(await context.newPage());
+      await provide(await context.newPage());
     } finally { await browser.close(); }
   },
 });
 const webkitTest = test.extend({
-  page: async ({ isolatedServer }, use) => {
+  page: async ({ isolatedServer }, provide) => {
     // WebKitGTK's ephemeral/private contexts cannot reliably persist blobs.
     // A temporary persistent profile models the normal browser/PWA storage.
     const context = await webkit.launchPersistentContext('', { baseURL: isolatedServer.url, viewport: { width: 820, height: 1180 }, hasTouch: true, headless: true });
     try {
       await context.addCookies(isolatedServer.storageState.cookies);
-      await use(await context.newPage());
+      await provide(await context.newPage());
     } finally { await context.close(); }
   },
 });

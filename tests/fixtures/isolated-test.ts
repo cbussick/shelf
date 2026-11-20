@@ -26,7 +26,7 @@ async function unusedPort(): Promise<number> {
 export const test = base.extend<{ isolatedServer: { url: string; storageState: StorageState } }>({
   // Playwright requires an object destructuring pattern to discover fixture dependencies.
   // oxlint-disable-next-line eslint/no-empty-pattern
-  isolatedServer: async ({}, use) => {
+  isolatedServer: async ({}, provide) => {
     const dataDir = await mkdtemp(join(tmpdir(), 'shelf-e2e-'));
     const port = await unusedPort();
     const url = `http://127.0.0.1:${port}`;
@@ -56,7 +56,7 @@ export const test = base.extend<{ isolatedServer: { url: string; storageState: S
         if (!notes.ok() || (await notes.json() as { notes: Array<unknown> }).notes.length !== 0) {
           throw new Error('Test server must start with an empty notes database');
         }
-        await use({ url, storageState: await context.storageState() });
+        await provide({ url, storageState: await context.storageState() });
       } finally {
         await context.dispose();
       }
@@ -69,8 +69,8 @@ export const test = base.extend<{ isolatedServer: { url: string; storageState: S
       await rm(dataDir, { recursive: true, force: true });
     }
   },
-  baseURL: async ({ isolatedServer }, use) => { await use(isolatedServer.url); },
-  storageState: async ({ isolatedServer }, use) => { await use(isolatedServer.storageState); },
+  baseURL: async ({ isolatedServer }, provide) => { await provide(isolatedServer.url); },
+  storageState: async ({ isolatedServer }, provide) => { await provide(isolatedServer.storageState); },
 });
 
 export { expect };

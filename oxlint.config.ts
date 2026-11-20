@@ -89,8 +89,6 @@ export default defineConfig({
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,Editor}.tsx'], rules: { 'react/set-state-in-effect': 'off' } },
     // Browser evaluate() closures must serialize in place; memo callbacks and local test helpers belong here.
     { files: ['src/client/components/NoteBoard.tsx', 'tests/e2e/{local-store-autosave,sync-layout}.spec.ts', 'tests/unit/{video,api}.test.ts'], rules: { 'unicorn/consistent-function-scoping': 'off' } },
-    // Playwright's fixture callback is named `use`, not React.use(). Keep real hook checks on.
-    { files: ['tests/fixtures/isolated-test.ts', 'tests/e2e/audio.spec.ts'], rules: { 'react/rules-of-hooks': 'off' } },
     // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.
     // This is not mutation of React state; replacing its tested protocol is outside lint migration.
     { files: ['src/client/components/Editor.tsx'], rules: { 'react/immutability': 'off' } },
