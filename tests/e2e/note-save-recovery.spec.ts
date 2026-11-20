@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures/isolated-test';
 
 const closingError = "Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.";
