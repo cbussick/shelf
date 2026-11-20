@@ -60,14 +60,5 @@ export default defineConfig({
       'no-with': 'error',
       'typescript/unbound-method': 'error',
     } },
-    // Reviewed Shelf exceptions/options; rationale and migration inventory: docs/cloudflare-oxlint-audit.md.
-    // Imperative editor/recorder callbacks and retained checkpoint state intentionally use refs.
-    // These components are not React-Compiler optimized; preserve tested save/lifecycle ordering.
-    { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,AudioRecorder,RichTextEditor,Editor}.tsx'], rules: { 'react/refs': 'off' } },
-    // Synchronize external audio/dialog/auth/sync lifecycles; moving these updates changes ordering.
-    { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,Editor}.tsx'], rules: { 'react/set-state-in-effect': 'off' } },
-    // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.
-    // This is not mutation of React state; replacing its tested protocol is outside lint migration.
-    { files: ['src/client/components/Editor.tsx'], rules: { 'react/immutability': 'off' } },
   ],
 });

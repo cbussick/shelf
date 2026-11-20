@@ -1,5 +1,5 @@
 import { props } from '@stylexjs/stylex';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MAX_AUDIO_BYTES, MAX_RECORDING_SECONDS } from '../../shared/contracts';
 import { audioTime, rememberRecordingDuration } from '../audio';
 import { styles } from '../app.stylex';
@@ -15,7 +15,7 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
   const stream = useRef<MediaStream | null>(null);
   const active = useRef(true);
   const suspendedRef = useRef(suspended);
-  suspendedRef.current = suspended;
+  useLayoutEffect(() => { suspendedRef.current = suspended; }, [suspended]);
   const startedAt = useRef(0);
   const [phase, setPhase] = useState<Phase>('ready');
   const [seconds, setSeconds] = useState(0);

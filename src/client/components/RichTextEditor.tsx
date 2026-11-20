@@ -76,7 +76,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const root = useRef<HTMLDivElement>(null);
   const instance = useRef<NoteEditor | null>(null);
   const callbacks = useRef({ onChange, disabled });
-  callbacks.current = { onChange, disabled };
+  useLayoutEffect(() => { callbacks.current = { onChange, disabled }; }, [onChange, disabled]);
   const initial = useRef({ initialValue, autoFocus });
   const fallback = useRef<HTMLTextAreaElement>(null);
   const fallbackAutoFocus = useRef(false);
