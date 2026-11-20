@@ -64,7 +64,6 @@ export default defineConfig({
     // Trusted SQLite/Multer rows, DOM targets, IDB records and test fault injection.
     // Keep runtime/schema validation; replacing these assertions is a separate boundary audit.
     { files: [
-      'src/server/{app,auth,database,note-uploads}.ts',
       'src/client/components/{AddAudio,Editor,NoteBoard,NoteContextMenu,NoteReading,RichTextEditor}.tsx',
       'src/client/{incoming-share,local-store,note-preparation,sw}.ts', 'tests/**/*.ts',
     ], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },

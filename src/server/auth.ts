@@ -19,7 +19,7 @@ export async function createOwner(database: AppDatabase, password: string): Prom
 }
 
 export async function verifyOwner(database: AppDatabase, password: string): Promise<boolean> {
-  const owner = database.prepare('SELECT password_hash FROM owner WHERE id = 1').get() as { password_hash: string } | undefined;
+  const owner = database.prepare<Array<unknown>, { password_hash: string }>('SELECT password_hash FROM owner WHERE id = 1').get();
   return owner ? verify(owner.password_hash, password) : false;
 }
 
@@ -49,7 +49,7 @@ export function destroySession(database: AppDatabase, request: Request, response
 export function isAuthenticated(database: AppDatabase, request: Request): boolean {
   const token = sessionToken(request);
   if (!token) {return false;}
-  const session = database.prepare('SELECT expires_at FROM sessions WHERE token_hash = ?').get(digest(token)) as { expires_at: string } | undefined;
+  const session = database.prepare<Array<unknown>, { expires_at: string }>('SELECT expires_at FROM sessions WHERE token_hash = ?').get(digest(token));
   return Boolean(session && session.expires_at > new Date().toISOString());
 }
 
