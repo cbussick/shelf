@@ -1,15 +1,23 @@
 import { MAX_AUDIO_BYTES } from '../shared/contracts';
 import type { NoteAudio } from '../shared/contracts';
 
-const audioFileIds = new WeakMap<File, string>();
-export function audioFileKey(file: File): string {
-  let id = audioFileIds.get(file);
-  if (!id) { id = crypto.randomUUID(); audioFileIds.set(file, id); }
-  return id;
-}
 const recordedDurations = new WeakMap<File, number>();
 export function rememberRecordingDuration(file: File, seconds: number) { recordedDurations.set(file, seconds); }
 export function recordingDuration(file: File) { return recordedDurations.get(file) ?? null; }
+
+type PlaybackDuration = Readonly<{ provided: number | null | undefined; value: number }>;
+type DurationUpdate = { type: 'metadata' | 'media'; duration: number | null | undefined };
+export function createPlaybackDuration(provided: number | null | undefined, recorded?: number | null): PlaybackDuration {
+  return { provided, value: provided ?? recorded ?? 0 };
+}
+export function updatePlaybackDuration(state: PlaybackDuration, update: DurationUpdate): PlaybackDuration {
+  if (update.type === 'metadata') {
+    // Re-renders must not replace a decoded duration with unchanged metadata.
+    // Track even absent metadata so a later supplied value is a new update.
+    return Object.is(update.duration, state.provided) ? state : { provided: update.duration, value: update.duration || state.value };
+  }
+  return update.duration && Number.isFinite(update.duration) ? { ...state, value: update.duration } : state;
+}
 
 export const AUDIO_ACCEPT = 'audio/*,.mp3,.m4a,.wav,.ogg,.opus,.webm,.flac,.aac';
 const types = new Map(Object.entries({

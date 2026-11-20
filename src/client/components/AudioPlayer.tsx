@@ -1,7 +1,7 @@
 import { props } from '@stylexjs/stylex';
 import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { audioTime, recordingDuration } from '../audio';
+import { audioTime, createPlaybackDuration, recordingDuration, updatePlaybackDuration } from '../audio';
 import { styles } from '../app.stylex';
 import { audioSource } from '../local-store';
 import type { LocalAudio } from '../local-store';
@@ -18,7 +18,14 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(audio?.duration ?? (file ? recordingDuration(file) : null) ?? 0);
+  const [durationState, setDurationState] = useState(() => createPlaybackDuration(audio?.duration, file ? recordingDuration(file) : null));
+  // Adjust only this component's state when supplied metadata actually changes.
+  // Native media events remain authoritative between metadata changes.
+  if (!Object.is(durationState.provided, audio?.duration)) {
+    setDurationState(updatePlaybackDuration(durationState, { type: 'metadata', duration: audio?.duration }));
+  }
+  const duration = durationState.value;
+  const [hasSource, setHasSource] = useState(false);
   const [error, setError] = useState('');
   const errorToastId = useId();
   const playbackError = () => {
@@ -30,7 +37,6 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       });
     } else {setError('Could not play this audio. Check your connection or download it to play elsewhere.');}
   };
-  useEffect(() => { if (audio?.duration) {setDuration(audio.duration);} }, [audio?.duration]);
   useEffect(() => {
     mounted.current = true;
     const element = player.current;
@@ -51,7 +57,13 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       }
       if (player.current) {player.current.src = url;}
       return url;
-    }).catch((error_: unknown) => { source.current = undefined; throw error_; });}
+    }).catch((error_: unknown) => {
+      source.current = undefined;
+      if (mounted.current) { setHasSource(false); }
+      throw error_;
+    });
+      setHasSource(true);
+    }
     return source.current;
   };
   const toggle = async () => {
@@ -72,7 +84,7 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
   };
   const updateDuration = () => {
     const seconds = player.current?.duration;
-    if (seconds && Number.isFinite(seconds)) {setDuration(seconds);}
+    setDurationState(current => updatePlaybackDuration(current, { type: 'media', duration: seconds }));
   };
   const download = async () => {
     try {
@@ -91,7 +103,7 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       <span {...props(styles.audioTime)}>{audioTime(position)} / {duration ? audioTime(duration) : '—'}</span>
       {!compact && <><button type="button" aria-label={`Download ${name}`} onClick={() => void download()} {...props(styles.iconButton)}><Icon name="download" width={18}/></button>{onRemove && <button type="button" aria-label={`Remove ${name}`} onClick={onRemove} {...props(styles.iconButton, styles.deleteIcon)}><Icon name="trash" width={18}/></button>}</>}
     </div>
-    <input type="range" aria-label={`Seek ${name}`} min={0} max={duration || 1} step={0.1} value={Math.min(position, duration || 1)} disabled={!duration || !source.current} onChange={event => { if (player.current) { player.current.currentTime = Number(event.target.value); setPosition(Number(event.target.value)); } }} {...props(styles.audioSeek)}/>
+    <input type="range" aria-label={`Seek ${name}`} min={0} max={duration || 1} step={0.1} value={Math.min(position, duration || 1)} disabled={!duration || !hasSource} onChange={event => { if (player.current) { player.current.currentTime = Number(event.target.value); setPosition(Number(event.target.value)); } }} {...props(styles.audioSeek)}/>
     {error && <p role="alert" {...props(styles.audioError)}>{error}</p>}
     <audio ref={player} preload="none" onPlay={() => {
       document.querySelectorAll('audio').forEach(other => { if (other !== player.current) {other.pause();} });
