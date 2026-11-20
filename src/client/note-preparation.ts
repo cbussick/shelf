@@ -47,14 +47,17 @@ export function useNotePreparation(notes: Array<{ id: string; body: string }>, p
     const sources = new Map(notes.map(note => [note.id, note.body]));
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
-        const id = (entry.target as HTMLElement).dataset.noteId!;
-        if (entry.isIntersecting) {visible.set(id, sources.get(id)!);}
+        const id = entry.target.getAttribute('data-note-id');
+        if (!id) { continue; }
+        const source = sources.get(id);
+        if (entry.isIntersecting && source !== undefined) {visible.set(id, source);}
         else {visible.delete(id);}
       }
       schedule();
     }, { rootMargin: '100px' });
     document.querySelectorAll<HTMLElement>('[data-note-id]').forEach(card => {
-      if (sources.has(card.dataset.noteId!)) {observer.observe(card);}
+      const id = card.dataset.noteId;
+      if (id && sources.has(id)) {observer.observe(card);}
     });
     document.addEventListener('visibilitychange', schedule);
     return () => {

@@ -197,11 +197,11 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     const selectionChanged = () => reveal();
     document.addEventListener('selectionchange', selectionChanged);
     let endTask = 0;
-    const endGesture = (event: Event) => {
+    const endGesture = (event: TouchEvent | PointerEvent) => {
       if (event.type.startsWith('touch')) {
-        if ((event as TouchEvent).touches?.length) {return;}
+        if ('touches' in event && event.touches.length) {return;}
         touching.current = false;
-      } else if ((event as PointerEvent).pointerType === 'touch' && touching.current) {
+      } else if ('pointerType' in event && event.pointerType === 'touch' && touching.current) {
         // Pointer cancellation starts native panning; touchend, not that
         // cancellation, tells us the finger has actually left the document.
         return;
@@ -316,7 +316,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
           onTouchStart={() => { gesture.current = true; touching.current = true; }}
           onKeyDown={event => { if (event.key === 'Enter' && mounted) { event.preventDefault(); reveal(true); } }}
           onClick={event => {
-            if ((event.target as HTMLElement).closest('a')) {return;}
+            if (event.target instanceof Element && event.target.closest('a')) {return;}
             restore.current.point = { left: event.clientX, top: event.clientY };
             if (!window.getSelection()?.isCollapsed) {return;}
             focusOnReveal.current = true;

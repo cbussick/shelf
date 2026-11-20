@@ -14,7 +14,9 @@ export function AddAudio({ onUpload, onRecord, bottom = false, disabled = false 
   useEffect(() => {
     if (!open) {return;}
     container.current?.querySelector<HTMLButtonElement>('[data-audio-action]')?.focus();
-    const dismiss = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) {setOpen(false);} };
+    // EventTarget is not statically a Node; contains() requires actual DOM identity.
+    // oxlint-disable-next-line @nkzw/no-instanceof
+    const dismiss = (event: PointerEvent) => { if (!(event.target instanceof Node) || !container.current?.contains(event.target)) {setOpen(false);} };
     document.addEventListener('pointerdown', dismiss);
     return () => document.removeEventListener('pointerdown', dismiss);
   }, [open]);

@@ -61,12 +61,6 @@ export default defineConfig({
       'typescript/unbound-method': 'error',
     } },
     // Reviewed Shelf exceptions/options; rationale and migration inventory: docs/cloudflare-oxlint-audit.md.
-    // Trusted SQLite/Multer rows, DOM targets, IDB records and test fault injection.
-    // Keep runtime/schema validation; replacing these assertions is a separate boundary audit.
-    { files: [
-      'src/client/components/{AddAudio,Editor,NoteBoard,NoteContextMenu,NoteReading,RichTextEditor}.tsx',
-      'src/client/note-preparation.ts',
-    ], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
     // Established schema keys, mounted refs, nonempty caches and checked IDB identities.
     // Do not substitute optional chaining that would silently skip required work.
     { files: [

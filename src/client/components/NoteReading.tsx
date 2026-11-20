@@ -36,11 +36,13 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     fragment.append(renderNode(dom, child, childPosition));
     childPosition += nodeSize(child);
   }
-  const wrap = (tag: string, content: Node = fragment) => {
+  function wrap<K extends keyof HTMLElementTagNameMap>(tag: K, content?: Node): HTMLElementTagNameMap[K];
+  function wrap(tag: string, content?: Node): HTMLElement;
+  function wrap(tag: string, content: Node = fragment) {
     const element = dom.createElement(tag);
     element.append(content);
     return element;
-  };
+  }
   const atom = (element: HTMLElement) => {
     element.dataset.noteAtomStart = String(position);
     element.dataset.noteAtomEnd = String(position + nodeSize(node));
@@ -56,7 +58,7 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
         else if (mark.type === 'link' && typeof mark.attrs?.href === 'string') {
           const href = safeNoteLink(mark.attrs.href);
           if (href) {
-            const link = wrap('a', content) as HTMLAnchorElement;
+            const link = wrap('a', content);
             link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer';
             content = link;
           }
@@ -70,7 +72,7 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     case 'heading': return wrap(`h${Math.min(6, Math.max(1, Number(attrs.level) || 1))}`);
     case 'bullet_list': return wrap('ul');
     case 'ordered_list': {
-      const list = wrap('ol') as HTMLOListElement;
+      const list = wrap('ol');
       list.start = Number(attrs.order) || 1;
       return list;
     }

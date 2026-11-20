@@ -53,9 +53,12 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   };
   const removeGhost = () => { ghost.current?.remove(); ghost.current = null; };
   const activate = (id: string) => {
-    const card = Array.from(board.current?.querySelectorAll<HTMLElement>('[data-item-id]') ?? []).find(item => item.dataset.itemId === id)?.firstElementChild as HTMLElement | undefined;
+    const card = Array.from(board.current?.querySelectorAll<HTMLElement>('[data-item-id]') ?? []).find(item => item.dataset.itemId === id)?.querySelector<HTMLElement>(':scope > :first-child');
     if (!card) {return;}
     const rect = card.getBoundingClientRect();
+    // Native cloneNode preserves this HTMLElement's concrete element class;
+    // lib.dom erases that guarantee to Node (it has no generic clone overload).
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const copy = card.cloneNode(true) as HTMLElement;
     copy.removeAttribute('data-note-id');
     copy.setAttribute('aria-hidden', 'true');
@@ -234,10 +237,9 @@ function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: Array<
     if (!board) {return;}
     const layout = () => {
       const columns = Number(getComputedStyle(board).getPropertyValue('--columns')) || 4;
-      const heights = Array(columns).fill(0) as Array<number>;
+      const heights = Array<number>(columns).fill(0);
       const gap = innerWidth <= 700 ? 12 : innerWidth <= 1100 ? 16 : 20;
-      for (const item of board.children) {
-        const element = item as HTMLElement;
+      for (const element of board.querySelectorAll<HTMLElement>(':scope > *')) {
         const column = heights.indexOf(Math.min(...heights));
         const height = Math.ceil(element.firstElementChild!.getBoundingClientRect().height);
         element.style.gridColumn = String(column + 1);

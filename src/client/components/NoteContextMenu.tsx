@@ -73,7 +73,9 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
     }
   }, [colorsOpen, target]);
   useEffect(() => {
-    const dismiss = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) {onClose();} };
+    // A document pointer target must be a real DOM node before calling contains().
+    // oxlint-disable-next-line @nkzw/no-instanceof
+    const dismiss = (event: PointerEvent) => { if (!(event.target instanceof Node) || !menu.current?.contains(event.target)) {onClose();} };
     const escape = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); onClose(); target.origin.focus({ preventScroll: true }); }
     };
@@ -90,7 +92,9 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
   }, [onClose, target]);
   const choose = (action: (note: LocalNote) => void) => { onClose(); action(target.note); };
   const navigate = (event: KeyboardEvent<HTMLDivElement>) => {
-    const inColors = submenu.current?.contains(event.target as Node);
+    // Guard DOM identity rather than assert that an arbitrary EventTarget is a Node.
+    // oxlint-disable-next-line @nkzw/no-instanceof
+    const inColors = event.target instanceof Node && submenu.current?.contains(event.target);
     if (inColors && (event.key === 'ArrowLeft' || event.key === 'Escape')) {
       event.preventDefault(); closeColors(); return;
     }
@@ -102,7 +106,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
     }
     const element = inColors ? submenu.current : menu.current;
     const buttons = Array.from(element?.querySelectorAll<HTMLButtonElement>(':scope > button') ?? []);
-    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const index = buttons.findIndex(button => button.isSameNode(document.activeElement));
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       buttons[(index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus();
@@ -111,7 +115,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
     }
   };
   return <div ref={menu} role="menu" aria-label="Note actions" {...props(styles.contextMenu)} style={{ left: target.x, top: target.y }} onKeyDown={navigate} onFocus={event => {
-    const item = event.target as HTMLElement;
+    const item: HTMLElement = event.target;
     if (item !== colorTrigger.current && item.parentElement === menu.current) {closeColors();}
   }}>
     <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onDelete)} {...props(styles.contextMenuDanger)}><Icon name="trash"/>Delete</button>

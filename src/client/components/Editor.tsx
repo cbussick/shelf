@@ -1,7 +1,7 @@
 import { props } from '@stylexjs/stylex';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckpointWriter } from '../checkpoint-writer';
-import { isVideo, VISUAL_ACCEPT, noteColorSchema } from '../../shared/contracts';
+import { imageRotationSchema, isVideo, VISUAL_ACCEPT, noteColorSchema } from '../../shared/contracts';
 import type { ImageRotation, NoteColor } from '../../shared/contracts';
 import { validateVisualFile } from '../visual-media';
 import { styles } from '../app.stylex';
@@ -165,7 +165,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     if (previewIndex === null || saving) {return;}
     const item = gallery[previewIndex];
     if (isVideo('image' in item ? item.image.mimeType : item.mimeType)) {return;}
-    const rotation = ((('image' in item ? item.image.rotation : item.rotation) + step + 360) % 360) as ImageRotation;
+    const rotation = imageRotationSchema.parse((('image' in item ? item.image.rotation : item.rotation) + step + 360) % 360);
     if (item.removal.kind === 'retained') {
       const id = item.removal.id;
       setRetainedImages(images => images.map(image => image.id === id ? { ...image, rotation } : image));
@@ -316,7 +316,7 @@ function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: 
     if (!open) {return;}
     if (!editingFocus.current) {container.current?.querySelector<HTMLInputElement>('input:checked')?.focus();}
     const dismiss = (event: PointerEvent) => {
-      if (!container.current?.contains(event.target as Node)) { setOpen(false); editingFocus.current = null; }
+      if (!(event.target instanceof Node) || !container.current?.contains(event.target)) { setOpen(false); editingFocus.current = null; }
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !editingFocus.current) {return;}
