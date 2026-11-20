@@ -5,7 +5,7 @@ export default defineConfig({
   ...cloudflare,
   options: { ...cloudflare.options, typeAware: true, typeCheck: true },
   ignorePatterns: [
-    ...cloudflare.ignorePatterns!,
+    ...(cloudflare.ignorePatterns ?? []),
     'dist/**', 'node_modules/**', 'playwright-report/**', 'test-results/**',
   ],
   rules: {
@@ -40,7 +40,7 @@ export default defineConfig({
     'typescript/no-misused-promises': 'error',
   },
   overrides: [
-    ...cloudflare.overrides!,
+    ...(cloudflare.overrides ?? []),
     // Preserve PR93 checks that the preset delegates to tsc, plus test method safety.
     { files: ['**/*.{ts,tsx,mts,cts}'], rules: {
       'constructor-super': 'error',
@@ -74,7 +74,12 @@ export default defineConfig({
     ], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
     // Inline `type` specifiers are already explicit and avoid splitting mixed imports.
     { files: ['**/*'], rules: { 'import/consistent-type-specifier-style': 'off' } },
-    { files: ['**/*'], rules: { 'typescript/no-non-null-assertion': 'off' } },
+    // Established schema keys, mounted refs, nonempty caches and checked IDB identities.
+    // Do not substitute optional chaining that would silently skip required work.
+    { files: [
+      'src/client/components/{NoteReading,AudioPlayer,RichTextEditor,NoteBoard}.tsx',
+      'src/client/{prepared-documents,note-preparation,rich-text,local-store,main}.ts*',
+    ], rules: { 'typescript/no-non-null-assertion': 'off' } },
     { files: ['**/*'], rules: { 'react/refs': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unnecessary-type-assertion': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-call': 'off' } },
