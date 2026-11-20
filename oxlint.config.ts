@@ -123,7 +123,9 @@ export default defineConfig({
     { files: ['**/*'], rules: { 'unicorn/numeric-separators-style': 'off' } },
     // Standalone verification CLI prints its result; app logging still forbids console.
     { files: ['docs/previews/loading/verify.mjs'], rules: { 'no-console': 'off' } },
-    { files: ['**/*'], rules: { 'react/immutability': 'off' } },
+    // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.
+    // This is not mutation of React state; replacing its tested protocol is outside lint migration.
+    { files: ['src/client/components/Editor.tsx'], rules: { 'react/immutability': 'off' } },
     { files: ['**/*'], rules: { 'react/button-has-type': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-unknown-returns': 'off' } },
     { files: ['**/*'], rules: { 'unicorn/prefer-number-properties': 'off' } },
