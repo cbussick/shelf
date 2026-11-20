@@ -12,7 +12,7 @@ test('ordinary and former profiling pages no longer enable the profiling policy'
 
 test('legacy profiling link opens the normal workspace with no diagnostic UI or sampling', async ({ page }) => {
   await page.addInitScript(() => {
-    const state = window as unknown as { profilerStarts: number };
+    const state = window;
     state.profilerStarts = 0;
     Object.defineProperty(window, 'Profiler', { configurable: true, value: class {
       constructor() { state.profilerStarts++; throw new Error('Unexpected CPU sampling'); }
@@ -39,7 +39,7 @@ test('legacy profiling link opens the normal workspace with no diagnostic UI or 
     await page.getByRole('button', { name: 'Close note', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Edit note', exact: true })).not.toBeVisible();
   }
-  expect(await page.evaluate(() => (window as unknown as { profilerStarts: number }).profilerStarts)).toBe(0);
+  expect(await page.evaluate(() => (window).profilerStarts)).toBe(0);
   const saved = (await (await page.request.get('/api/notes')).json()).notes[0];
   expect(saved.body).toBe(body); expect(saved.version).toBe(1);
 });

@@ -969,7 +969,8 @@ test('receives an Android share as a draft and saves it on close', async ({ page
     });
     await chooser.asElement().setInputFiles('tests/fixtures/image.jpg');
     return page.evaluate(async () => {
-      const input = document.querySelector('body > input[type=file]') as HTMLInputElement;
+      const input = document.querySelector<HTMLInputElement>('body > input[type=file]');
+      if (!input) { throw new Error('The share input did not mount'); }
       const form = new FormData();
       form.append('images', input.files![0]);
       input.remove();
@@ -1018,7 +1019,8 @@ test('can receive and save a shared screenshot offline', async ({ page, context 
   await picker.asElement().setInputFiles('tests/fixtures/image.jpg');
   await context.setOffline(true);
   await page.evaluate(() => {
-    const picker = document.querySelector('body > input[type=file]') as HTMLInputElement;
+    const picker = document.querySelector<HTMLInputElement>('body > input[type=file]');
+    if (!picker) { throw new Error('The share picker did not mount'); }
     const form = document.createElement('form');
     form.action = '/share-target';
     form.method = 'POST';

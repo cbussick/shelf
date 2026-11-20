@@ -65,7 +65,7 @@ export default defineConfig({
     // Keep runtime/schema validation; replacing these assertions is a separate boundary audit.
     { files: [
       'src/client/components/{AddAudio,Editor,NoteBoard,NoteContextMenu,NoteReading,RichTextEditor}.tsx',
-      'src/client/{incoming-share,local-store,note-preparation,sw}.ts', 'tests/**/*.ts',
+      'src/client/{incoming-share,local-store,note-preparation,sw}.ts',
     ], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
     // Established schema keys, mounted refs, nonempty caches and checked IDB identities.
     // Do not substitute optional chaining that would silently skip required work.
@@ -76,8 +76,8 @@ export default defineConfig({
     // Imperative editor/recorder callbacks and retained checkpoint state intentionally use refs.
     // These components are not React-Compiler optimized; preserve tested save/lifecycle ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,AudioRecorder,RichTextEditor,Editor}.tsx'], rules: { 'react/refs': 'off' } },
-    // Test-only window hooks/readonly viewport overrides and the worker's dual DOM lib bridge.
-    { files: ['src/client/sw.ts', 'tests/e2e/{diagnostics-cleanup,mobile-editor-keyboard,note-save-recovery,note-context-color,async-callbacks,note-autosave,sync-errors,audio}.spec.ts'], rules: { 'quality/no-chained-type-assertions': 'off' } },
+    // Temporary: investigate the worker's dual DOM lib bridge below.
+    { files: ['src/client/sw.ts'], rules: { 'quality/no-chained-type-assertions': 'off' } },
     // Same-realm DOM/File guards and trusted error subclasses must not become duck typing.
     { files: ['src/client/{App.tsx,sw.ts}', 'src/client/components/{RichTextEditor,Editor}.tsx', 'src/server/{app,logging}.ts', 'tests/e2e/{audio-error-layout,note-autosave}.spec.ts'], rules: { '@nkzw/no-instanceof': 'off' } },
     // Synchronize external audio/dialog/auth/sync lifecycles; moving these updates changes ordering.

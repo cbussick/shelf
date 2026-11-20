@@ -11,8 +11,7 @@ for (const width of [390, 834]) {
     await expect(icons).toHaveCount(13);
     await expect(toolbar.getByRole('button', { name: 'Quote', exact: true }).locator('svg')).toHaveClass(/lucide-quote/);
     await expect(toolbar.getByRole('button', { name: 'Link', exact: true }).locator('svg')).toHaveClass(/lucide-link/);
-    const geometry = await icons.evaluateAll(elements => elements.map(element => {
-      const svg = element as SVGSVGElement;
+    const geometry = await icons.evaluateAll((elements: Array<SVGSVGElement>) => elements.map(svg => {
       const box = svg.getBBox(), view = svg.viewBox.baseVal;
       const halfStroke = Number.parseFloat(getComputedStyle(svg).strokeWidth) / 2;
       return { left: box.x - halfStroke, top: box.y - halfStroke, right: box.x + box.width + halfStroke, bottom: box.y + box.height + halfStroke, width: view.width, height: view.height };

@@ -6,6 +6,23 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import { noteListResponseSchema } from '../../src/shared/contracts';
+
+// Browser-only hooks installed by the fault-injection tests before they are used.
+// Declaring their actual owned contract avoids casting Window through unknown.
+declare global {
+  interface Window {
+    profilerStarts: number;
+    shelfDatabase: IDBDatabase;
+    restoreReorderReads: () => void;
+    restoreLocalWrites: () => void;
+    restoreWrites: () => void;
+    restorePinWrites: () => void;
+    restoreTransactions: () => void;
+    releaseMicrophone: () => void;
+    acquiredStream: MediaStream;
+  }
+}
 
 type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>;
 
@@ -53,7 +70,7 @@ export const test = base.extend<{ isolatedServer: { url: string; storageState: S
         const response = await context.post('/api/auth/setup', { data: { password: 'correct horse battery staple' } });
         if (!response.ok()) {throw new Error(`Could not set up test account: ${response.status()}`);}
         const notes = await context.get('/api/notes');
-        if (!notes.ok() || (await notes.json() as { notes: Array<unknown> }).notes.length !== 0) {
+        if (!notes.ok() || noteListResponseSchema.parse(await notes.json()).notes.length !== 0) {
           throw new Error('Test server must start with an empty notes database');
         }
         await provide({ url, storageState: await context.storageState() });

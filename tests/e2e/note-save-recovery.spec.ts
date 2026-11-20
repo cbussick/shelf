@@ -11,7 +11,7 @@ async function trackDatabase(page: Page) {
     IDBFactory.prototype.open = function (...args) {
       const request = open.apply(this, args);
       if (args[0] === 'shelf') {request.addEventListener('success', () => {
-        (window as unknown as { shelfDatabase: IDBDatabase }).shelfDatabase = request.result;
+        (window).shelfDatabase = request.result;
       });}
       return request;
     };
@@ -33,7 +33,7 @@ async function openExistingNote(page: Page) {
 test('reopens a closed local database and saves the edited note', async ({ page }) => {
   await trackDatabase(page);
   const editor = await openExistingNote(page);
-  await page.evaluate(() => (window as unknown as { shelfDatabase: IDBDatabase }).shelfDatabase.close());
+  await page.evaluate(() => (window).shelfDatabase.close());
   await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Open note: Recoverable note' })).toContainText('Unsaved changes');
@@ -47,7 +47,7 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
       // Keep the unbound original solely to restore the prototype after fault injection.
       // oxlint-disable-next-line typescript/unbound-method
       const transaction = IDBDatabase.prototype.transaction;
-      (window as unknown as { restoreTransactions: () => void }).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };
+      (window).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };
       IDBDatabase.prototype.transaction = function () { throw new DOMException(message, 'InvalidStateError'); };
     }, closingError);
     await editor.getByRole('button', { name: 'Close note' }).click();
@@ -69,7 +69,7 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
     await close();
     await confirmation.getByRole('button', { name: 'Close without saving', exact: true }).click();
     await expect(editor).not.toBeVisible();
-    await page.evaluate(() => (window as unknown as { restoreTransactions: () => void }).restoreTransactions());
+    await page.evaluate(() => (window).restoreTransactions());
     await page.getByRole('button', { name: 'Open note: Recoverable note' }).click();
     await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Original text');
   });
@@ -81,9 +81,12 @@ test('reconnects when the local database closes during image decoding', async ({
   await editor.locator('input[type="file"][accept^="image/"]').setInputFiles('tests/fixtures/image.jpg');
   await page.evaluate(() => {
     const decode = window.createImageBitmap;
+    // Keep the saved native API's overloads: this wrapper forwards every argument
+    // unchanged, but Parameters exposes only the last overload to TypeScript.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     window.createImageBitmap = (async (...args: Parameters<typeof decode>) => {
       const bitmap = await decode(...args);
-      (window as unknown as { shelfDatabase: IDBDatabase }).shelfDatabase.close();
+      (window).shelfDatabase.close();
       return bitmap;
     }) as typeof decode;
   });
@@ -100,7 +103,7 @@ test('reconnects when the local database closes while syncing a save', async ({ 
   const editor = await openExistingNote(page);
   await page.route('**/api/notes', async route => {
     const response = await route.fetch();
-    await page.evaluate(() => (window as unknown as { shelfDatabase: IDBDatabase }).shelfDatabase.close());
+    await page.evaluate(() => (window).shelfDatabase.close());
     await route.fulfill({ response });
   });
   await editor.getByRole('button', { name: 'Close note' }).click();
@@ -118,11 +121,11 @@ test('can retry a failed save without losing the edits', async ({ page }) => {
     // oxlint-disable-next-line typescript/unbound-method
     const transaction = IDBDatabase.prototype.transaction;
     IDBDatabase.prototype.transaction = function () { throw new DOMException('Storage unavailable', 'UnknownError'); };
-    (window as unknown as { restoreTransactions: () => void }).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };
+    (window).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };
   });
   await editor.getByRole('button', { name: 'Close note' }).click();
   await expect(editor.getByRole('alert')).not.toBeEmpty();
-  await page.evaluate(() => (window as unknown as { restoreTransactions: () => void }).restoreTransactions());
+  await page.evaluate(() => (window).restoreTransactions());
   await editor.getByRole('button', { name: 'Retry save', exact: true }).click();
   await expect(editor.getByTestId('note-save-status')).toHaveText('Saved');
   await expect(editor).toBeVisible();

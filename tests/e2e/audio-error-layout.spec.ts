@@ -26,7 +26,7 @@ for (const width of [390, 820, 1280]) {
     });
     await expect.poll(overlaps).toBe(false);
     const audioCard = cards.filter({ has: page.locator('audio') });
-    const rowSpan = () => audioCard.evaluate(element => (element.parentElement as HTMLElement).style.gridRowEnd);
+    const rowSpan = () => audioCard.evaluate(element => element.parentElement!.style.gridRowEnd);
     await expect.poll(rowSpan).toMatch(/^span \d+$/);
     const initialSpan = await rowSpan();
     await page.evaluate(() => document.fonts.ready);

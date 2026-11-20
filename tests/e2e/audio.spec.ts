@@ -257,7 +257,7 @@ test('conflict copies retain audio and uploaded audio does not autoplay or downl
   await page.reload();
   await expect(page.getByRole('button', { name: 'Play Keep me.wav' })).toHaveCount(2);
   expect(requests).toEqual([]);
-  expect(await page.locator('audio').evaluateAll(players => players.every(player => (player as HTMLAudioElement).paused))).toBe(true);
+  expect(await page.locator('audio').evaluateAll((players: Array<HTMLAudioElement>) => players.every(player => player.paused))).toBe(true);
 });
 
 recordingTest.describe('microphone recording', () => {
@@ -308,8 +308,8 @@ recordingTest.describe('microphone recording', () => {
       const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
       navigator.mediaDevices.getUserMedia = async constraints => {
         const stream = await original(constraints);
-        await new Promise<void>(resolve => { (window as unknown as { releaseMicrophone: () => void }).releaseMicrophone = resolve; });
-        (window as unknown as { acquiredStream: MediaStream }).acquiredStream = stream;
+        await new Promise<void>(resolve => { (window).releaseMicrophone = resolve; });
+        (window).acquiredStream = stream;
         return stream;
       };
     });
@@ -318,15 +318,15 @@ recordingTest.describe('microphone recording', () => {
     await page.getByRole('button', { name: 'Record with microphone' }).click();
     const recorder = page.getByRole('dialog', { name: 'Record audio', exact: true });
     await recorder.getByRole('button', { name: 'Start recording' }).click();
-    await page.waitForFunction(() => typeof (window as unknown as { releaseMicrophone?: () => void }).releaseMicrophone === 'function');
+    await page.waitForFunction(() => typeof (window).releaseMicrophone === 'function');
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
       document.dispatchEvent(new Event('visibilitychange'));
-      (window as unknown as { releaseMicrophone: () => void }).releaseMicrophone();
+      (window).releaseMicrophone();
     });
     await expect(recorder.getByRole('status')).toContainText('Recording did not start');
     await expect(recorder.getByRole('button', { name: 'Start recording' })).toBeVisible();
-    expect(await page.evaluate(() => (window as unknown as { acquiredStream: MediaStream }).acquiredStream.getTracks().every(track => track.readyState === 'ended'))).toBe(true);
+    expect(await page.evaluate(() => (window).acquiredStream.getTracks().every(track => track.readyState === 'ended'))).toBe(true);
   });
 
   recordingTest('Discard dismisses a recording preview without attaching or saving it', async ({ page }) => {

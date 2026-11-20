@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/isolated-test';
+import { readNotes } from '../fixtures/note-responses';
 import AxeBuilder from '@axe-core/playwright';
 import { webkit } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -15,9 +16,9 @@ async function seed(page: Page, body: string) {
 
 async function savedBody(page: Page) {
   await expect(page.getByRole('dialog', { name: /^(Add|Edit) note$/ })).toHaveCount(0);
-  await expect.poll(async () => ((await (await page.request.get('/api/notes')).json()).notes as Array<unknown>).length).toBe(1);
+  await expect.poll(async () => (await readNotes(page.request)).length).toBe(1);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  return ((await (await page.request.get('/api/notes')).json()).notes as Array<{ body: string }>)[0].body;
+  return (await readNotes(page.request))[0].body;
 }
 
 test('rich text formats and saves the latest keystroke without a debounce race', async ({ page }) => {

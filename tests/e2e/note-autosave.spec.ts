@@ -99,7 +99,7 @@ for (const width of [390, 1024]) {
     await page.getByRole('textbox', { name: 'Password', exact: true }).fill('correct horse battery staple');
     await page.getByRole('button', { name: 'Open Shelf', exact: true }).click();
     await expect(body).toHaveText('A last-minute change that must not disappear.');
-    await page.evaluate(() => (window as unknown as { restoreLocalWrites: () => void }).restoreLocalWrites());
+    await page.evaluate(() => (window).restoreLocalWrites());
     await page.getByRole('button', { name: 'Retry save' }).click();
     await expect(status).toHaveText('Saved');
     await page.getByRole('button', { name: 'Close note' }).click();

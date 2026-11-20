@@ -199,7 +199,7 @@ test('structural commands read native selection before selectionchange is delive
   await seedAndWarm(page, '- First\n- Second\n- Third');
   await page.getByRole('button', { name: 'Open note: Prepared note', exact: true }).click();
   await body(page).evaluate(element => {
-    (element as HTMLElement).focus();
+    element.focus();
     const text = [...element.querySelectorAll('p')].find(p => p.textContent === 'Second')!.firstChild!;
     const range = document.createRange(); range.setStart(text, 0); range.collapse(true);
     window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);

@@ -173,7 +173,7 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
     // Save the unbound method for restoration and explicit .apply(this, args) below.
     // oxlint-disable-next-line typescript/unbound-method
     const put = IDBObjectStore.prototype.put;
-    (window as unknown as { restoreWrites: () => void }).restoreWrites = () => { IDBObjectStore.prototype.put = put; };
+    (window).restoreWrites = () => { IDBObjectStore.prototype.put = put; };
     IDBObjectStore.prototype.put = function (...args) {
       if (this.name === 'notes') {throw new DOMException('Storage unavailable', 'UnknownError');}
       return put.apply(this, args);
@@ -185,7 +185,7 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
   await menu.getByRole('menuitemradio', { name: 'Mint' }).click();
   await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toHaveText('Could not change note color. Try again.');
   await expect(card).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-  await page.evaluate(() => (window as unknown as { restoreWrites: () => void }).restoreWrites());
+  await page.evaluate(() => (window).restoreWrites());
   await card.click({ button: 'right' });
   await menu.getByRole('menuitem', { name: 'Change color' }).click();
   await menu.getByRole('menuitemradio', { name: 'Mint' }).click();
@@ -212,7 +212,7 @@ test('reports a failed pin save without an unhandled rejection and allows retry'
   await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toHaveText('Could not pin note. Try again.');
   await expect(pin).toBeVisible();
   expect(errors).toEqual([]);
-  await page.evaluate(() => (window as unknown as { restorePinWrites: () => void }).restorePinWrites());
+  await page.evaluate(() => (window).restorePinWrites());
   await pin.click();
   await expect(page.getByRole('button', { name: 'Unpin note: Color target', exact: true })).toBeVisible();
 });

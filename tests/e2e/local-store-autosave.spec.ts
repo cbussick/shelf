@@ -254,6 +254,9 @@ test('session redirects fence continued text and stable media retries, including
     const decode = window.createImageBitmap;
     const gate = new Promise<void>(resolve => { window.releaseMedia = resolve; });
     // Forward either overload unchanged; Parameters models only the last overload.
+    // Forward all runtime overloads unchanged; Parameters models only the last
+    // overload, so TS cannot prove that this transparent async wrapper preserves both.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     window.createImageBitmap = (async (...args: Parameters<typeof createImageBitmap>) => {
       await gate;
       return decode(...args);
