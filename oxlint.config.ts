@@ -65,7 +65,7 @@ export default defineConfig({
     // Keep runtime/schema validation; replacing these assertions is a separate boundary audit.
     { files: [
       'src/client/components/{AddAudio,Editor,NoteBoard,NoteContextMenu,NoteReading,RichTextEditor}.tsx',
-      'src/client/{incoming-share,local-store,note-preparation,sw}.ts',
+      'src/client/{note-preparation,sw}.ts',
     ], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
     // Established schema keys, mounted refs, nonempty caches and checked IDB identities.
     // Do not substitute optional chaining that would silently skip required work.
@@ -85,8 +85,5 @@ export default defineConfig({
     // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.
     // This is not mutation of React state; replacing its tested protocol is outside lint migration.
     { files: ['src/client/components/Editor.tsx'], rules: { 'react/immutability': 'off' } },
-    // IDB's get contract is deliberately unknown until parsed; Express ignores handler return values.
-    // Neither adapter should claim unvalidated bytes are a domain value.
-    { files: ['src/client/local-store.ts', 'src/server/note-uploads.ts'], rules: { 'quality/no-unknown-returns': 'off' } },
   ],
 });

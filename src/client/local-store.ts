@@ -1,5 +1,5 @@
 import { openDB } from 'idb';
-import type { DBSchema, IDBPDatabase } from 'idb';
+import type { DBSchema, IDBPDatabase, IDBPObjectStore } from 'idb';
 import { z } from 'zod';
 import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema } from '../shared/contracts';
 import type { ImageRotation, Note, NoteAudio, NoteColor, NoteImage } from '../shared/contracts';
@@ -19,6 +19,7 @@ const parseOperation = (value: unknown) => outboxSchema.parse(value);
 const parseOptionalNote = (value: unknown) => value === undefined ? undefined : parseNote(value);
 const parseOptionalOperation = (value: unknown) => value === undefined ? undefined : parseOperation(value);
 const parseBlob = (value: unknown) => z.instanceof(Blob).parse(value);
+const pendingOrderSchema = z.object({ token: z.string() }).optional();
 
 const visualMetadata = new WeakMap<File, ReturnType<typeof visualDimensions>>();
 async function prepareVisual(file: File) {
@@ -155,7 +156,7 @@ export async function saveLocalNote(value: {
     if (rotation !== undefined) {rotations.set(imageId, rotation);}
     const blobId = `blob:${imageId}`;
     blobs.push({ id: blobId, file });
-    images.push({ id: imageId, blobId, url: '', alt: file.name, mimeType: file.type as LocalImage['mimeType'], size: file.size, ...dimensions, rotation: value.newImageRotations?.[index] ?? 0 });
+    images.push({ id: imageId, blobId, url: '', alt: file.name, mimeType: imageSchema.shape.mimeType.parse(file.type), size: file.size, ...dimensions, rotation: value.newImageRotations?.[index] ?? 0 });
   }
   const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'meta', 'blobs'], 'readwrite');
@@ -436,13 +437,13 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
     }
   }
 
-  const order = await database.get('meta', 'pendingOrder') as { token: string } | undefined;
+  const order = pendingOrderSchema.parse(await database.get('meta', 'pendingOrder'));
   if (order && connection !== 'unauthorized') {
     try {
       // Include newly created notes, but leave notes added on another device for the server to append.
       await api.reorderNotes((await localNotes()).map(note => note.id));
       database = await getDatabase();
-      const latest = await database.get('meta', 'pendingOrder') as typeof order;
+      const latest = pendingOrderSchema.parse(await database.get('meta', 'pendingOrder'));
       if (latest?.token === order.token) {await database.delete('meta', 'pendingOrder');}
     } catch (error) {
       if (!(error instanceof ApiError && [0, 401, 409].includes(error.status))) {throw error;}
@@ -546,16 +547,18 @@ async function cloneAsConflict(note: LocalNote) {
   return { note: copy, blobs, missingAttachments, attachmentIds, operation: { noteId: id, type: 'save' as const, expectedVersion: 0, mutationId: crypto.randomUUID() } };
 }
 
-type EditorRedirect = { id: string; attachments: Record<string, string | null>; deleted?: boolean };
+const editorRedirectSchema = z.object({ id: z.string(), attachments: z.record(z.string(), z.string().nullable()), deleted: z.boolean().optional() });
+type EditorRedirect = z.infer<typeof editorRedirectSchema>;
+type MetaReader = Pick<IDBPObjectStore<LocalDatabase, ['meta'], 'meta'>, 'get'>;
 const redirectKey = (session: string, id: string) => `editorRedirect:${session}:${id}`;
 
 // Resolve under the caller's transaction: conflict retargeting and a queued
 // writer must serialize, including media prepared before the conflict committed.
-async function followRedirects(meta: { get(key: string): Promise<unknown> }, id: string, session?: string) {
+async function followRedirects(meta: MetaReader, id: string, session?: string) {
   const path: Array<{ key: string; value: EditorRedirect }> = [];
   if (session) {while (true) {
     const key = redirectKey(session, id);
-    const value = await meta.get(key) as EditorRedirect | undefined;
+    const value = editorRedirectSchema.optional().parse(await meta.get(key));
     if (!value) {break;}
     path.push({ key, value });
     if (id === value.id) {break;} // A terminal tombstone fences writers already targeting the copy.

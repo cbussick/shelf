@@ -15,7 +15,7 @@ export function noteUploadFiles(request: Request) {
 
 // Stream every attachment to a private, per-request directory. No audio file
 // count limit: only the six-photo/video limit and per-file byte limits apply.
-export function withNoteUploads(directory: string, handler: (request: Request, response: Response) => Promise<unknown>) {
+export function withNoteUploads(directory: string, handler: (request: Request, response: Response) => Promise<Response | void>) {
   return async (request: Request, response: Response) => {
     const temporary = await mkdtemp(join(directory, 'note-'));
     const upload = multer({

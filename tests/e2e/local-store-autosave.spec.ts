@@ -43,6 +43,31 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('malformed editor redirect metadata rejects a write without losing the saved note', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const draft = { ...window.draft, editorSession: 'redirect-validation', body: 'Keep this checkpoint' };
+    const saved = await window.storage.saveLocalNote(draft);
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('shelf');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction('meta', 'readwrite');
+    transaction.objectStore('meta').put({ id: 42, attachments: {} }, `editorRedirect:${draft.editorSession}:${saved.id}`);
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+    let rejected = false;
+    try { await window.storage.saveLocalNote({ ...draft, body: 'Must not replace the checkpoint' }); }
+    catch { rejected = true; }
+    const state = await window.storage.noteSyncState(saved.id);
+    return { rejected, body: state.note?.body, pending: state.pending };
+  });
+  expect(result).toEqual({ rejected: true, body: 'Keep this checkpoint', pending: true });
+});
+
 test('stable attachment retries reuse pending bytes and uploaded metadata, including rotations', async ({ page }) => {
   await page.route('**/fixture.jpg', route => route.fulfill({ path: 'tests/fixtures/image.jpg' }));
   await page.route('**/fixture.opus', route => route.fulfill({ path: 'tests/fixtures/audio.opus' }));
