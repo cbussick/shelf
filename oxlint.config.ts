@@ -83,7 +83,8 @@ export default defineConfig({
     // Imperative editor/recorder callbacks and retained checkpoint state intentionally use refs.
     // These components are not React-Compiler optimized; preserve tested save/lifecycle ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,AudioRecorder,RichTextEditor,Editor}.tsx'], rules: { 'react/refs': 'off' } },
-    { files: ['**/*'], rules: { 'typescript/no-unnecessary-type-assertion': 'off' } },
+    // Schema/DOM assertions record invariants even when inferred programs omit nullability.
+    { files: ['src/client/rich-text.ts', 'tests/e2e/{app,audio-conflicts,loading,local-store-autosave,ready-note-dialog,rich-text-safety,rich-text}.spec.ts'], rules: { 'typescript/no-unnecessary-type-assertion': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-call': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-chained-type-assertions': 'off' } },
     { files: ['**/*'], rules: { 'import/no-namespace': 'off' } },
