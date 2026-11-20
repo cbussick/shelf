@@ -98,7 +98,8 @@ export default defineConfig({
     { files: ['src/client/{local-store,rich-text}.ts', 'src/server/logging.ts'], rules: { 'typescript/no-unsafe-assignment': 'off' } },
     // ProseMirror's toJSON() returns any; test API/IDB fixtures intentionally inspect raw payloads.
     { files: ['src/client/rich-text.ts', 'tests/e2e/{app,autosave-conflicts,image-rotation,video}.spec.ts'], rules: { 'typescript/no-unsafe-return': 'off' } },
-    { files: ['**/*'], rules: { 'quality/no-known-value-widening': 'off' } },
+    // Open lookup dictionaries and stable return unions are deliberate contracts, not lost evidence.
+    { files: ['src/client/{App.tsx,audio.ts}', 'src/client/components/NoteReading.tsx', 'src/server/logging.ts'], rules: { 'quality/no-known-value-widening': 'off' } },
     { files: ['**/*'], rules: { 'unicorn/catch-error-name': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-conditional-empty-object-spread': 'off' } },
     { files: ['**/*'], rules: { 'typescript/consistent-type-imports': 'off' } },
