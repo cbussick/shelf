@@ -128,7 +128,9 @@ export default defineConfig({
     { files: ['src/client/components/Editor.tsx'], rules: { 'react/immutability': 'off' } },
     // Both flagged buttons spread buttonProps, which already contains `type: 'button' as const`.
     { files: ['src/client/components/NoteBoard.tsx'], rules: { 'react/button-has-type': 'off' } },
-    { files: ['**/*'], rules: { 'quality/no-unknown-returns': 'off' } },
+    // IDB's get contract is deliberately unknown until parsed; Express ignores handler return values.
+    // Neither adapter should claim unvalidated bytes are a domain value.
+    { files: ['src/client/local-store.ts', 'src/server/note-uploads.ts'], rules: { 'quality/no-unknown-returns': 'off' } },
     { files: ['**/*'], rules: { 'unicorn/prefer-number-properties': 'off' } },
     { files: ['**/*'], rules: { '@nkzw/require-use-effect-arguments': 'off' } },
   ],
