@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearPreparedDocuments, getPreparedDocument, rememberDocument, installDocumentParser, prepareDocument, documentGeneration } from '../../src/client/prepared-documents';
+import { clearPreparedDocuments, getPreparedDocument, rememberDocument, installDocumentParser, parsePreparedNode, prepareDocument, documentGeneration } from '../../src/client/prepared-documents';
 
 const doc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Prepared' }] }] };
 beforeEach(clearPreparedDocuments);
 
 describe('prepared note documents', () => {
+  it('validates serialized trees while retaining nested schema attributes', () => {
+    const serialized = { type: 'doc', content: [{ type: 'text', text: 'Link', marks: [{ type: 'link', attrs: { href: 'https://example.com', metadata: { checked: false, order: 0 } } }] }] };
+    expect(parsePreparedNode(serialized)).toEqual(serialized);
+  });
+
+  it('rejects malformed serialized content and non-JSON attributes', () => {
+    expect(() => parsePreparedNode({ type: 'doc', content: [{ text: 'Missing type' }] })).toThrow();
+    expect(() => parsePreparedNode({ type: 'text', attrs: { callback: () => {} } })).toThrow();
+  });
   it('prepares once per exact source without caching editor state', () => {
     let parses = 0;
     installDocumentParser(() => { parses++; return doc; }, documentGeneration());

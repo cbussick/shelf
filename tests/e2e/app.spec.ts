@@ -938,7 +938,10 @@ test('shows the same image mosaic on cards and in the editor', async ({ page }) 
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
     const card = page.getByRole('button', { name: `Open note: ${title}` });
     await expect(card.locator('img')).toHaveCount(Math.min(count, 4));
-    const cardBoxes = await card.evaluate(element => Array.from(element.querySelectorAll('img'), image => image.getBoundingClientRect().toJSON()));
+    const cardBoxes = await card.evaluate(element => Array.from(element.querySelectorAll('img'), image => {
+      const { width, y } = image.getBoundingClientRect();
+      return { width, y };
+    }));
     expect(cardBoxes[0].width).toBeGreaterThan(0);
     expect(cardBoxes[0].y).toBe(cardBoxes[1].y);
     if (count === 3) {expect(cardBoxes[2].width).toBeGreaterThan(cardBoxes[0].width * 1.9);}

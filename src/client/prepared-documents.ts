@@ -1,14 +1,18 @@
-import type { JSONRecord } from '@milkdown/kit/transformer';
+import { z } from 'zod';
 
 // Only document data is shared. Every opening still owns its state, history and
 // callbacks. The cache is session-local, so a new build also gets a new schema.
-export type PreparedNode = {
-  type: string;
-  text?: string;
-  attrs?: JSONRecord;
-  marks?: Array<{ type: string; attrs?: JSONRecord }>;
-  content?: Array<PreparedNode>;
-};
+const attributes = z.record(z.string(), z.json());
+const preparedNodeSchema = z.object({
+  type: z.string(),
+  text: z.string().optional(),
+  attrs: attributes.optional(),
+  marks: z.array(z.object({ type: z.string(), attrs: attributes.optional() })).optional(),
+  get content() { return z.array(preparedNodeSchema).optional(); },
+});
+export type PreparedNode = z.infer<typeof preparedNodeSchema>;
+// ProseMirror's toJSON() is typed any; validate at the cache's typed boundary.
+export const parsePreparedNode = (value: unknown): PreparedNode => preparedNodeSchema.parse(value);
 
 const MAX_ENTRIES = 24;
 const MAX_BYTES = 1024 * 1024;

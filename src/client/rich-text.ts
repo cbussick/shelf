@@ -15,7 +15,7 @@ import { Fragment } from '@milkdown/kit/prose/model';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
 import { $prose, $view } from '@milkdown/kit/utils';
 
-import { documentGeneration, getPreparedDocument, installDocumentParser, rememberDocument } from './prepared-documents';
+import { documentGeneration, getPreparedDocument, installDocumentParser, parsePreparedNode, rememberDocument } from './prepared-documents';
 
 export const MAX_NOTE_BODY = 20_000;
 export type Format = 'heading' | 'bold' | 'italic' | 'bullet' | 'ordered' | 'task' | 'indent' | 'outdent' | 'quote' | 'code' | 'undo' | 'redo';
@@ -249,15 +249,13 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       },
       view(view) {
         initialDoc = view.state.doc;
-        // ProseMirror owns this document; its toJSON() declaration returns any.
-        // oxlint-disable-next-line typescript/no-unsafe-argument
-        rememberDocument(markdown, initialDoc.toJSON(), generation);
+        rememberDocument(markdown, parsePreparedNode(initialDoc.toJSON()), generation);
         // Capture the pure parser, not the editor/context being destroyed. This
         // lets idle preparation reuse its schema without retaining a live view.
         const parse = ctx.get(parserCtx);
         installDocumentParser(source => {
           const doc = parse(source);
-          return mergeAdjacentLists(EditorState.create({ schema: doc.type.schema, doc }).tr).doc.toJSON();
+          return parsePreparedNode(mergeAdjacentLists(EditorState.create({ schema: doc.type.schema, doc }).tr).doc.toJSON());
         }, generation);
         onSelection(activeFormats(view.state));
         read = () => view.state.doc.eq(initialDoc!) ? markdown : serialize(view.state.doc);

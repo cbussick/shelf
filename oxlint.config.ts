@@ -83,8 +83,6 @@ export default defineConfig({
     { files: ['src/client/sw.ts', 'tests/e2e/{diagnostics-cleanup,mobile-editor-keyboard,note-save-recovery,note-context-color,async-callbacks,note-autosave,sync-errors,audio}.spec.ts'], rules: { 'quality/no-chained-type-assertions': 'off' } },
     // Same-realm DOM/File guards and trusted error subclasses must not become duck typing.
     { files: ['src/client/{App.tsx,sw.ts}', 'src/client/components/{RichTextEditor,Editor}.tsx', 'src/server/{app,logging}.ts', 'tests/e2e/{audio-error-layout,note-autosave}.spec.ts'], rules: { '@nkzw/no-instanceof': 'off' } },
-    // ProseMirror's toJSON() returns any; test API/IDB fixtures intentionally inspect raw payloads.
-    { files: ['src/client/rich-text.ts', 'tests/e2e/{app,autosave-conflicts,image-rotation,video}.spec.ts'], rules: { 'typescript/no-unsafe-return': 'off' } },
     // Synchronize external audio/dialog/auth/sync lifecycles; moving these updates changes ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,Editor}.tsx'], rules: { 'react/set-state-in-effect': 'off' } },
     // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.
