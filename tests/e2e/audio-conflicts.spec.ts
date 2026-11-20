@@ -123,7 +123,7 @@ test('identically named draft files retain separate players after one is removed
   await page.goto('/');
   await page.getByRole('button', { name: 'New note' }).click();
   await page.evaluate(buffers => {
-    const files = buffers.map(bytes => new File([new Uint8Array(bytes)], 'Same name.wav', { type: 'audio/wav', lastModified: 12345 }));
+    const files = buffers.map(bytes => new File([new Uint8Array(bytes)], 'Same name.wav', { type: 'audio/wav', lastModified: 12_345 }));
     const transfer = new DataTransfer();
     files.forEach(file => transfer.items.add(file));
     const input = document.querySelector<HTMLInputElement>('dialog[open] input[type=file][accept^="audio/"]')!;

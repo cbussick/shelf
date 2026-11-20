@@ -109,8 +109,6 @@ export default defineConfig({
     { files: ['src/client/components/NoteBoard.tsx', 'tests/e2e/{local-store-autosave,sync-layout}.spec.ts', 'tests/unit/{video,api}.test.ts'], rules: { 'unicorn/consistent-function-scoping': 'off' } },
     // Playwright's fixture callback is named `use`, not React.use(). Keep real hook checks on.
     { files: ['tests/fixtures/isolated-test.ts', 'tests/e2e/audio.spec.ts'], rules: { 'react/rules-of-hooks': 'off' } },
-    // Keep readable byte/sample-rate constants; separator grouping is not a safety check.
-    { files: ['**/*'], rules: { 'unicorn/numeric-separators-style': 'off' } },
     // Standalone verification CLI prints its result; app logging still forbids console.
     { files: ['docs/previews/loading/verify.mjs'], rules: { 'no-console': 'off' } },
     // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.

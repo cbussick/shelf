@@ -1,7 +1,7 @@
 // A real, small PCM WAV; usable for API uploads and browser playback without
 // relying on an external codec tool or a copyrighted recording.
 export function wavAudio(seconds = 1): Buffer {
-  const sampleRate = 8_000;
+  const sampleRate = 8000;
   const samples = Math.floor(sampleRate * seconds);
   const buffer = Buffer.alloc(44 + samples * 2);
   buffer.write('RIFF', 0);
