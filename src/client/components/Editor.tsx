@@ -18,15 +18,15 @@ const colors = noteColorSchema.options;
 
 export type EditorValue = {
   id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
-  retainedImages: LocalImage[]; newImages: File[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
-  retainedAudio: LocalAudio[]; newAudio: File[];
-  newImageIds?: string[]; newAudioIds?: string[]; editorSession?: string; baseNote?: LocalNote;
+  retainedImages: Array<LocalImage>; newImages: Array<File>; newImageRotations?: Array<ImageRotation>; version?: number; createdAt?: string;
+  retainedAudio: Array<LocalAudio>; newAudio: Array<File>;
+  newImageIds?: Array<string>; newAudioIds?: Array<string>; editorSession?: string; baseNote?: LocalNote;
 };
 
 export type EditorSyncState = 'syncing' | 'synced' | 'offline' | 'error';
 
 export function Editor({ note, open = true, locked = false, syncState = 'syncing', syncError, initialImages = [], initialAudio = [], initialRecording = false, onSave, onDelete, onClose, onRetrySync, onDirtyChange }: {
-  note?: LocalNote; open?: boolean; locked?: boolean; syncState?: EditorSyncState; syncError?: string; initialImages?: File[]; initialAudio?: File[]; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<LocalNote>;
+  note?: LocalNote; open?: boolean; locked?: boolean; syncState?: EditorSyncState; syncError?: string; initialImages?: Array<File>; initialAudio?: Array<File>; initialRecording?: boolean; onSave: (value: EditorValue) => Promise<LocalNote>;
   onDelete: (note: LocalNote, editorSession?: string) => Promise<void>; onClose: (retainReady?: boolean) => void;
   onRetrySync?: () => void; onDirtyChange?: (dirty: boolean) => void;
 }) {
@@ -46,11 +46,11 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   const [color, setColor] = useState<NoteColor>(note?.color ?? 'paper');
   const [pinned, setPinned] = useState(note?.pinned ?? false);
   const [retainedImages, setRetainedImages] = useState(note?.images ?? []);
-  const [newImages, setNewImages] = useState<File[]>(initialImages);
+  const [newImages, setNewImages] = useState<Array<File>>(initialImages);
   const [rotations, setRotations] = useState(new Map<File, ImageRotation>());
   const newImageRotations = newImages.map(file => rotations.get(file) ?? 0);
   const [retainedAudio, setRetainedAudio] = useState(note?.audio ?? []);
-  const [newAudio, setNewAudio] = useState<File[]>(initialAudio);
+  const [newAudio, setNewAudio] = useState<Array<File>>(initialAudio);
   const [recordingOpen, setRecordingOpen] = useState(false);
   const hasAudio = retainedAudio.length + newAudio.length > 0;
   const editorPhoto = stylex.props(styles.editorPhoto, hasAudio && styles.mixedEditorPhoto);
@@ -172,9 +172,9 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
       setRotations(current => new Map(current).set(file, rotation));
     }
   };
-  const addFiles = (files: FileList | File[] | null) => {
+  const addFiles = (files: FileList | Array<File> | null) => {
     if (!files?.length) {return;}
-    const accepted: File[] = [];
+    const accepted: Array<File> = [];
     for (const file of files) {
       try { validateVisualFile(file); accepted.push(file); }
       catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not attach this file.'); }
@@ -182,7 +182,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     if (retainedImages.length + newImages.length + accepted.length > 6) {return setError('Up to 6 images or videos per note.');}
     setNewImages(current => [...current, ...accepted]);
   };
-  const addAudio = (files: File[]) => {
+  const addAudio = (files: Array<File>) => {
     try {
       files.forEach(validateAudioFile);
       setNewAudio(current => [...current, ...files]);
@@ -356,7 +356,7 @@ type GalleryItem = { removal: { kind: 'retained'; id: string } | { kind: 'new'; 
 function galleryVideo(item: GalleryItem) { return isVideo('image' in item ? item.image.mimeType : item.mimeType); }
 
 function ImagePreview({ gallery, index, onIndexChange, onRotate, onRemove, onClose }: {
-  gallery: GalleryItem[]; index: number; onIndexChange: (index: number) => void; onRotate: (step: -90 | 90) => void; onRemove: () => void; onClose: () => void;
+  gallery: Array<GalleryItem>; index: number; onIndexChange: (index: number) => void; onRotate: (step: -90 | 90) => void; onRemove: () => void; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {

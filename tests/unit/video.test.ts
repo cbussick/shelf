@@ -14,7 +14,7 @@ let directory: string;
 let database: AppDatabase;
 let app: Express;
 let agent: Agent;
-const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [] as string[] });
+const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [] as Array<string> });
 
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'shelf-video-'));

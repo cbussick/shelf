@@ -64,7 +64,7 @@ export function openDatabase(environment: Environment): AppDatabase {
   `);
   if (!database.prepare('PRAGMA table_info(notes)').all().some(column => (column as { name: string }).name === 'position')) {
     database.exec('ALTER TABLE notes ADD COLUMN position INTEGER NOT NULL DEFAULT 0');
-    const old = database.prepare('SELECT id FROM notes ORDER BY updated_at DESC, id ASC').all() as { id: string }[];
+    const old = database.prepare('SELECT id FROM notes ORDER BY updated_at DESC, id ASC').all() as Array<{ id: string }>;
     const update = database.prepare('UPDATE notes SET position = ? WHERE id = ?');
     database.transaction(() => old.forEach((note, index) => update.run(index, note.id)))();
   }
@@ -92,7 +92,7 @@ function expandNoteColors(database: AppDatabase) {
         DROP TABLE notes;
         ALTER TABLE notes_expanded RENAME TO notes;
       `);
-      if ((database.pragma('foreign_key_check') as unknown[]).length) {throw new Error('Note color migration failed foreign key validation.');}
+      if ((database.pragma('foreign_key_check') as Array<unknown>).length) {throw new Error('Note color migration failed foreign key validation.');}
     })();
   } finally {
     database.pragma('foreign_keys = ON');
@@ -116,22 +116,22 @@ type AudioRow = {
 export function readNote(database: AppDatabase, id: string): Note | undefined {
   const row = database.prepare('SELECT * FROM notes WHERE id = ?').get(id) as NoteRow | undefined;
   if (!row) {return undefined;}
-  const images = database.prepare('SELECT * FROM images WHERE note_id = ? ORDER BY position').all(id) as ImageRow[];
-  const audio = database.prepare('SELECT * FROM audio WHERE note_id = ? ORDER BY position').all(id) as AudioRow[];
+  const images = database.prepare('SELECT * FROM images WHERE note_id = ? ORDER BY position').all(id) as Array<ImageRow>;
+  const audio = database.prepare('SELECT * FROM audio WHERE note_id = ? ORDER BY position').all(id) as Array<AudioRow>;
   return mapNote(row, images, audio);
 }
 
-export function readNotes(database: AppDatabase): Note[] {
-  const notes = database.prepare('SELECT * FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all() as NoteRow[];
-  const images = database.prepare('SELECT * FROM images ORDER BY note_id, position').all() as ImageRow[];
-  const audio = database.prepare('SELECT * FROM audio ORDER BY note_id, position').all() as AudioRow[];
+export function readNotes(database: AppDatabase): Array<Note> {
+  const notes = database.prepare('SELECT * FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all() as Array<NoteRow>;
+  const images = database.prepare('SELECT * FROM images ORDER BY note_id, position').all() as Array<ImageRow>;
+  const audio = database.prepare('SELECT * FROM audio ORDER BY note_id, position').all() as Array<AudioRow>;
   const imagesByNote = groupAttachments(images);
   const audioByNote = groupAttachments(audio);
   return notes.map(note => mapNote(note, imagesByNote.get(note.id) ?? [], audioByNote.get(note.id) ?? []));
 }
 
-function groupAttachments<T extends { note_id: string }>(attachments: T[]): Map<string, T[]> {
-  const groups = new Map<string, T[]>();
+function groupAttachments<T extends { note_id: string }>(attachments: Array<T>): Map<string, Array<T>> {
+  const groups = new Map<string, Array<T>>();
   for (const attachment of attachments) {
     const group = groups.get(attachment.note_id) ?? [];
     group.push(attachment);
@@ -140,7 +140,7 @@ function groupAttachments<T extends { note_id: string }>(attachments: T[]): Map<
   return groups;
 }
 
-function mapNote(row: NoteRow, images: ImageRow[], audio: AudioRow[]): Note {
+function mapNote(row: NoteRow, images: Array<ImageRow>, audio: Array<AudioRow>): Note {
   return {
     id: row.id,
     title: row.title,

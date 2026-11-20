@@ -52,7 +52,7 @@ export const test = base.extend<{ isolatedServer: { url: string; storageState: S
         const response = await context.post('/api/auth/setup', { data: { password: 'correct horse battery staple' } });
         if (!response.ok()) {throw new Error(`Could not set up test account: ${response.status()}`);}
         const notes = await context.get('/api/notes');
-        if (!notes.ok() || (await notes.json() as { notes: unknown[] }).notes.length !== 0) {
+        if (!notes.ok() || (await notes.json() as { notes: Array<unknown> }).notes.length !== 0) {
           throw new Error('Test server must start with an empty notes database');
         }
         await use({ url, storageState: await context.storageState() });

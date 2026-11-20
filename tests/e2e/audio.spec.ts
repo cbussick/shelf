@@ -87,7 +87,7 @@ test('Opus upload syncs on mobile, survives reload, and does not block subsequen
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   const notes = (await (await page.request.get('/api/notes')).json()).notes;
   expect(notes).toHaveLength(2);
-  expect(notes.find((note: { audio: unknown[] }) => note.audio.length).audio[0].mimeType).toBe('audio/ogg');
+  expect(notes.find((note: { audio: Array<unknown> }) => note.audio.length).audio[0].mimeType).toBe('audio/ogg');
 });
 
 test('multiple audio attachments share a scrollable attachment area with images without a count limit', async ({ page }) => {
@@ -155,7 +155,7 @@ test('removing pending audio offline reclaims its stored bytes', async ({ page, 
       opening.onerror = () => reject(opening.error);
     });
     try {
-      return await new Promise<IDBValidKey[]>((resolve, reject) => {
+      return await new Promise<Array<IDBValidKey>>((resolve, reject) => {
         const request = database.transaction('blobs').objectStore('blobs').getAllKeys();
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
@@ -250,8 +250,8 @@ test('conflict copies retain audio and uploaded audio does not autoplay or downl
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   const notes = (await (await page.request.get('/api/notes')).json()).notes;
   expect(notes).toHaveLength(2);
-  expect(notes.every((saved: { audio: unknown[] }) => saved.audio.length === 1)).toBe(true);
-  const requests: string[] = [];
+  expect(notes.every((saved: { audio: Array<unknown> }) => saved.audio.length === 1)).toBe(true);
+  const requests: Array<string> = [];
   page.on('request', request => { if (request.url().includes('/api/audio/')) {requests.push(request.url());} });
   await page.reload();
   await expect(page.getByRole('button', { name: 'Play Keep me.wav' })).toHaveCount(2);

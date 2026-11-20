@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/isolated-test';
 
 test('reports a reorder failure even when the recovery read also fails', async ({ page }) => {
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
   for (const title of ['First', 'Second']) {

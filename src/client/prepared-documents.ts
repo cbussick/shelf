@@ -6,8 +6,8 @@ export type PreparedNode = {
   type: string;
   text?: string;
   attrs?: JSONRecord;
-  marks?: { type: string; attrs?: JSONRecord }[];
-  content?: PreparedNode[];
+  marks?: Array<{ type: string; attrs?: JSONRecord }>;
+  content?: Array<PreparedNode>;
 };
 
 const MAX_ENTRIES = 24;

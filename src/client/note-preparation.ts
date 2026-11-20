@@ -7,7 +7,7 @@ import { whenNoteIdle } from './note-scheduling';
 // An empty, detached editor supplies the schema/parser once; its view is then
 // destroyed. The caller may additionally warm one closed dialog once a nearby
 // document is prepared; all other notes retain only bounded document data.
-export function useNotePreparation(notes: { id: string; body: string }[], paused: boolean, onPrepared?: (id: string, source: string) => void, preferredId?: string) {
+export function useNotePreparation(notes: Array<{ id: string; body: string }>, paused: boolean, onPrepared?: (id: string, source: string) => void, preferredId?: string) {
   useEffect(() => {
     if (paused || !notes.length || typeof IntersectionObserver === 'undefined') {return;}
     const owner = documentGeneration();

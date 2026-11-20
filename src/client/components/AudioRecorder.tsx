@@ -86,7 +86,7 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
       if (!mimeType) {throw new Error('This browser cannot record a supported audio format. Upload a recording instead.');}
       const capture = new MediaRecorder(microphone, { mimeType, audioBitsPerSecond: 96_000 });
       recorder.current = capture;
-      const chunks: Blob[] = [];
+      const chunks: Array<Blob> = [];
       let size = 0;
       capture.ondataavailable = event => {
         if (!event.data.size) {return;}

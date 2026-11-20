@@ -14,7 +14,7 @@ import type { Environment } from '../../src/shared/contracts';
 let directory: string;
 let database: AppDatabase;
 let environment: Environment;
-let lines: Record<string, unknown>[];
+let lines: Array<Record<string, unknown>>;
 let log: pino.Logger;
 
 beforeEach(async () => {

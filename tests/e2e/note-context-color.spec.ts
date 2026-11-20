@@ -194,7 +194,7 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
 });
 
 test('reports a failed pin save without an unhandled rejection and allows retry', async ({ page }) => {
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   page.on('pageerror', error => errors.push(error.message));
   await createNote(page);
   await page.evaluate(() => {

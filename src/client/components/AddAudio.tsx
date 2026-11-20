@@ -5,7 +5,7 @@ import { styles } from '../app.stylex';
 import { Icon } from './Icon';
 
 export function AddAudio({ onUpload, onRecord, bottom = false, disabled = false }: {
-  onUpload: (files: File[]) => void; onRecord: () => void; bottom?: boolean; disabled?: boolean;
+  onUpload: (files: Array<File>) => void; onRecord: () => void; bottom?: boolean; disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);

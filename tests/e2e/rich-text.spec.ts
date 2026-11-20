@@ -14,9 +14,9 @@ async function seed(page: import('@playwright/test').Page, body: string) {
 
 async function savedBody(page: import('@playwright/test').Page) {
   await expect(page.getByRole('dialog', { name: /^(Add|Edit) note$/ })).toHaveCount(0);
-  await expect.poll(async () => ((await (await page.request.get('/api/notes')).json()).notes as unknown[]).length).toBe(1);
+  await expect.poll(async () => ((await (await page.request.get('/api/notes')).json()).notes as Array<unknown>).length).toBe(1);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  return ((await (await page.request.get('/api/notes')).json()).notes as { body: string }[])[0]!.body;
+  return ((await (await page.request.get('/api/notes')).json()).notes as Array<{ body: string }>)[0]!.body;
 }
 
 test('rich text formats and saves the latest keystroke without a debounce race', async ({ page }) => {
@@ -191,7 +191,7 @@ test('checklists toggle, nest, undo and persist as Markdown', async ({ page }) =
 test('opening existing Markdown is not a mutation and remote images never load', async ({ page }) => {
   const markdown = '    indented code\n\n## Heading\n\n**Bold** and [unsafe](javascript:alert(1))\n\n![private](https://example.org/tracking.png)\n';
   await seed(page, markdown);
-  const remoteRequests: string[] = [];
+  const remoteRequests: Array<string> = [];
   page.on('request', request => { if (request.url().includes('example.org')) {remoteRequests.push(request.url());} });
   await page.goto('/');
   await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();

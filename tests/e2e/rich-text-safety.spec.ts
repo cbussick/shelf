@@ -14,7 +14,7 @@ async function seed(page: Page, markdown: string) {
 }
 
 test('pasted Markdown and HTML images stay inert, including intermediate clipboard parsing', async ({ page }) => {
-  const requests: string[] = [];
+  const requests: Array<string> = [];
   await page.route('https://tracker.example/**', route => { requests.push(route.request().url()); return route.abort(); });
   await page.goto('/');
   await page.getByRole('button', { name: 'New note' }).click();

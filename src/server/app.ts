@@ -97,7 +97,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
   app.get('/api/notes', (_request, response) => response.json({ notes: readNotes(database) }));
   app.put('/api/notes/order', (request, response) => {
     const { ids } = reorderNotesSchema.parse(request.body);
-    const existing = database.prepare('SELECT id FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all() as { id: string }[];
+    const existing = database.prepare('SELECT id FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all() as Array<{ id: string }>;
     const known = new Set(existing.map(note => note.id));
     if (ids.some(id => !known.has(id))) {return response.status(409).json({ error: 'The notes changed. Try reordering again.' });}
     const requested = new Set(ids);
@@ -125,7 +125,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
 
   app.put('/api/notes/:id', withNoteUploads(uploadDirectory, async (request, response) => {
     const { id } = noteIdParamsSchema.parse(request.params);
-    const attachments = (request.files ?? {}) as Record<string, Express.Multer.File[]>;
+    const attachments = (request.files ?? {}) as Record<string, Array<Express.Multer.File>>;
     const files = attachments.images ?? [];
     const audioFiles = attachments.audio ?? [];
     let rawPayload: unknown;
@@ -173,9 +173,9 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
       return response.status(400).json({ error: 'An uploaded audio ID is already in use.' });
     }
 
-    const prepared: { id: string; filename: string; alt: string; mimeType: string; width: number; height: number; size: number }[] = [];
-    const preparedAudio: { id: string; filename: string; name: string; mimeType: string; size: number; duration: number | null }[] = [];
-    const writtenPaths: string[] = [];
+    const prepared: Array<{ id: string; filename: string; alt: string; mimeType: string; width: number; height: number; size: number }> = [];
+    const preparedAudio: Array<{ id: string; filename: string; name: string; mimeType: string; size: number; duration: number | null }> = [];
+    const writtenPaths: Array<string> = [];
     try {
       for (const [index, file] of files.entries()) {
         const detected = await fileTypeFromFile(file.path);
@@ -243,7 +243,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
           database.prepare('INSERT INTO notes (id,title,body,color,pinned,created_at,updated_at,version,position) VALUES (?,?,?,?,?,?,?,1,?)')
             .run(id, input.title, input.body, input.color, Number(input.pinned), now, now, (first.position ?? 0) - 1);
         }
-        const oldImages = database.prepare('SELECT id, filename FROM images WHERE note_id=?').all(id) as { id: string; filename: string }[];
+        const oldImages = database.prepare('SELECT id, filename FROM images WHERE note_id=?').all(id) as Array<{ id: string; filename: string }>;
         const removed = oldImages.filter(image => !retained.has(image.id));
         for (const image of removed) {database.prepare('DELETE FROM images WHERE id=?').run(image.id);}
         let position = 0;
@@ -253,7 +253,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
             .run(image.id, id, image.filename, image.alt, image.mimeType, image.width, image.height, image.size, position++);
         }
         for (const image of input.imageRotations ?? []) {database.prepare('UPDATE images SET rotation=? WHERE id=? AND note_id=?').run(image.rotation, image.id, id);}
-        const oldAudio = database.prepare('SELECT id, filename FROM audio WHERE note_id=?').all(id) as { id: string; filename: string }[];
+        const oldAudio = database.prepare('SELECT id, filename FROM audio WHERE note_id=?').all(id) as Array<{ id: string; filename: string }>;
         const removedAudio = oldAudio.filter(audio => !retainedAudio.has(audio.id));
         for (const audio of removedAudio) {database.prepare('DELETE FROM audio WHERE id=?').run(audio.id);}
         let audioPosition = 0;
@@ -276,8 +276,8 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     const current = readNote(database, id);
     if (!current) {return response.status(204).end();}
     if (current.version !== expectedVersion) {return response.status(409).json({ error: 'This note changed on another device.', note: current });}
-    const filenames = database.prepare('SELECT filename FROM images WHERE note_id=?').all(id) as { filename: string }[];
-    const audioFilenames = database.prepare('SELECT filename FROM audio WHERE note_id=?').all(id) as { filename: string }[];
+    const filenames = database.prepare('SELECT filename FROM images WHERE note_id=?').all(id) as Array<{ filename: string }>;
+    const audioFilenames = database.prepare('SELECT filename FROM audio WHERE note_id=?').all(id) as Array<{ filename: string }>;
     database.prepare('DELETE FROM notes WHERE id=?').run(id);
     void Promise.all([...filenames.map(file => join(imageDirectory, file.filename)), ...audioFilenames.map(file => join(audioDirectory, file.filename))].map(path => rm(path, { force: true })))
       .catch((error: unknown) => requestLogger(response).error({ error: safeError(error) }, 'Could not remove deleted attachment files.'));

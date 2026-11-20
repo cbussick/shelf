@@ -749,7 +749,7 @@ for (const width of [390, 1440]) {
       await button.blur();
       await page.mouse.move(0, 0);
       const { data, info } = await sharp(await button.screenshot()).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-      const rows: number[] = [];
+      const rows: Array<number> = [];
       for (let y = 0; y < info.height; y++) {
         for (let x = 0; x < info.width; x++) {
           const offset = (y * info.width + x) * info.channels;

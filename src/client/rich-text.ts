@@ -22,7 +22,7 @@ export type Format = 'heading' | 'bold' | 'italic' | 'bullet' | 'ordered' | 'tas
 // Join only neighboring sibling lists, including inside list items and quotes.
 // Working right-to-left keeps earlier boundary positions valid after each join.
 function mergeAdjacentLists(tr: Transaction) {
-  const boundaries: number[] = [];
+  const boundaries: Array<number> = [];
   tr.doc.descendants((node, pos) => {
     if (node.type.name === 'bullet_list' || node.type.name === 'ordered_list') {boundaries.push(pos);}
   });
@@ -118,7 +118,7 @@ export function moveRows(direction: -1 | 1): Command {
     const siblingIndex = direction < 0 ? startIndex - 1 : endIndex;
     if (siblingIndex < 0 || siblingIndex >= parent.childCount) {return false;}
     const sibling = parent.child(siblingIndex);
-    const rows: ProseNode[] = [];
+    const rows: Array<ProseNode> = [];
     for (let index = startIndex; index < endIndex; index++) {rows.push(parent.child(index));}
     const replacement = Fragment.fromArray(direction < 0 ? [...rows, sibling] : [sibling, ...rows]);
     const from = direction < 0 ? start - sibling.nodeSize : start;
@@ -169,9 +169,9 @@ export function setNoteLink(href: string | null): Command {
   };
 }
 
-export function activeFormats(state: EditorState): Format[] {
+export function activeFormats(state: EditorState): Array<Format> {
   const { from, to, empty, $from } = state.selection;
-  const active: Format[] = [];
+  const active: Array<Format> = [];
   for (const [format, name] of [['bold', 'strong'], ['italic', 'emphasis'], ['code', 'inlineCode']] as const) {
     const type = state.schema.marks[name]!;
     if (empty ? type.isInSet(state.storedMarks ?? $from.marks()) : state.doc.rangeHasMark(from, to, type)) {active.push(format);}
@@ -224,7 +224,7 @@ function inertPastedHTML(html: string): string {
 // and closing a note must not rewrite its whitespace or Markdown conventions.
 export function createNoteEditor({ root, markdown, onChange, onLimit, onSelection, editable }: {
   root: HTMLElement; markdown: string; onChange: (value: string) => void;
-  onLimit: () => void; onSelection: (formats: Format[]) => void; editable: () => boolean;
+  onLimit: () => void; onSelection: (formats: Array<Format>) => void; editable: () => boolean;
 }) {
   const generation = documentGeneration();
   let initialDoc: ProseNode | undefined;

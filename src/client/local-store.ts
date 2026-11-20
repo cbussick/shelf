@@ -7,7 +7,7 @@ import { visualDimensions } from './visual-media';
 
 export type LocalImage = NoteImage & { blobId?: string };
 export type LocalAudio = NoteAudio & { blobId?: string };
-export type LocalNote = Omit<Note, 'images' | 'audio' | 'version'> & { images: LocalImage[]; audio: LocalAudio[]; version: number };
+export type LocalNote = Omit<Note, 'images' | 'audio' | 'version'> & { images: Array<LocalImage>; audio: Array<LocalAudio>; version: number };
 const localImageSchema = imageSchema.extend({ url: z.string(), blobId: z.string().optional() });
 const localAudioSchema = audioSchema.extend({ url: z.string(), blobId: z.string().optional() });
 const localNoteSchema = noteSchema.omit({ images: true, audio: true, version: true, position: true }).extend({ images: z.array(localImageSchema).max(6), audio: z.array(localAudioSchema).default([]), version: z.number().int().nonnegative(), position: z.number().int().default(0) });
@@ -59,7 +59,7 @@ async function getDatabase() {
   }
 }
 
-export async function localNotes(): Promise<LocalNote[]> {
+export async function localNotes(): Promise<Array<LocalNote>> {
   const database = await getDatabase();
   const notes = z.array(localNoteSchema).parse(await database.getAll('notes'));
   return notes.sort((a, b) => a.position - b.position || b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
@@ -124,15 +124,15 @@ export async function clearLocalData(): Promise<void> {
 
 export async function saveLocalNote(value: {
   id?: string; editorSession?: string; baseNote?: LocalNote; title: string; body: string; color: NoteColor; pinned: boolean;
-  retainedImages: LocalImage[]; newImages: File[]; newImageIds?: string[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
-  retainedAudio?: LocalAudio[]; newAudio?: File[]; newAudioIds?: string[];
+  retainedImages: Array<LocalImage>; newImages: Array<File>; newImageIds?: Array<string>; newImageRotations?: Array<ImageRotation>; version?: number; createdAt?: string;
+  retainedAudio?: Array<LocalAudio>; newAudio?: Array<File>; newAudioIds?: Array<string>;
 }): Promise<LocalNote> {
   for (const file of value.newAudio ?? []) {validateAudioFile(file);}
   const now = new Date().toISOString();
   let id = value.id ?? crypto.randomUUID();
   let images = [...value.retainedImages];
   const rotations = new Map(value.retainedImages.map(image => [image.id, image.rotation]));
-  const blobs: { id: string; file: File }[] = [];
+  const blobs: Array<{ id: string; file: File }> = [];
   for (const [index, file] of value.newImages.entries()) {
     const dimensions = await prepareVisual(file);
     if (dimensions.width * dimensions.height > 40_000_000) {throw new Error('Images and videos may contain up to 40 megapixels.');}
@@ -233,7 +233,7 @@ export async function saveLocalNote(value: {
   return note;
 }
 
-export async function reorderLocalNotes(ids: string[]): Promise<void> {
+export async function reorderLocalNotes(ids: Array<string>): Promise<void> {
   const database = await getDatabase();
   const transaction = database.transaction(['notes', 'meta'], 'readwrite');
   const current = z.array(localNoteSchema).parse(await transaction.objectStore('notes').getAll());
@@ -280,12 +280,12 @@ async function reportSyncFailure(entry: z.infer<typeof outboxSchema>, error: unk
   catch { /* Keep the original failure if the local database also failed. */ }
 }
 
-export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ notes: LocalNote[]; pending: number; conflict: boolean; missingAttachments: string[]; conflictCopies: Record<string, string>; connection: 'connected' | 'offline' | 'unauthorized' }> {
+export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ notes: Array<LocalNote>; pending: number; conflict: boolean; missingAttachments: Array<string>; conflictCopies: Record<string, string>; connection: 'connected' | 'offline' | 'unauthorized' }> {
   let database = await getDatabase();
   const entries = z.array(outboxSchema).parse(await database.getAll('outbox'));
   let conflict = false;
   const conflictCopies: Record<string, string> = {};
-  const missingAttachments: string[] = [];
+  const missingAttachments: Array<string> = [];
   let connection: 'connected' | 'offline' | 'unauthorized' = 'connected';
   syncEntries: for (const entry of entries) {
     const note = parseOptionalNote(await database.get('notes', entry.noteId));
@@ -482,9 +482,9 @@ export async function imageSource(image: LocalImage): Promise<string> {
 async function cloneAsConflict(note: LocalNote) {
   const database = await getDatabase();
   const id = crypto.randomUUID();
-  const images: LocalImage[] = [];
-  const blobs: { blobId: string; blob: Blob }[] = [];
-  const missingAttachments: string[] = [];
+  const images: Array<LocalImage> = [];
+  const blobs: Array<{ blobId: string; blob: Blob }> = [];
+  const missingAttachments: Array<string> = [];
   const attachmentIds: Record<string, string | null> = {};
   for (const image of note.images) {
     let blob: Blob;
@@ -502,7 +502,7 @@ async function cloneAsConflict(note: LocalNote) {
     blobs.push({ blobId, blob });
     images.push({ ...image, id: imageId, url: '', blobId });
   }
-  const audio: LocalAudio[] = [];
+  const audio: Array<LocalAudio> = [];
   for (const attachment of note.audio) {
     const cached = await database.get('blobs', attachment.blobId ?? `audio:${attachment.id}`);
     let blob: Blob;
@@ -533,7 +533,7 @@ const redirectKey = (session: string, id: string) => `editorRedirect:${session}:
 // Resolve under the caller's transaction: conflict retargeting and a queued
 // writer must serialize, including media prepared before the conflict committed.
 async function followRedirects(meta: { get(key: string): Promise<unknown> }, id: string, session?: string) {
-  const path: { key: string; value: EditorRedirect }[] = [];
+  const path: Array<{ key: string; value: EditorRedirect }> = [];
   if (session) {while (true) {
     const key = redirectKey(session, id);
     const value = await meta.get(key) as EditorRedirect | undefined;
@@ -555,11 +555,11 @@ async function removeBlobs(note: LocalNote) {
   await Promise.all([...note.images, ...note.audio].flatMap(attachment => attachment.blobId ? [database.delete('blobs', attachment.blobId)] : []));
 }
 
-function audioBlobKeys(audio: LocalAudio): string[] {
+function audioBlobKeys(audio: LocalAudio): Array<string> {
   return [...(audio.blobId ? [audio.blobId] : []), `audio:${audio.id}`];
 }
 
-function reconcileAttachments<T extends { id: string; blobId?: string }>(local: T[], uploaded: T[]): T[] {
+function reconcileAttachments<T extends { id: string; blobId?: string }>(local: Array<T>, uploaded: Array<T>): Array<T> {
   const byId = new Map(uploaded.map(attachment => [attachment.id, attachment]));
   return local.map(attachment => attachment.blobId ? byId.get(attachment.id) ?? attachment : attachment);
 }

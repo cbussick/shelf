@@ -7,9 +7,9 @@ const shares = openDB('shelf-incoming-shares', 1, {
 });
 const lifetime = 24 * 60 * 60 * 1000;
 
-type IncomingShare = { files: File[]; createdAt: number };
+type IncomingShare = { files: Array<File>; createdAt: number };
 
-export async function stageShare(files: File[]): Promise<string> {
+export async function stageShare(files: Array<File>): Promise<string> {
   const database = await shares;
   const now = Date.now();
   const transaction = database.transaction('shares', 'readwrite');
@@ -25,7 +25,7 @@ export async function stageShare(files: File[]): Promise<string> {
   return id;
 }
 
-export async function getShare(id: string): Promise<File[] | undefined> {
+export async function getShare(id: string): Promise<Array<File> | undefined> {
   const share = await (await shares).get('shares', id) as IncomingShare | undefined;
   if (!share) {return undefined;}
   if (Date.now() - share.createdAt > lifetime) {

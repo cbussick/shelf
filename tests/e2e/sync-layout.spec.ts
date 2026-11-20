@@ -70,7 +70,7 @@ for (const width of [1506, 834, 390, 320]) {
       { name: 'Audio', title: '', body: '', image: false, audio: true },
       { name: 'Mixed', title: 'Mixed', body: 'Text and attachments.', image: true, audio: true },
     ];
-    const ids: string[] = [];
+    const ids: Array<string> = [];
     for (const variant of variants) {
       const id = crypto.randomUUID(); ids.push(id);
       const multipart = {

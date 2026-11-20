@@ -1,7 +1,7 @@
 import { isVideo, MAX_VIDEO_BYTES, visualMimeTypes } from '../shared/contracts';
 
 export function validateVisualFile(file: File) {
-  if (!(visualMimeTypes as readonly string[]).includes(file.type)) {throw new Error('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');}
+  if (!(visualMimeTypes as ReadonlyArray<string>).includes(file.type)) {throw new Error('Choose a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.');}
   if (!file.size) {throw new Error('This attachment is empty.');}
   if (file.size > (isVideo(file.type) ? MAX_VIDEO_BYTES : 20 * 1024 * 1024)) {throw new Error(isVideo(file.type) ? 'Videos must be under 100 MB.' : 'Images must be under 20 MB.');}
 }

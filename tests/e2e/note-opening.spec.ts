@@ -35,7 +35,7 @@ async function pauseOpening(page: Page) {
 test('visible cards prepare before their first opening without fetching inline resources', async ({ page }) => {
   const id = await seedNote(page);
   const unsafe = `${source}\n\n![External](https://tracker.example/image.png)\n\n<script>alert(1)</script>\n\n[Unsafe](javascript:alert(1))`;
-  const requests: string[] = [];
+  const requests: Array<string> = [];
   await page.route('https://tracker.example/**', route => { requests.push(route.request().url()); return route.abort(); });
   expect((await page.request.put(`/api/notes/${id}`, { multipart: { payload: JSON.stringify({
     id, title: 'Prepared note', body: unsafe, color: 'blue', pinned: false, expectedVersion: 1, retainedImageIds: [], retainedAudioIds: [],

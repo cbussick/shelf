@@ -12,7 +12,7 @@ import { linkParts } from './link-parts';
 import { noteExcerpt } from '../note-excerpt';
 
 export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
-  notes: LocalNote[]; pendingSync?: Readonly<Record<string, PendingNoteSync>>; heading?: string; label: string;
+  notes: Array<LocalNote>; pendingSync?: Readonly<Record<string, PendingNoteSync>>; heading?: string; label: string;
   onOpen: (note: LocalNote) => void; onPin: (note: LocalNote) => void;
   onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void;
   onReorder: (source: string, target: string) => void;
@@ -227,13 +227,13 @@ export function LocalPhoto({ image, className, crop, controls }: { image: LocalI
   return <Photo src={source} alt={image.alt} mimeType={image.mimeType} controls={controls} width={image.width} height={image.height} rotation={image.rotation} crop={crop} className={className ?? stylex.props(styles.photo).className}/>;
 }
 
-function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: LocalNote[]) {
+function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: Array<LocalNote>) {
   useLayoutEffect(() => {
     const board = ref.current;
     if (!board) {return;}
     const layout = () => {
       const columns = Number(getComputedStyle(board).getPropertyValue('--columns')) || 4;
-      const heights = Array(columns).fill(0) as number[];
+      const heights = Array(columns).fill(0) as Array<number>;
       const gap = innerWidth <= 700 ? 12 : innerWidth <= 1100 ? 16 : 20;
       for (const item of board.children) {
         const element = item as HTMLElement;

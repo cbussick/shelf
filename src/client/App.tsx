@@ -20,7 +20,7 @@ import { clearShares, discardShare, getShare } from './incoming-share';
 import { clearLocalData, deleteLocalNote, hasLocalData, localNotes, localSyncOverview, noteSyncState, pendingLocalChanges, reorderLocalNotes, saveLocalNote, syncNotes, type LocalNote, type PendingNoteSync } from './local-store';
 
 type SyncState = 'connecting' | 'syncing' | 'synced' | 'local' | 'offline' | 'error';
-type EditorSession = { note?: LocalNote; files?: File[]; audio?: File[]; recording?: boolean; shareId?: string };
+type EditorSession = { note?: LocalNote; files?: Array<File>; audio?: Array<File>; recording?: boolean; shareId?: string };
 
 // Include the full immutable note snapshot, including attachment/local-blob
 // identities. A parked dialog must never reuse stale save versions or content.
@@ -89,7 +89,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     sessionEvents.addEventListener('expired', onSessionExpired);
     return () => sessionEvents.removeEventListener('expired', onSessionExpired);
   }, [onSessionExpired]);
-  const [notes, setNotes] = useState<LocalNote[]>([]);
+  const [notes, setNotes] = useState<Array<LocalNote>>([]);
   const [query, setQuery] = useState('');
   const [editor, setEditor] = useState<EditorSession>();
   const [parkedEditor, setParkedEditor] = useState<{ value: EditorSession & { note: LocalNote }; read: boolean }>();
@@ -367,7 +367,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       setEditor({ files: [...files] });
     } catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach these files.'); }
   };
-  const chooseAudio = (files: File[]) => {
+  const chooseAudio = (files: Array<File>) => {
     try { files.forEach(validateAudioFile); setEditor({ audio: files }); }
     catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach this audio.'); }
   };

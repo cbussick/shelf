@@ -61,8 +61,6 @@ export default defineConfig({
       'typescript/unbound-method': 'error',
     } },
     // Reviewed Shelf exceptions/options; rationale and migration inventory: docs/cloudflare-oxlint-audit.md.
-    // Both T[] and Array<T> are readable; do not rewrite 117 existing annotations.
-    { files: ['**/*'], rules: { 'typescript/array-type': 'off' } },
     // Trusted SQLite/Multer rows, DOM targets, IDB records and test fault injection.
     // Keep runtime/schema validation; replacing these assertions is a separate boundary audit.
     { files: [

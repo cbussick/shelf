@@ -4,7 +4,7 @@ import { Icon } from './Icon';
 
 /** The same first-four layout is used on cards and in the editor; the editor opens images in the preview. */
 export function ImageMosaic({ images, editor = false, onOpen, labels }: {
-  images: React.ReactNode[]; editor?: boolean; labels?: string[];
+  images: Array<React.ReactNode>; editor?: boolean; labels?: Array<string>;
   onOpen?: (index: number) => void;
 }) {
   return <span {...stylex.props(styles.imageMosaic, editor && styles.editorMosaic, images.length === 2 && styles.mosaicTwo)}>

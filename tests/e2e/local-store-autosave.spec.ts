@@ -175,7 +175,7 @@ for (const failure of ['save', 'reorder'] as const) {
       if (failure === 'reorder') {await storage.syncNotes();}
       await storage.reorderLocalNotes([draft.id!]);
     }, failure);
-    const requests: string[] = [];
+    const requests: Array<string> = [];
     await page.route('**/api/notes**', async route => {
       requests.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
       await route.fulfill({ status: 401, json: { error: 'Unauthorized' } });
@@ -200,7 +200,7 @@ test('a conflict attachment 401 leaves the local edit queued and stops network w
     await storage.reorderLocalNotes([synced.id]);
     return synced;
   });
-  const requests: string[] = [];
+  const requests: Array<string> = [];
   await page.route('**/api/**', async route => {
     const request = route.request();
     requests.push(`${request.method()} ${new URL(request.url()).pathname}`);
@@ -271,7 +271,7 @@ test('session redirects fence continued text and stable media retries, including
         request.onsuccess = () => resolve(request.result);
       });
       try {
-        const keys = await new Promise<IDBValidKey[]>(resolve => {
+        const keys = await new Promise<Array<IDBValidKey>>(resolve => {
           const request = database.transaction('blobs').objectStore('blobs').getAllKeys();
           request.onsuccess = () => resolve(request.result);
         });

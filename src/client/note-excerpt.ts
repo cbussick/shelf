@@ -8,7 +8,7 @@ const parser = unified().use(remarkParse).use(remarkGfm);
 // avoids stripping punctuation inside code, escaped text or link destinations.
 export function noteExcerpt(markdown: string): string {
   const root = parser.parse(markdown);
-  type Node = { type: string; value?: string; alt?: string | null; url?: string; checked?: boolean | null; children?: Node[] };
+  type Node = { type: string; value?: string; alt?: string | null; url?: string; checked?: boolean | null; children?: Array<Node> };
   const text = (node: Node): string => {
     if (node.type === 'html') {return '';}
     if (node.type === 'image') {return node.alt ?? '';}

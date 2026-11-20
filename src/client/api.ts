@@ -40,8 +40,8 @@ export const api = {
   login: (password: string) => request('/api/auth/login', okResponseSchema, jsonRequest(credentialsSchema.parse({ password }))),
   logout: () => request('/api/auth/logout', okResponseSchema, { method: 'POST' }),
   notes: () => request('/api/notes', noteListResponseSchema),
-  reorderNotes: (ids: string[]) => request('/api/notes/order', okResponseSchema, jsonRequest(reorderNotesSchema.parse({ ids }), 'PUT')),
-  saveNote: (input: NoteWrite, images: File[], audio: File[] = []) => {
+  reorderNotes: (ids: Array<string>) => request('/api/notes/order', okResponseSchema, jsonRequest(reorderNotesSchema.parse({ ids }), 'PUT')),
+  saveNote: (input: NoteWrite, images: Array<File>, audio: Array<File> = []) => {
     const form = new FormData();
     form.set('payload', JSON.stringify(input));
     for (const image of images) {form.append('images', image, image.name);}

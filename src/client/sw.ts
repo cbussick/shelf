@@ -45,7 +45,7 @@ worker.addEventListener('fetch', event => {
         !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(value.type) ||
         value.size > 20 * 1024 * 1024 || value.size === 0
       )) {return Response.redirect('/?shareError=invalid', 303);}
-      const id = await stageShare(files as File[]);
+      const id = await stageShare(files as Array<File>);
       return Response.redirect(`/?share=${encodeURIComponent(id)}`, 303);
     } catch {
       return Response.redirect('/?shareError=storage', 303);

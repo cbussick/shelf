@@ -134,7 +134,7 @@ describe('image rotation', () => {
 });
 
 describe('audio attachments', () => {
-  const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] as string[] });
+  const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] as Array<string> });
 
   it('stores audio-only notes, authenticates playback, supports ranges and downloads, and removes bytes', async () => {
     await setup();

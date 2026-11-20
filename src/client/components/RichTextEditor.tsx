@@ -53,7 +53,7 @@ function previewSelection(doc: ProseNode, anchor: number, head: number) {
 type NoteEditor = ReturnType<typeof createNoteEditor>;
 export type RichTextHandle = { read: () => string; isReady: () => boolean; restartReading: () => void };
 
-const tools: { format: Format; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+const tools: Array<{ format: Format; label: string; icon: Parameters<typeof Icon>[0]['name'] }> = [
   { format: 'heading', label: 'Heading', icon: 'heading' },
   { format: 'bold', label: 'Bold', icon: 'bold' },
   { format: 'italic', label: 'Italic', icon: 'italic' },
@@ -90,7 +90,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const [blockedSelection, setBlockedSelection] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [ready, setReady] = useState(false);
-  const [active, setActive] = useState<Format[]>([]);
+  const [active, setActive] = useState<Array<Format>>([]);
   const [failed, setFailed] = useState(false);
   const [limit, setLimit] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
