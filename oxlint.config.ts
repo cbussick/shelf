@@ -114,7 +114,8 @@ export default defineConfig({
     { files: ['**/*'], rules: { 'eqeqeq': ['error', 'always', { null: 'ignore' }] } },
     // Synchronize external audio/dialog/auth/sync lifecycles; moving these updates changes ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,Editor}.tsx'], rules: { 'react/set-state-in-effect': 'off' } },
-    { files: ['**/*'], rules: { 'unicorn/consistent-function-scoping': 'off' } },
+    // Browser evaluate() closures must serialize in place; memo callbacks and local test helpers belong here.
+    { files: ['src/client/components/NoteBoard.tsx', 'tests/e2e/{local-store-autosave,sync-layout}.spec.ts', 'tests/unit/{video,api}.test.ts'], rules: { 'unicorn/consistent-function-scoping': 'off' } },
     { files: ['**/*'], rules: { 'react/rules-of-hooks': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-member-access': 'off' } },
     { files: ['**/*'], rules: { 'typescript/use-unknown-in-catch-callback-variable': 'off' } },
