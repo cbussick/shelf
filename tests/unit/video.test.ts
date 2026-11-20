@@ -1,3 +1,4 @@
+import { noteListResponseSchema } from '../../src/shared/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -48,10 +49,10 @@ describe('shared photo/video attachments', () => {
     expect(playback.body).toEqual(bytes.subarray(0, 44));
     const retained = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, expectedVersion: 1, retainedImageIds: [imageId], title: 'Still here' }));
     expect(retained.status).toBe(200);
-    expect(retained.body.note.images).toEqual(note.images);
+    expect(noteResponseSchema.parse(retained.body).note.images).toEqual(note.images);
     const removed = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, expectedVersion: 2 }));
     expect(removed.status).toBe(200);
-    expect(removed.body.note.images).toEqual([]);
+    expect(noteResponseSchema.parse(removed.body).note.images).toEqual([]);
     expect((await agent.get(video.url)).status).toBe(404);
     expect(await readdir(join(directory, 'images'))).toEqual([]);
     expect(await readdir(join(directory, 'uploads'))).toEqual([]);
@@ -78,7 +79,7 @@ describe('shared photo/video attachments', () => {
     const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
       .attach('images', large, { filename: 'large.mp4', contentType: 'video/mp4' });
     expect(created.status).toBe(201);
-    expect(created.body.note.images[0].size).toBe(large.length);
+    expect(noteResponseSchema.parse(created.body).note.images[0].size).toBe(large.length);
     const truncated = payload();
     expect((await agent.put(`/api/notes/${truncated.id}`).field('payload', JSON.stringify(truncated))
       .attach('images', bytes.subarray(0, 40), { filename: 'truncated.mp4', contentType: 'video/mp4' })).status).toBe(400);
@@ -89,13 +90,13 @@ describe('shared photo/video attachments', () => {
     const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
       .attach('images', 'tests/fixtures/image.jpg').attach('images', 'tests/fixtures/video.webm');
     expect(created.status).toBe(201);
-    const images = created.body.note.images;
+    const images = noteResponseSchema.parse(created.body).note.images;
     expect(images.map((image: { mimeType: string }) => image.mimeType)).toEqual(['image/jpeg', 'video/webm']);
     const update = { ...input, expectedVersion: 1, retainedImageIds: images.map((image: { id: string }) => image.id) };
     let overflow = agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(update));
     for (let i = 0; i < 5; i++) {overflow = overflow.attach('images', 'tests/fixtures/video.webm');}
     expect((await overflow).status).toBe(400);
-    expect((await agent.get('/api/notes')).body.notes[0].version).toBe(1);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes[0].version).toBe(1);
     expect((await agent.delete(`/api/notes/${input.id}`).send({ expectedVersion: 1 })).status).toBe(204);
     await expect.poll(() => readdir(join(directory, 'images'))).toEqual([]);
   });
@@ -110,7 +111,7 @@ describe('shared photo/video attachments', () => {
       expect(await readdir(join(directory, 'images'))).toEqual([]);
       expect(await readdir(join(directory, 'uploads'))).toEqual([]);
     }
-    expect((await agent.get('/api/notes')).body.notes).toEqual([]);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes).toEqual([]);
   });
 
   it('rejects video rotation and still rejects videos uploaded as audio', async () => {

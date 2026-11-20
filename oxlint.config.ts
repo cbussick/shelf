@@ -79,8 +79,6 @@ export default defineConfig({
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,AudioRecorder,RichTextEditor,Editor}.tsx'], rules: { 'react/refs': 'off' } },
     // Schema/DOM assertions record invariants even when inferred programs omit nullability.
     { files: ['src/client/rich-text.ts', 'tests/e2e/{app,audio-conflicts,loading,local-store-autosave,ready-note-dialog,rich-text-safety,rich-text}.spec.ts'], rules: { 'typescript/no-unnecessary-type-assertion': 'off' } },
-    // Untyped request.json()/IDB test fixtures exercise malformed payloads, not app boundaries.
-    { files: ['tests/e2e/{audio-conflicts,audio,autosave-conflicts,board-previews,image-rotation,video}.spec.ts', 'tests/unit/{api,video}.test.ts'], rules: { 'typescript/no-unsafe-call': 'off' } },
     // Test-only window hooks/readonly viewport overrides and the worker's dual DOM lib bridge.
     { files: ['src/client/sw.ts', 'tests/e2e/{diagnostics-cleanup,mobile-editor-keyboard,note-save-recovery,note-context-color,async-callbacks,note-autosave,sync-errors,audio}.spec.ts'], rules: { 'quality/no-chained-type-assertions': 'off' } },
     // Same-realm DOM/File guards and trusted error subclasses must not become duck typing.

@@ -1,3 +1,4 @@
+import { readNotes } from '../fixtures/note-responses';
 import { test, expect } from '../fixtures/isolated-test';
 import { webkit } from '@playwright/test';
 
@@ -33,10 +34,10 @@ for (const [width, extension] of [[1280, 'webm'], [390, 'webm'], [1280, 'mp4'], 
     await page.getByRole('button', { name: 'Close note' }).click();
     await context.setOffline(false);
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect.poll(async () => (await (await request.get('/api/notes')).json()).notes[0]?.images[0]?.mimeType).toBe(`video/${extension}`);
+    await expect.poll(async () => (await readNotes(request))[0]?.images[0]?.mimeType).toBe(`video/${extension}`);
     await page.reload();
     await card.click();
-    const note = (await (await request.get('/api/notes')).json()).notes[0];
+    const note = (await readNotes(request))[0];
     expect(await page.evaluate(async url => {
       const cache = await caches.open('shelf-images');
       return Boolean(await cache.match(url));
@@ -53,7 +54,7 @@ for (const [width, extension] of [[1280, 'webm'], [390, 'webm'], [1280, 'mp4'], 
     await expect(preview.locator('video')).toHaveCount(0);
     await preview.getByRole('button', { name: 'Close image preview' }).click();
     await page.getByRole('button', { name: 'Close note' }).click();
-    await expect.poll(async () => (await (await request.get('/api/notes')).json()).notes[0]?.images.map((image: { mimeType: string }) => image.mimeType)).toEqual(['image/jpeg']);
+    await expect.poll(async () => (await readNotes(request))[0]?.images.map((image: { mimeType: string }) => image.mimeType)).toEqual(['image/jpeg']);
   });
 }
 
