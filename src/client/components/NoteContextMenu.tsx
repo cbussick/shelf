@@ -1,4 +1,4 @@
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { noteColorSchema } from '../../shared/contracts';
@@ -110,25 +110,25 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
       event.preventDefault(); buttons[event.key === 'Home' ? 0 : buttons.length - 1]?.focus();
     }
   };
-  return <div ref={menu} role="menu" aria-label="Note actions" {...stylex.props(styles.contextMenu)} style={{ left: target.x, top: target.y }} onKeyDown={navigate} onFocus={event => {
+  return <div ref={menu} role="menu" aria-label="Note actions" {...props(styles.contextMenu)} style={{ left: target.x, top: target.y }} onKeyDown={navigate} onFocus={event => {
     const item = event.target as HTMLElement;
     if (item !== colorTrigger.current && item.parentElement === menu.current) {closeColors();}
   }}>
-    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onDelete)} {...stylex.props(styles.contextMenuDanger)}><Icon name="trash"/>Delete</button>
-    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onPin)} {...stylex.props(styles.contextMenuItem)}><Icon name={target.note.pinned ? 'pin-filled' : 'pin'}/>{target.note.pinned ? 'Unpin' : 'Pin'}</button>
+    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onDelete)} {...props(styles.contextMenuDanger)}><Icon name="trash"/>Delete</button>
+    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onPin)} {...props(styles.contextMenuItem)}><Icon name={target.note.pinned ? 'pin-filled' : 'pin'}/>{target.note.pinned ? 'Unpin' : 'Pin'}</button>
     <button ref={colorTrigger} type="button" role="menuitem" tabIndex={-1} aria-haspopup="menu" aria-expanded={colorsOpen} aria-controls={colorsOpen ? colorChoicesId : undefined}
       onPointerEnter={() => openColors()} onPointerLeave={scheduleSubmenuClose} onClick={() => openColors(true)}
-      {...stylex.props(styles.contextMenuItem, colorsOpen && styles.contextMenuActive)}><Icon name="palette"/>Change color<Icon name="chevron-right" {...stylex.props(styles.contextMenuChevron)}/></button>
-    {colorsOpen && <div ref={submenu} id={colorChoicesId} role="menu" aria-label="Note color" onPointerEnter={cancelSubmenuClose} onPointerLeave={scheduleSubmenuClose} {...stylex.props(styles.contextMenu)}>
+      {...props(styles.contextMenuItem, colorsOpen && styles.contextMenuActive)}><Icon name="palette"/>Change color<Icon name="chevron-right" {...props(styles.contextMenuChevron)}/></button>
+    {colorsOpen && <div ref={submenu} id={colorChoicesId} role="menu" aria-label="Note color" onPointerEnter={cancelSubmenuClose} onPointerLeave={scheduleSubmenuClose} {...props(styles.contextMenu)}>
       {noteColorSchema.options.map(color => <button key={color} type="button" role="menuitemradio" tabIndex={focusedColor === color ? 0 : -1} onFocus={() => setFocusedColor(color)} aria-checked={target.note.color === color} onClick={() => {
         choose(note => onColor(note, color));
         target.origin.focus({ preventScroll: true });
-      }} {...stylex.props(styles.contextMenuItem, styles.contextMenuColor)}>
-        <span aria-hidden="true" {...stylex.props(styles.swatch, styles[color], color === 'paper' && styles.paperSwatch, styles.contextMenuSwatch)}/>
+      }} {...props(styles.contextMenuItem, styles.contextMenuColor)}>
+        <span aria-hidden="true" {...props(styles.swatch, styles[color], color === 'paper' && styles.paperSwatch, styles.contextMenuSwatch)}/>
         {color[0].toUpperCase() + color.slice(1)}
         {target.note.color === color && <span aria-hidden="true">✓</span>}
       </button>)}
     </div>}
-    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onOpen)} {...stylex.props(styles.contextMenuItem)}><Icon name="note"/>Open</button>
+    <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onOpen)} {...props(styles.contextMenuItem)}><Icon name="note"/>Open</button>
   </div>;
 }

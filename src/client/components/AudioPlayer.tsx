@@ -1,4 +1,4 @@
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { audioTime, recordingDuration } from '../audio';
@@ -82,15 +82,15 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
       link.click();
     } catch { setError('Could not download this audio. Try again.'); }
   };
-  return <div {...stylex.props(styles.audioPlayer, compact && styles.compactAudio)}>
-    <div {...stylex.props(styles.audioHeading)}><Icon name="audio" width={16}/><span title={name} {...stylex.props(styles.audioName)}>{name}</span></div>
-    <div {...stylex.props(styles.audioControls)}>
-      <button type="button" aria-label={`${playing ? 'Pause' : 'Play'} ${name}`} disabled={loading} onClick={() => void toggle()} {...stylex.props(styles.audioPlay)}><Icon name={playing ? 'pause' : 'play'} width={20}/></button>
-      <span {...stylex.props(styles.audioTime)}>{audioTime(position)} / {duration ? audioTime(duration) : '—'}</span>
-      {!compact && <><button type="button" aria-label={`Download ${name}`} onClick={() => void download()} {...stylex.props(styles.iconButton)}><Icon name="download" width={18}/></button>{onRemove && <button type="button" aria-label={`Remove ${name}`} onClick={onRemove} {...stylex.props(styles.iconButton, styles.deleteIcon)}><Icon name="trash" width={18}/></button>}</>}
+  return <div {...props(styles.audioPlayer, compact && styles.compactAudio)}>
+    <div {...props(styles.audioHeading)}><Icon name="audio" width={16}/><span title={name} {...props(styles.audioName)}>{name}</span></div>
+    <div {...props(styles.audioControls)}>
+      <button type="button" aria-label={`${playing ? 'Pause' : 'Play'} ${name}`} disabled={loading} onClick={() => void toggle()} {...props(styles.audioPlay)}><Icon name={playing ? 'pause' : 'play'} width={20}/></button>
+      <span {...props(styles.audioTime)}>{audioTime(position)} / {duration ? audioTime(duration) : '—'}</span>
+      {!compact && <><button type="button" aria-label={`Download ${name}`} onClick={() => void download()} {...props(styles.iconButton)}><Icon name="download" width={18}/></button>{onRemove && <button type="button" aria-label={`Remove ${name}`} onClick={onRemove} {...props(styles.iconButton, styles.deleteIcon)}><Icon name="trash" width={18}/></button>}</>}
     </div>
-    <input type="range" aria-label={`Seek ${name}`} min={0} max={duration || 1} step={0.1} value={Math.min(position, duration || 1)} disabled={!duration || !source.current} onChange={event => { if (player.current) { player.current.currentTime = Number(event.target.value); setPosition(Number(event.target.value)); } }} {...stylex.props(styles.audioSeek)}/>
-    {error && <p role="alert" {...stylex.props(styles.audioError)}>{error}</p>}
+    <input type="range" aria-label={`Seek ${name}`} min={0} max={duration || 1} step={0.1} value={Math.min(position, duration || 1)} disabled={!duration || !source.current} onChange={event => { if (player.current) { player.current.currentTime = Number(event.target.value); setPosition(Number(event.target.value)); } }} {...props(styles.audioSeek)}/>
+    {error && <p role="alert" {...props(styles.audioError)}>{error}</p>}
     <audio ref={player} preload="none" onPlay={() => {
       document.querySelectorAll('audio').forEach(other => { if (other !== player.current) {other.pause();} });
       setPlaying(true);

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast, Toaster } from 'sonner';
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { registerSW } from 'virtual:pwa-register';
@@ -64,8 +64,8 @@ function UpdateNotice() {
     if (!available) { toast.dismiss('app-update'); return; }
     toast('A new version of Shelf is ready. Finish editing before refreshing.', {
       id: 'app-update', duration: Infinity, dismissible: false, style: { flexWrap: 'wrap' },
-      action: <button type="button" disabled={applying || !online} onClick={() => void refresh()} {...stylex.props(styles.updateButton)}>{applying ? 'Refreshing…' : 'Refresh app'}</button>,
-      cancel: <button type="button" aria-label="Remind me later" onClick={() => setAvailable(false)} {...stylex.props(styles.updateDismiss)}>Later</button>,
+      action: <button type="button" disabled={applying || !online} onClick={() => void refresh()} {...props(styles.updateButton)}>{applying ? 'Refreshing…' : 'Refresh app'}</button>,
+      cancel: <button type="button" aria-label="Remind me later" onClick={() => setAvailable(false)} {...props(styles.updateDismiss)}>Later</button>,
     });
   }, [available, applying, online, refresh]);
   useEffect(() => () => { toast.dismiss('app-update'); }, []);

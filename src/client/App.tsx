@@ -1,4 +1,4 @@
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -64,7 +64,7 @@ export function App() {
     const locked = sessionExpired || confirmedExpiry;
     return <><NotesApp offlineEntry={!auth.data?.authenticated} locked={locked} onSessionExpired={expireSession} onLogout={() => { workspaceOpened.current = false; setSessionExpired(false); queryClient.setQueryData(['offline-access'], false); queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false }); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>{locked && <Auth setupRequired={false} sessionExpired onAuthenticated={authenticated}/>}</>;
   }
-  if (unreachable) {return <main {...stylex.props(styles.loginPage)}><section role="alert" {...stylex.props(styles.loginCard)}><Brand/><h1 {...stylex.props(styles.loginTitle)}>Shelf is offline</h1><p {...stylex.props(styles.loginCopy)}>Connect to your server to open Shelf. Your notes could not be opened on this device.</p><button type="button" disabled={auth.isFetching} onClick={() => void auth.refetch()} {...stylex.props(styles.primary)}>Try again</button></section></main>;}
+  if (unreachable) {return <main {...props(styles.loginPage)}><section role="alert" {...props(styles.loginCard)}><Brand/><h1 {...props(styles.loginTitle)}>Shelf is offline</h1><p {...props(styles.loginCopy)}>Connect to your server to open Shelf. Your notes could not be opened on this device.</p><button type="button" disabled={auth.isFetching} onClick={() => void auth.refetch()} {...props(styles.primary)}>Try again</button></section></main>;}
   if (auth.error) {return <Auth setupRequired={false} onAuthenticated={authenticated}/>;}
   return <Auth setupRequired={auth.data?.setupRequired ?? false} onAuthenticated={authenticated}/>;
 }
@@ -396,22 +396,22 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   const hasSyncFailures = Object.values(pendingNotes).some(note => note.error);
   const overviewLabel = unsyncedCount ? `${unsyncedCount} not synced` : status.label;
   return <div ref={workspace} hidden={locked} inert={locked}>
-    <a href="#main" {...stylex.props(styles.skipLink)}>Skip to notes</a>
-    <header {...stylex.props(styles.header)}><a href="/" aria-label="Shelf home" {...stylex.props(styles.brand)}><Brand/></a>
-      <search {...stylex.props(styles.search)}><Icon name="search"/><input id="search" type="search" aria-label="Search notes" placeholder="Search your notes" value={query} onChange={event => setQuery(event.target.value)} {...stylex.props(styles.searchInput)}/><kbd {...stylex.props(styles.searchKey)}>F</kbd></search>
-      <div {...stylex.props(styles.accountActions)}><button type="button" data-testid="sync-overview" aria-label={overviewLabel} title={status.label} onClick={() => syncDialog.current?.showModal()} {...stylex.props(styles.syncButton, hasSyncFailures && styles.saveStatusWarning)}><Icon name={hasSyncFailures ? 'cloud-warning' : status.icon}/><span>{overviewLabel}</span></button><button type="button" onClick={() => void logout()} {...stylex.props(styles.signOutButton)}>Sign out</button></div>
+    <a href="#main" {...props(styles.skipLink)}>Skip to notes</a>
+    <header {...props(styles.header)}><a href="/" aria-label="Shelf home" {...props(styles.brand)}><Brand/></a>
+      <search {...props(styles.search)}><Icon name="search"/><input id="search" type="search" aria-label="Search notes" placeholder="Search your notes" value={query} onChange={event => setQuery(event.target.value)} {...props(styles.searchInput)}/><kbd {...props(styles.searchKey)}>F</kbd></search>
+      <div {...props(styles.accountActions)}><button type="button" data-testid="sync-overview" aria-label={overviewLabel} title={status.label} onClick={() => syncDialog.current?.showModal()} {...props(styles.syncButton, hasSyncFailures && styles.saveStatusWarning)}><Icon name={hasSyncFailures ? 'cloud-warning' : status.icon}/><span>{overviewLabel}</span></button><button type="button" onClick={() => void logout()} {...props(styles.signOutButton)}>Sign out</button></div>
     </header>
-    <main id="main" {...stylex.props(styles.workspace)}><section {...stylex.props(styles.pageHeading)}><h1 {...stylex.props(styles.h1)}>Your notes</h1></section>
-      <nav aria-label="Create a note" {...stylex.props(styles.floatingCapture)}><button type="button" aria-label="Add an image or video" onClick={() => imageInput.current?.click()} {...stylex.props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => setEditor({ recording: true })}/><span {...stylex.props(styles.mobileDivider)}/><button type="button" onClick={() => setEditor({})} {...stylex.props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
+    <main id="main" {...props(styles.workspace)}><section {...props(styles.pageHeading)}><h1 {...props(styles.h1)}>Your notes</h1></section>
+      <nav aria-label="Create a note" {...props(styles.floatingCapture)}><button type="button" aria-label="Add an image or video" onClick={() => imageInput.current?.click()} {...props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => setEditor({ recording: true })}/><span {...props(styles.mobileDivider)}/><button type="button" onClick={() => setEditor({})} {...props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
       {pinned.length > 0 && <NoteBoard notes={pinned} pendingSync={pendingNotes} heading="Pinned" label="Pinned notes" onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/>}
-      {others.length > 0 && <div {...stylex.props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} pendingSync={pendingNotes} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
-      {filtered.length === 0 && <section {...stylex.props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...stylex.props(styles.secondary)}>Clear search</button>}</section>}
+      {others.length > 0 && <div {...props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} pendingSync={pendingNotes} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
+      {filtered.length === 0 && <section {...props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...props(styles.secondary)}>Clear search</button>}</section>}
     </main>
     <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={(note, color) => { void changeColor(note, color); }}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) {return remove(noteToDelete.current);} }}/>
     {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} locked={locked} syncState={editorSync} syncError={editorSyncError} onSave={save} onDelete={remove} onClose={retainReady => { void closeEditor(retainReady); }} onRetrySync={() => void synchronize()} onDirtyChange={setUnsaved}/>}
-    <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
+    <dialog ref={syncDialog} aria-labelledby="sync-title" {...props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...props(styles.dialogTitle)}>{status.label}</h2><p {...props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...props(styles.syncError)}>{syncError}</p>}<div {...props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...props(styles.primary)}>Sync now</button></div></dialog>
   </div>;
 }
 
@@ -423,4 +423,4 @@ function syncStatus(state: SyncState, pending: number): { label: string; copy: s
   return { label: 'Synced', copy: 'This device and your server are up to date.', icon: 'cloud-check' };
 }
 
-function Loading() { return <main {...stylex.props(styles.loginPage)}><LoadingBrand/></main>; }
+function Loading() { return <main {...props(styles.loginPage)}><LoadingBrand/></main>; }

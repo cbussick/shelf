@@ -1,4 +1,4 @@
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckpointWriter } from '../checkpoint-writer';
 import { isVideo, VISUAL_ACCEPT, noteColorSchema } from '../../shared/contracts';
@@ -55,7 +55,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   const [newAudio, setNewAudio] = useState<Array<File>>(initialAudio);
   const [recordingOpen, setRecordingOpen] = useState(false);
   const hasAudio = retainedAudio.length + newAudio.length > 0;
-  const editorPhoto = stylex.props(styles.editorPhoto, hasAudio && styles.mixedEditorPhoto);
+  const editorPhoto = props(styles.editorPhoto, hasAudio && styles.mixedEditorPhoto);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -248,42 +248,42 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
       const startedOnBackdrop = backdropPress.current;
       backdropPress.current = false;
       if (startedOnBackdrop && isDialogBackdrop(event)) {requestClose();}
-    }} {...stylex.props(styles.dialog, styles.editor, styles[color])}>
-      <div {...stylex.props(styles.editorForm)}>
-        <header {...stylex.props(styles.editorHeader)}>
-          {note && <div {...stylex.props(styles.noteTimestamps)}>
+    }} {...props(styles.dialog, styles.editor, styles[color])}>
+      <div {...props(styles.editorForm)}>
+        <header {...props(styles.editorHeader)}>
+          {note && <div {...props(styles.noteTimestamps)}>
             <span>Created <time dateTime={note.createdAt}>{formatTimestamp(note.createdAt)}</time></span>
             <span>Updated <time dateTime={note.updatedAt}>{formatTimestamp(note.updatedAt)}</time></span>
           </div>}
-          <div {...stylex.props(styles.headerActions)}>
-            {(note || committedNote.current) && <button type="button" aria-label="Delete note" disabled={deleting} onClick={() => deleteDialog.current?.showModal()} {...stylex.props(styles.iconButton, styles.deleteIcon)}><Icon name="trash"/></button>}
-            <button type="button" aria-label={pinned ? 'Unpin note' : 'Pin note'} aria-pressed={pinned} onClick={() => setPinned(value => !value)} {...stylex.props(styles.pinText, pinned && styles.pinned)}><Icon name={pinned ? 'pin-filled' : 'pin'} width={18}/></button>
-            <button type="button" data-close-note aria-label="Close note" disabled={saving} onClick={requestClose} {...stylex.props(styles.iconButton)}><Icon name="x"/></button>
+          <div {...props(styles.headerActions)}>
+            {(note || committedNote.current) && <button type="button" aria-label="Delete note" disabled={deleting} onClick={() => deleteDialog.current?.showModal()} {...props(styles.iconButton, styles.deleteIcon)}><Icon name="trash"/></button>}
+            <button type="button" aria-label={pinned ? 'Unpin note' : 'Pin note'} aria-pressed={pinned} onClick={() => setPinned(value => !value)} {...props(styles.pinText, pinned && styles.pinned)}><Icon name={pinned ? 'pin-filled' : 'pin'} width={18}/></button>
+            <button type="button" data-close-note aria-label="Close note" disabled={saving} onClick={requestClose} {...props(styles.iconButton)}><Icon name="x"/></button>
           </div>
         </header>
-        <div {...stylex.props(styles.editorAttachments)}>
-        {gallery.length === 1 && <div {...stylex.props(styles.editorImages)}><div {...stylex.props(styles.editorImage)}>
-          <button type="button" aria-label={`View ${galleryVideo(gallery[0]) ? 'video' : 'image'} 1`} onClick={() => setPreviewIndex(0)} {...stylex.props(styles.photoButton)}>{'image' in gallery[0] ? <LocalPhoto image={gallery[0].image} className={editorPhoto.className}/> : <Photo key={gallery[0].src} src={gallery[0].src} mimeType={gallery[0].mimeType} alt={gallery[0].alt} rotation={gallery[0].rotation} className={editorPhoto.className}/>}</button>
+        <div {...props(styles.editorAttachments)}>
+        {gallery.length === 1 && <div {...props(styles.editorImages)}><div {...props(styles.editorImage)}>
+          <button type="button" aria-label={`View ${galleryVideo(gallery[0]) ? 'video' : 'image'} 1`} onClick={() => setPreviewIndex(0)} {...props(styles.photoButton)}>{'image' in gallery[0] ? <LocalPhoto image={gallery[0].image} className={editorPhoto.className}/> : <Photo key={gallery[0].src} src={gallery[0].src} mimeType={gallery[0].mimeType} alt={gallery[0].alt} rotation={gallery[0].rotation} className={editorPhoto.className}/>}</button>
         </div></div>}
-        {gallery.length > 1 && <ImageMosaic editor labels={gallery.map(item => galleryVideo(item) ? 'video' : 'image')} images={gallery.map(item => 'image' in item ? <LocalPhoto key={item.image.id} image={item.image} crop className={stylex.props(styles.mosaicPhoto).className}/> : <Photo key={item.src} src={item.src} mimeType={item.mimeType} alt={item.alt} rotation={item.rotation} crop className={stylex.props(styles.mosaicPhoto).className}/>)} onOpen={setPreviewIndex}/>}
-        {hasAudio && <section aria-label="Audio attachments" {...stylex.props(styles.audioList)}>
-          <h3 {...stylex.props(styles.audioListHeading)}>Audio · {retainedAudio.length + newAudio.length} {retainedAudio.length + newAudio.length === 1 ? 'file' : 'files'}</h3>
+        {gallery.length > 1 && <ImageMosaic editor labels={gallery.map(item => galleryVideo(item) ? 'video' : 'image')} images={gallery.map(item => 'image' in item ? <LocalPhoto key={item.image.id} image={item.image} crop className={props(styles.mosaicPhoto).className}/> : <Photo key={item.src} src={item.src} mimeType={item.mimeType} alt={item.alt} rotation={item.rotation} crop className={props(styles.mosaicPhoto).className}/>)} onOpen={setPreviewIndex}/>}
+        {hasAudio && <section aria-label="Audio attachments" {...props(styles.audioList)}>
+          <h3 {...props(styles.audioListHeading)}>Audio · {retainedAudio.length + newAudio.length} {retainedAudio.length + newAudio.length === 1 ? 'file' : 'files'}</h3>
           {retainedAudio.map(audio => <AudioPlayer key={audio.id} audio={audio} onRemove={() => requestAudioRemoval({ kind: 'retained', id: audio.id })}/>)}
           {newAudio.map(file => <AudioPlayer key={audioFileKey(file)} file={file} onRemove={() => requestAudioRemoval({ kind: 'new', file })}/>)}
         </section>}
         </div>
-        <div {...stylex.props(styles.editorFields)}>
-          <label className="sr-only" htmlFor="note-title">Title</label><input id="note-title" maxLength={160} placeholder="Title" value={title} onChange={event => setTitle(event.target.value)} {...stylex.props(styles.titleInput)}/>
+        <div {...props(styles.editorFields)}>
+          <label className="sr-only" htmlFor="note-title">Title</label><input id="note-title" maxLength={160} placeholder="Title" value={title} onChange={event => setTitle(event.target.value)} {...props(styles.titleInput)}/>
           <RichTextEditor ref={bodyInput} initialValue={note?.body ?? ''} onChange={value => { canRetainReady.current = false; setBody(value); }} autoFocus={!note} disabled={saving}/>
         </div>
-        {(localError || error) && <p role="alert" {...stylex.props(styles.error)}>{localError || error}</p>}
-        {showSyncError && <div role="alert" data-testid="note-sync-error" {...stylex.props(styles.editorSyncError)}><div>Your note is saved on this device.</div><div>{syncState === 'offline' && 'Last sync attempt: '}{syncError}</div></div>}
-        <footer {...stylex.props(styles.editorFooter)}><div {...stylex.props(styles.tools, styles.editorTools)}>
+        {(localError || error) && <p role="alert" {...props(styles.error)}>{localError || error}</p>}
+        {showSyncError && <div role="alert" data-testid="note-sync-error" {...props(styles.editorSyncError)}><div>Your note is saved on this device.</div><div>{syncState === 'offline' && 'Last sync attempt: '}{syncError}</div></div>}
+        <footer {...props(styles.editorFooter)}><div {...props(styles.tools, styles.editorTools)}>
           <AddAudio onUpload={addAudio} onRecord={() => setRecordingOpen(true)} disabled={saving}/>
-          <button type="button" aria-label="Attach an image or video" onClick={() => input.current?.click()} {...stylex.props(styles.iconButton)}><Icon name="image"/></button>
+          <button type="button" aria-label="Attach an image or video" onClick={() => input.current?.click()} {...props(styles.iconButton)}><Icon name="image"/></button>
           <input ref={input} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }}/>
           <ColorPicker color={color} onChange={setColor}/>
-        </div><div data-testid="note-save-status" aria-live="off" {...stylex.props(styles.editorSaveStatus, saveFailed && styles.saveStatusError, syncFailed && styles.saveStatusWarning)}>{status && <><Icon name={saveFailed ? 'warning' : dirty || writer.saving ? 'clock' : syncFailed ? 'warning' : syncState === 'syncing' ? 'refresh' : 'check'} width={15} {...stylex.props(styles.saveStatusIcon)}/><span>{status}</span></>}</div>{retry && <button type="button" aria-label={saveFailed ? 'Retry save' : 'Retry sync'} disabled={writer.saving} onClick={retry} {...stylex.props(styles.editorRetry, saveFailed ? styles.saveStatusError : styles.saveStatusWarning)}>Retry</button>}<button type="button" data-close-note disabled={saving || deleting} onClick={requestClose} {...stylex.props(styles.secondary, styles.editorClose)}>Close</button></footer>
+        </div><div data-testid="note-save-status" aria-live="off" {...props(styles.editorSaveStatus, saveFailed && styles.saveStatusError, syncFailed && styles.saveStatusWarning)}>{status && <><Icon name={saveFailed ? 'warning' : dirty || writer.saving ? 'clock' : syncFailed ? 'warning' : syncState === 'syncing' ? 'refresh' : 'check'} width={15} {...props(styles.saveStatusIcon)}/><span>{status}</span></>}</div>{retry && <button type="button" aria-label={saveFailed ? 'Retry save' : 'Retry sync'} disabled={writer.saving} onClick={retry} {...props(styles.editorRetry, saveFailed ? styles.saveStatusError : styles.saveStatusWarning)}>Retry</button>}<button type="button" data-close-note disabled={saving || deleting} onClick={requestClose} {...props(styles.secondary, styles.editorClose)}>Close</button></footer>
       </div>
     </dialog>
     {recordingOpen && <AudioRecorder suspended={locked} onKeep={file => { addAudio([file]); setRecordingOpen(false); }} onClose={() => setRecordingOpen(false)}/>}
@@ -345,10 +345,10 @@ function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: 
       event.stopPropagation();
       close();
     }
-  }} {...stylex.props(styles.colorPickerAnchor)}>
-    <button ref={trigger} type="button" aria-label="Note color" aria-expanded={open} aria-controls="note-color-choices" onClick={() => { if (open) {close();} else {setOpen(true);} }} {...stylex.props(styles.iconButton)}><Icon name="palette"/></button>
-    {open && <div id="note-color-choices" {...stylex.props(styles.colorPopover)}>
-      <fieldset {...stylex.props(styles.colorPicker)}><legend className="sr-only">Note color</legend>{colors.map(option => <label key={option} {...stylex.props(styles.swatch, styles[option], option === 'paper' && styles.paperSwatch, option === color && styles.swatchSelected)}><input type="radio" name="color" value={option} checked={option === color} onClick={() => { if (option === color) {close();} }} onChange={() => { onChange(option); close(); }} aria-label={option[0].toUpperCase() + option.slice(1)} {...stylex.props(styles.radio)}/></label>)}</fieldset>
+  }} {...props(styles.colorPickerAnchor)}>
+    <button ref={trigger} type="button" aria-label="Note color" aria-expanded={open} aria-controls="note-color-choices" onClick={() => { if (open) {close();} else {setOpen(true);} }} {...props(styles.iconButton)}><Icon name="palette"/></button>
+    {open && <div id="note-color-choices" {...props(styles.colorPopover)}>
+      <fieldset {...props(styles.colorPicker)}><legend className="sr-only">Note color</legend>{colors.map(option => <label key={option} {...props(styles.swatch, styles[option], option === 'paper' && styles.paperSwatch, option === color && styles.swatchSelected)}><input type="radio" name="color" value={option} checked={option === color} onClick={() => { if (option === color) {close();} }} onChange={() => { onChange(option); close(); }} aria-label={option[0].toUpperCase() + option.slice(1)} {...props(styles.radio)}/></label>)}</fieldset>
     </div>}
   </div>;
 }
@@ -369,20 +369,20 @@ function ImagePreview({ gallery, index, onIndexChange, onRotate, onRemove, onClo
   const preview = gallery[index];
   const video = galleryVideo(preview);
   const move = (step: number) => onIndexChange((index + step + gallery.length) % gallery.length);
-  return <dialog ref={dialog} aria-label="Image preview" onClose={onClose} onClick={event => { if (event.target === event.currentTarget) {dialog.current?.close();} }} onKeyDown={event => { if (event.target instanceof HTMLVideoElement) {return;} if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); } }} {...stylex.props(styles.previewDialog)}>
-    <div {...stylex.props(styles.previewStage)}><div {...stylex.props(styles.previewImage)}>
-      {'image' in preview ? <LocalPhoto key={preview.image.id} image={preview.image} controls className={stylex.props(styles.previewPhoto).className}/> : <Photo key={preview.src} src={preview.src} mimeType={preview.mimeType} controls alt={preview.alt} rotation={preview.rotation} className={stylex.props(styles.previewPhoto).className}/>}
-      <div {...stylex.props(styles.previewImageActions)}>
-        <button type="button" aria-label={`Remove ${video ? 'video' : 'image'} ${index + 1}`} onClick={onRemove} {...stylex.props(styles.previewImageAction)}><Icon name="trash" width={20}/></button>
-        <button type="button" aria-label="Close image preview" onClick={() => dialog.current?.close()} {...stylex.props(styles.previewImageAction)}><Icon name="x"/></button>
+  return <dialog ref={dialog} aria-label="Image preview" onClose={onClose} onClick={event => { if (event.target === event.currentTarget) {dialog.current?.close();} }} onKeyDown={event => { if (event.target instanceof HTMLVideoElement) {return;} if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); } }} {...props(styles.previewDialog)}>
+    <div {...props(styles.previewStage)}><div {...props(styles.previewImage)}>
+      {'image' in preview ? <LocalPhoto key={preview.image.id} image={preview.image} controls className={props(styles.previewPhoto).className}/> : <Photo key={preview.src} src={preview.src} mimeType={preview.mimeType} controls alt={preview.alt} rotation={preview.rotation} className={props(styles.previewPhoto).className}/>}
+      <div {...props(styles.previewImageActions)}>
+        <button type="button" aria-label={`Remove ${video ? 'video' : 'image'} ${index + 1}`} onClick={onRemove} {...props(styles.previewImageAction)}><Icon name="trash" width={20}/></button>
+        <button type="button" aria-label="Close image preview" onClick={() => dialog.current?.close()} {...props(styles.previewImageAction)}><Icon name="x"/></button>
       </div>
     </div></div>
-    {!video && <div role="group" aria-label="Image rotation" {...stylex.props(styles.previewRotationActions)}>
-      <button type="button" aria-label="Rotate image counterclockwise" title="Rotate counterclockwise" onClick={() => onRotate(-90)} {...stylex.props(styles.previewImageAction)}><Icon name="rotate-left" width={20}/></button>
-      <button type="button" aria-label="Rotate image clockwise" title="Rotate clockwise" onClick={() => onRotate(90)} {...stylex.props(styles.previewImageAction)}><Icon name="rotate-right" width={20}/></button>
+    {!video && <div role="group" aria-label="Image rotation" {...props(styles.previewRotationActions)}>
+      <button type="button" aria-label="Rotate image counterclockwise" title="Rotate counterclockwise" onClick={() => onRotate(-90)} {...props(styles.previewImageAction)}><Icon name="rotate-left" width={20}/></button>
+      <button type="button" aria-label="Rotate image clockwise" title="Rotate clockwise" onClick={() => onRotate(90)} {...props(styles.previewImageAction)}><Icon name="rotate-right" width={20}/></button>
       <span role="status" className="sr-only">Image rotation: {'image' in preview ? preview.image.rotation : preview.rotation} degrees</span>
     </div>}
-    {gallery.length > 1 && <><button type="button" aria-label="Previous image" onClick={() => move(-1)} {...stylex.props(styles.previewPrevious)}><Icon name="chevron-left"/></button><button type="button" aria-label="Next image" onClick={() => move(1)} {...stylex.props(styles.previewNext)}><Icon name="chevron-right"/></button><span {...stylex.props(styles.previewCount)}>{index + 1} / {gallery.length}</span></>}
+    {gallery.length > 1 && <><button type="button" aria-label="Previous image" onClick={() => move(-1)} {...props(styles.previewPrevious)}><Icon name="chevron-left"/></button><button type="button" aria-label="Next image" onClick={() => move(1)} {...props(styles.previewNext)}><Icon name="chevron-right"/></button><span {...props(styles.previewCount)}>{index + 1} / {gallery.length}</span></>}
   </dialog>;
 }
 
@@ -390,7 +390,7 @@ export function ConfirmDialog({ ref, title, copy, cancel, confirm, onConfirm }: 
   ref: React.RefObject<HTMLDialogElement | null>; title: string; copy: string; cancel: string; confirm: string; onConfirm: () => void | Promise<void>;
 }) {
   const headingId = `${confirm.toLowerCase().replaceAll(' ', '-')}-heading`;
-  return <dialog ref={ref} aria-labelledby={headingId} {...stylex.props(styles.dialog, styles.smallDialog)}><h2 id={headingId} {...stylex.props(styles.dialogTitle)}>{title}</h2><p {...stylex.props(styles.dialogCopy)}>{copy}</p><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => ref.current?.close()} {...stylex.props(styles.secondary)}>{cancel}</button><button type="button" onClick={() => { ref.current?.close(); void onConfirm(); }} {...stylex.props(styles.danger)}>{confirm}</button></div></dialog>;
+  return <dialog ref={ref} aria-labelledby={headingId} {...props(styles.dialog, styles.smallDialog)}><h2 id={headingId} {...props(styles.dialogTitle)}>{title}</h2><p {...props(styles.dialogCopy)}>{copy}</p><div {...props(styles.dialogActions)}><button type="button" onClick={() => ref.current?.close()} {...props(styles.secondary)}>{cancel}</button><button type="button" onClick={() => { ref.current?.close(); void onConfirm(); }} {...props(styles.danger)}>{confirm}</button></div></dialog>;
 }
 
 function formatTimestamp(value: string) {

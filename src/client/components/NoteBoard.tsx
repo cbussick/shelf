@@ -1,4 +1,4 @@
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { LocalImage, LocalNote, PendingNoteSync } from '../local-store';
 import { imageSource } from '../local-store';
@@ -152,9 +152,9 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
       document.removeEventListener('pointercancel', onCancel);
     };
   });
-  return <section {...stylex.props(styles.section)}>
-    {heading && <h2 {...stylex.props(styles.sectionHeading)}>{heading}</h2>}
-    <ul ref={board} aria-label={label} {...stylex.props(styles.board)}>
+  return <section {...props(styles.section)}>
+    {heading && <h2 {...props(styles.sectionHeading)}>{heading}</h2>}
+    <ul ref={board} aria-label={label} {...props(styles.board)}>
       {displayed.map((note) => <NoteCard key={note.id} note={note} sync={pendingSync?.[note.id]} onPin={onPin} onContextMenu={onContextMenu} dropTarget={placement?.source === note.id}
         onPointerDown={event => start(event, note.id)}
         onCardClick={() => { if (suppressClick.current === note.id) { suppressClick.current = undefined; return; } onOpen(note); }}
@@ -184,16 +184,16 @@ function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, o
   const hasLinks = [...titleParts, ...bodyParts].some(part => part.href);
   const content = <>
     {note.images.length === 1 && <LocalPhoto image={image}/>}
-    {note.images.length > 1 && <ImageMosaic images={note.images.map(item => <LocalPhoto key={item.id} image={item} crop className={stylex.props(styles.mosaicPhoto).className}/>)}/>}
-    {(note.title || note.body) && <span {...stylex.props(styles.noteContent, image && styles.imageContent, hasLinks && styles.linkedContent)}>
-      {note.title && <span {...stylex.props(styles.noteTitle)}>{hasLinks ? <LinkedText parts={titleParts}/> : note.title}</span>}
-      {note.body && <span {...stylex.props(styles.noteBody)}><LinkedText parts={bodyParts}/></span>}
+    {note.images.length > 1 && <ImageMosaic images={note.images.map(item => <LocalPhoto key={item.id} image={item} crop className={props(styles.mosaicPhoto).className}/>)}/>}
+    {(note.title || note.body) && <span {...props(styles.noteContent, image && styles.imageContent, hasLinks && styles.linkedContent)}>
+      {note.title && <span {...props(styles.noteTitle)}>{hasLinks ? <LinkedText parts={titleParts}/> : note.title}</span>}
+      {note.body && <span {...props(styles.noteBody)}><LinkedText parts={bodyParts}/></span>}
     </span>}
-    {note.audio.length > 0 && <div {...stylex.props(styles.cardAudio)}>
+    {note.audio.length > 0 && <div {...props(styles.cardAudio)}>
       <AudioPlayer key={note.audio[0].id} audio={note.audio[0]} compact/>
-      {note.audio.length > 1 && <button type="button" onClick={onCardClick} {...stylex.props(styles.audioMore)}>{note.audio.length - 1} more audio {note.audio.length === 2 ? 'file' : 'files'}</button>}
+      {note.audio.length > 1 && <button type="button" onClick={onCardClick} {...props(styles.audioMore)}>{note.audio.length - 1} more audio {note.audio.length === 2 ? 'file' : 'files'}</button>}
     </div>}
-    {sync && <span id={`note-sync-${note.id}`} data-testid="note-card-sync" {...stylex.props(styles.noteSyncStatus, Boolean(sync.error) && styles.saveStatusWarning)}><Icon name={sync.error ? 'cloud-warning' : 'clock'} width={14} {...stylex.props(styles.noteSyncIcon)}/><span {...stylex.props(styles.noteSyncLabel)}>{sync.error ? 'Sync failed' : 'Waiting to sync'}</span></span>}
+    {sync && <span id={`note-sync-${note.id}`} data-testid="note-card-sync" {...props(styles.noteSyncStatus, Boolean(sync.error) && styles.saveStatusWarning)}><Icon name={sync.error ? 'cloud-warning' : 'clock'} width={14} {...props(styles.noteSyncIcon)}/><span {...props(styles.noteSyncLabel)}>{sync.error ? 'Sync failed' : 'Waiting to sync'}</span></span>}
   </>;
   const buttonProps = {
     type: 'button' as const, 'data-note-id': note.id,
@@ -203,12 +203,12 @@ function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, o
     onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => { event.preventDefault(); if (navigator.maxTouchPoints === 0) {onContextMenu(note, event);} },
     onDragStart: (event: React.DragEvent<HTMLButtonElement>) => event.preventDefault(), onKeyDown,
   };
-  return <li data-item-id={note.id} {...stylex.props(styles.noteItem, dropTarget && styles.dropTarget)}>
-    {hasLinks || note.audio.length > 0 ? <div {...stylex.props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>
-      <button {...buttonProps} {...stylex.props(styles.cardOverlay)}/>
+  return <li data-item-id={note.id} {...props(styles.noteItem, dropTarget && styles.dropTarget)}>
+    {hasLinks || note.audio.length > 0 ? <div {...props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>
+      <button {...buttonProps} {...props(styles.cardOverlay)}/>
       {content}
-    </div> : <button {...buttonProps} {...stylex.props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>{content}</button>}
-    {!dropTarget && <button type="button" data-pin-id={note.id} aria-label={`${note.pinned ? 'Unpin' : 'Pin'} note: ${label}`} aria-pressed={note.pinned} title={note.pinned ? 'Unpin note' : 'Pin note'} onClick={() => onPin(note)} {...stylex.props(styles.pin, styles.pinVisibility, note.pinned && styles.pinned)}><Icon name={note.pinned ? 'pin-filled' : 'pin'} width={18}/></button>}
+    </div> : <button {...buttonProps} {...props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>{content}</button>}
+    {!dropTarget && <button type="button" data-pin-id={note.id} aria-label={`${note.pinned ? 'Unpin' : 'Pin'} note: ${label}`} aria-pressed={note.pinned} title={note.pinned ? 'Unpin note' : 'Pin note'} onClick={() => onPin(note)} {...props(styles.pin, styles.pinVisibility, note.pinned && styles.pinned)}><Icon name={note.pinned ? 'pin-filled' : 'pin'} width={18}/></button>}
   </li>;
 }
 
@@ -224,7 +224,7 @@ export function LocalPhoto({ image, className, crop, controls }: { image: LocalI
     });
     return () => { active = false; if (objectUrl) {URL.revokeObjectURL(objectUrl);} };
   }, [image]);
-  return <Photo src={source} alt={image.alt} mimeType={image.mimeType} controls={controls} width={image.width} height={image.height} rotation={image.rotation} crop={crop} className={className ?? stylex.props(styles.photo).className}/>;
+  return <Photo src={source} alt={image.alt} mimeType={image.mimeType} controls={controls} width={image.width} height={image.height} rotation={image.rotation} crop={crop} className={className ?? props(styles.photo).className}/>;
 }
 
 function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: Array<LocalNote>) {

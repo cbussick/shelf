@@ -1,6 +1,6 @@
 import { isVideo } from '../../shared/contracts';
 import type { ImageRotation } from '../../shared/contracts';
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import { styles } from '../app.stylex';
 import { Icon } from './Icon';
 import { useEffect, useRef, useState } from 'react';
@@ -15,9 +15,9 @@ function Video({ src, name, width, height, crop, className, controls }: {
     if (video && src && video.getAttribute('src') !== src) {video.src = src;}
     return () => { video?.pause(); video?.removeAttribute('src'); video?.load(); };
   }, [src]);
-  return <span {...stylex.props(styles.videoFrame, crop && styles.videoCrop)}>
+  return <span {...props(styles.videoFrame, crop && styles.videoCrop)}>
     <video ref={player} src={src || undefined} aria-label={name || 'Attached video'} width={width} height={height} className={className} controls={controls} playsInline preload="metadata" muted={!controls} onError={() => setFailed(true)}/>
-    {!controls && <span aria-hidden="true" {...stylex.props(styles.videoBadge)}><Icon name="play" width={20}/>Video</span>}
+    {!controls && <span aria-hidden="true" {...props(styles.videoBadge)}><Icon name="play" width={20}/>Video</span>}
     {failed && <span role="status">Video preview unavailable.{controls && <> <a href={src} download={name}>Download video</a> to play it in another app.</>}</span>}
   </span>;
 }

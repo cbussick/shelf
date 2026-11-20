@@ -1,4 +1,4 @@
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import { useEffect, useRef, useState } from 'react';
 import { MAX_AUDIO_BYTES, MAX_RECORDING_SECONDS } from '../../shared/contracts';
 import { audioTime, rememberRecordingDuration } from '../audio';
@@ -132,17 +132,17 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
     if (phase === 'ready') {onClose();}
     else {setConfirmDiscard(true);}
   };
-  return <dialog ref={dialog} aria-labelledby="audio-recorder-title" onCancel={event => { event.preventDefault(); requestClose(); }} {...stylex.props(styles.dialog, styles.smallDialog)}>
-    <header {...stylex.props(styles.audioRecorderHeader)}><h2 id="audio-recorder-title" {...stylex.props(styles.dialogTitle)}>Record audio</h2><button type="button" aria-label="Close audio recorder" onClick={requestClose} {...stylex.props(styles.iconButton)}><Icon name="x"/></button></header>
-    <p {...stylex.props(styles.dialogCopy)}>Keep Shelf open while recording. Switching apps or locking your device may interrupt the microphone.</p>
-    {phase === 'recording' || phase === 'stopping' ? <div role="status" {...stylex.props(styles.recordingStatus)}><Icon name="microphone" width={24}/><span>{phase === 'stopping' ? 'Finishing recording…' : `Recording · ${audioTime(seconds)}`}</span></div> : phase === 'requesting' ? <p role="status">Waiting for microphone permission…</p> : null}
+  return <dialog ref={dialog} aria-labelledby="audio-recorder-title" onCancel={event => { event.preventDefault(); requestClose(); }} {...props(styles.dialog, styles.smallDialog)}>
+    <header {...props(styles.audioRecorderHeader)}><h2 id="audio-recorder-title" {...props(styles.dialogTitle)}>Record audio</h2><button type="button" aria-label="Close audio recorder" onClick={requestClose} {...props(styles.iconButton)}><Icon name="x"/></button></header>
+    <p {...props(styles.dialogCopy)}>Keep Shelf open while recording. Switching apps or locking your device may interrupt the microphone.</p>
+    {phase === 'recording' || phase === 'stopping' ? <div role="status" {...props(styles.recordingStatus)}><Icon name="microphone" width={24}/><span>{phase === 'stopping' ? 'Finishing recording…' : `Recording · ${audioTime(seconds)}`}</span></div> : phase === 'requesting' ? <p role="status">Waiting for microphone permission…</p> : null}
     {file && phase === 'preview' && <AudioPlayer file={file}/>}
-    {notice && <p role="status" {...stylex.props(styles.dialogCopy)}>{notice}</p>}
-    {error && <p role="alert" {...stylex.props(styles.audioError)}>{error}</p>}
-    {confirmDiscard ? <><p>Discard this recording?</p><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => setConfirmDiscard(false)} {...stylex.props(styles.secondary)}>Go back</button><button type="button" onClick={onClose} {...stylex.props(styles.danger)}>Discard recording</button></div></> : <div {...stylex.props(styles.dialogActions)}>
-      {phase === 'ready' && <button type="button" onClick={() => void start()} {...stylex.props(styles.primary)}><Icon name="microphone" width={18}/>Start recording</button>}
-      {phase === 'recording' && <button type="button" onClick={stop} {...stylex.props(styles.primary)}><Icon name="stop" width={18}/>Stop recording</button>}
-      {phase === 'preview' && <><button type="button" onClick={onClose} {...stylex.props(styles.secondary)}>Discard</button><button type="button" onClick={() => { if (file) {onKeep(file);} }} {...stylex.props(styles.primary)}>Add to note</button></>}
+    {notice && <p role="status" {...props(styles.dialogCopy)}>{notice}</p>}
+    {error && <p role="alert" {...props(styles.audioError)}>{error}</p>}
+    {confirmDiscard ? <><p>Discard this recording?</p><div {...props(styles.dialogActions)}><button type="button" onClick={() => setConfirmDiscard(false)} {...props(styles.secondary)}>Go back</button><button type="button" onClick={onClose} {...props(styles.danger)}>Discard recording</button></div></> : <div {...props(styles.dialogActions)}>
+      {phase === 'ready' && <button type="button" onClick={() => void start()} {...props(styles.primary)}><Icon name="microphone" width={18}/>Start recording</button>}
+      {phase === 'recording' && <button type="button" onClick={stop} {...props(styles.primary)}><Icon name="stop" width={18}/>Stop recording</button>}
+      {phase === 'preview' && <><button type="button" onClick={onClose} {...props(styles.secondary)}>Discard</button><button type="button" onClick={() => { if (file) {onKeep(file);} }} {...props(styles.primary)}>Add to note</button></>}
     </div>}
   </dialog>;
 }

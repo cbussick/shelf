@@ -1,11 +1,11 @@
-import * as stylex from '@stylexjs/stylex';
+import { create, defineVars } from '@stylexjs/stylex';
 
-export const colors = stylex.defineVars({
+export const colors = defineVars({
   canvas: '#f7f8fa', paper: '#fff', ink: '#263630', muted: '#646f67', green: '#285b48', line: '#e5e8e6',
   butter: '#f8ebad', mint: '#dbebe1', lilac: '#eae4f3', peach: '#f6dfd2', blue: '#d9e8f8', orange: '#f8d2a8', rose: '#f3dce5', danger: '#a03832',
 });
 
-export const styles = stylex.create({
+export const styles = create({
   skipLink: { position: 'fixed', left: 16, top: -80, padding: 12, backgroundColor: 'white', zIndex: 30, ':focus': { top: 12 } },
   header: {
     position: 'sticky', top: 0, zIndex: 10, minHeight: 80, display: 'flex', alignItems: 'center', gap: 40, paddingInline: '5.55%', borderBottom: `1px solid ${colors.line}`, backgroundColor: '#fff',
