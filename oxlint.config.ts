@@ -61,6 +61,7 @@ export default defineConfig({
       'typescript/unbound-method': 'error',
     } },
     // Temporary migration disables; evaluate each in its own commit.
+    // Existing compact guards/loops are intentional; a brace-only rewrite adds noise.
     { files: ['**/*'], rules: { 'curly': 'off' } },
     { files: ['**/*'], rules: { 'typescript/array-type': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
