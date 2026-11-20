@@ -6,11 +6,11 @@ import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { stageShare } from './incoming-share';
 
-const worker = self as unknown as ServiceWorkerGlobalScope;
-// Workbox replaces this exact expression with the precache manifest at build time.
-// The build replaces this untyped expression with Workbox's generated manifest.
-// @ts-expect-error __WB_MANIFEST is injected by Workbox
-precacheAndRoute(self.__WB_MANIFEST); // oxlint-disable-line typescript/no-unsafe-argument
+// This module is the service-worker entry, not a Window script. Workbox replaces
+// this exact self.__WB_MANIFEST expression with its generated manifest at build time.
+declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Parameters<typeof precacheAndRoute>[0] };
+const worker = self;
+precacheAndRoute(self.__WB_MANIFEST);
 registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), {
   denylist: [/^\/api\//, /^\/share-target$/],
 }));
@@ -29,9 +29,8 @@ registerRoute(
 );
 
 worker.addEventListener('message', event => {
-  // Browser message data is any; only this exact control token is acted on.
-  // oxlint-disable-next-line typescript/no-unsafe-member-access
-  if (event.data?.type === 'SKIP_WAITING') {void worker.skipWaiting();}
+  const data: unknown = event.data;
+  if (typeof data === 'object' && data !== null && 'type' in data && data.type === 'SKIP_WAITING') {void worker.skipWaiting();}
 });
 
 worker.addEventListener('fetch', event => {
@@ -40,12 +39,12 @@ worker.addEventListener('fetch', event => {
     try {
       const form = await event.request.formData();
       const files = form.getAll('images');
-      if (!files.length || files.length > 6 || files.some(value =>
-        !(value instanceof File) ||
-        !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(value.type) ||
-        value.size > 20 * 1024 * 1024 || value.size === 0
+      if (!files.length || files.length > 6 || !files.every((value): value is File =>
+        value instanceof File &&
+        ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(value.type) &&
+        value.size <= 20 * 1024 * 1024 && value.size !== 0
       )) {return Response.redirect('/?shareError=invalid', 303);}
-      const id = await stageShare(files as Array<File>);
+      const id = await stageShare(files);
       return Response.redirect(`/?share=${encodeURIComponent(id)}`, 303);
     } catch {
       return Response.redirect('/?shareError=storage', 303);

@@ -287,9 +287,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       <button type="button" disabled={!ready || disabled} onMouseDown={event => event.preventDefault()} onClick={() => {
         setLinkOpen(value => !value);
         const state = instance.current?.view().state;
-        // The installed commonmark link schema owns href, but types attrs as any.
-        // oxlint-disable-next-line typescript/no-unsafe-argument
-        setLink(state?.selection.$from.marks().find(mark => mark.type.name === 'link')?.attrs.href ?? '');
+        const href: unknown = state?.selection.$from.marks().find(mark => mark.type.name === 'link')?.attrs.href;
+        setLink(typeof href === 'string' ? href : '');
         setLinkError('');
       }} title="Link" aria-label="Link" aria-expanded={linkOpen}><Icon name="link"/></button>
     </div>}

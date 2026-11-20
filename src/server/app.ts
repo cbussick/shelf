@@ -130,9 +130,9 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     const files = attachments.images ?? [];
     const audioFiles = attachments.audio ?? [];
     let rawPayload: unknown;
-    // Multer's field bag is any; parse JSON to unknown before schema validation below.
-    // oxlint-disable-next-line typescript/no-unsafe-member-access
-    try { rawPayload = JSON.parse(String(request.body.payload)); }
+    const fields: unknown = request.body;
+    const payload = typeof fields === 'object' && fields !== null && 'payload' in fields ? fields.payload : undefined;
+    try { rawPayload = JSON.parse(String(payload)); }
     catch { return response.status(400).json({ error: 'Invalid note payload.' }); }
     const input = noteWriteSchema.parse(rawPayload);
     if (input.newImageIds && input.newImageIds.length !== files.length) {return response.status(400).json({ error: 'Image IDs do not match the uploaded files.' });}
