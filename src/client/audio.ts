@@ -12,20 +12,20 @@ export function rememberRecordingDuration(file: File, seconds: number) { recorde
 export function recordingDuration(file: File) { return recordedDurations.get(file) ?? null; }
 
 export const AUDIO_ACCEPT = 'audio/*,.mp3,.m4a,.wav,.ogg,.opus,.webm,.flac,.aac';
-const types: Record<string, NoteAudio['mimeType']> = {
+const types = new Map(Object.entries({
   'audio/mpeg': 'audio/mpeg', 'audio/mp3': 'audio/mpeg', 'audio/mp4': 'audio/mp4', 'audio/x-m4a': 'audio/mp4',
   'audio/wav': 'audio/wav', 'audio/x-wav': 'audio/wav', 'audio/wave': 'audio/wav',
   'audio/ogg': 'audio/ogg', 'audio/opus': 'audio/ogg', 'audio/webm': 'audio/webm',
   'audio/flac': 'audio/flac', 'audio/x-flac': 'audio/flac', 'audio/aac': 'audio/aac',
-};
-const extensions: Record<string, NoteAudio['mimeType']> = {
+} satisfies Record<string, NoteAudio['mimeType']>));
+const extensions = new Map(Object.entries({
   mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg',
   webm: 'audio/webm', flac: 'audio/flac', aac: 'audio/aac',
-};
+} satisfies Record<string, NoteAudio['mimeType']>));
 
 export function audioMimeType(file: File): NoteAudio['mimeType'] {
   const mime = file.type.split(';')[0].toLowerCase();
-  const type = types[mime] ?? extensions[file.name.split('.').at(-1)?.toLowerCase() ?? ''];
+  const type = types.get(mime) ?? extensions.get(file.name.split('.').at(-1)?.toLowerCase() ?? '');
   if (!type) {throw new Error('Choose an MP3, M4A, WAV, Ogg, WebM, FLAC or AAC audio file.');}
   return type;
 }

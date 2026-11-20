@@ -90,8 +90,6 @@ export default defineConfig({
     { files: ['src/client/{local-store,rich-text}.ts', 'src/server/logging.ts'], rules: { 'typescript/no-unsafe-assignment': 'off' } },
     // ProseMirror's toJSON() returns any; test API/IDB fixtures intentionally inspect raw payloads.
     { files: ['src/client/rich-text.ts', 'tests/e2e/{app,autosave-conflicts,image-rotation,video}.spec.ts'], rules: { 'typescript/no-unsafe-return': 'off' } },
-    // Open lookup dictionaries and stable return unions are deliberate contracts, not lost evidence.
-    { files: ['src/client/{App.tsx,audio.ts}', 'src/client/components/NoteReading.tsx', 'src/server/logging.ts'], rules: { 'quality/no-known-value-widening': 'off' } },
     // Unknown is intentional for sanitized structured logs and readonly viewport fault injection.
     { files: ['src/server/logging.ts', 'tests/unit/logging.test.ts', 'tests/e2e/mobile-editor-keyboard.spec.ts'], rules: { 'quality/no-unsafe-dictionary-type': 'off' } },
     // `value == null` intentionally matches null AND undefined in optional task attrs.

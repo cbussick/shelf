@@ -7,16 +7,19 @@ import multer from 'multer';
 
 export const logger = pino({ base: { service: 'shelf' }, timestamp: pino.stdTimeFunctions.isoTime });
 
-const requests = new WeakMap<Response, { logger: Logger; error?: Record<string, unknown> }>();
+type SafeError = { code: 'unexpected_error'; frames: Array<string> };
+type RequestError = SafeError | { code: string; issues?: Array<Pick<ZodError['issues'][number], 'path' | 'code'>>; issueCount?: number };
+type RequestContext = { logger: Logger; error?: RequestError };
+const requests = new WeakMap<Response, RequestContext>();
 type RequestCompletion = {
   method: string; route: string; status: number; durationMs: number;
-  aborted?: true; error?: Record<string, unknown>;
+  aborted?: true; error?: RequestError;
 };
 
 // Error messages, causes and arbitrary error properties can contain note text,
 // SQL parameters, upload filenames or malformed JSON. Retain only server stack
 // locations, not the raw stack (whose first line includes the error message).
-export function safeError(error: unknown): Record<string, unknown> {
+export function safeError(error: unknown): SafeError {
   const stack = error instanceof Error ? error.stack ?? '' : '';
   const frames = [...stack.matchAll(/(?:\/|\\)((?:src\/server|dist\/server)\/[A-Za-z0-9_./-]+\.[cm]?[jt]s):(\d+):(\d+)/g)]
     .slice(0, 20).map(match => `${match[1]}:${match[2]}:${match[3]}`);
@@ -48,7 +51,7 @@ export function recordRequestError(response: Response, error: unknown): void {
 export function requestLogging(log: Logger): RequestHandler {
   return (request, response, next) => {
     const requestId = randomUUID();
-    const context: { logger: Logger; error?: Record<string, unknown> } = { logger: log.child({ requestId }) };
+    const context: RequestContext = { logger: log.child({ requestId }) };
     requests.set(response, context);
     response.setHeader('X-Request-ID', requestId);
     const started = performance.now();

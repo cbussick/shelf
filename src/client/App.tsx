@@ -415,7 +415,8 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   </div>;
 }
 
-function syncStatus(state: SyncState, pending: number): { label: string; copy: string; icon: 'offline' | 'cloud-check' | 'refresh' } {
+type SyncStatusView = { label: string; copy: string; icon: 'offline' | 'cloud-check' | 'refresh' };
+function syncStatus(state: SyncState, pending: number): SyncStatusView {
   if (state === 'syncing' || state === 'connecting') {return { label: 'Syncing…', copy: 'Checking your server for changes.', icon: 'refresh' };}
   if (state === 'offline') {return { label: pending ? 'Saved on device' : 'Offline', copy: pending ? `${pending} change${pending === 1 ? '' : 's'} will sync when Shelf is open and connected.` : 'Your downloaded notes remain available on this device.', icon: 'offline' };}
   if (state === 'error') {return { label: 'Sync needs attention', copy: 'Your notes are safe on this device. Try syncing again.', icon: 'offline' };}

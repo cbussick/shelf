@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import type { PreparedNode } from '../prepared-documents';
 import { safeNoteLink } from '../rich-text';
 
-const markTags: Readonly<Record<string, string>> = { strong: 'strong', emphasis: 'em', inlineCode: 'code', strike_through: 'del' };
+const markTags = new Map(Object.entries({ strong: 'strong', emphasis: 'em', inlineCode: 'code', strike_through: 'del' }));
 
 // This immutable surface needs no React reconciliation per paragraph. Building
 // plain DOM keeps the first frame cheap on phones. Only known tags/attributes
@@ -51,7 +51,7 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     case 'text': {
       let content: Node = dom.createTextNode(node.text ?? '');
       for (const mark of node.marks ?? []) {
-        const tag = markTags[mark.type];
+        const tag = markTags.get(mark.type);
         if (typeof tag === 'string') {content = wrap(tag, content);}
         else if (mark.type === 'link' && typeof mark.attrs?.href === 'string') {
           const href = safeNoteLink(mark.attrs.href);
