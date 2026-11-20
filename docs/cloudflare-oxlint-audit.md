@@ -1,6 +1,6 @@
-# Cloudflare preset defaults: implementation and decision report
+# Cloudflare preset defaults: implementation and local validation report
 
-## Current status: draft, partial, not lint-clean
+## Current status: lint-clean; full test suite has two baseline failures
 
 PR #94 now evaluates **stock `@cloudflare/oxlint-config` defaults**, superseding
 the curated-policy recommendation at commit `603703d`. Mechanical changes were
@@ -8,21 +8,22 @@ explicitly authorized. Every migration-added global/file rule exclusion and
 relaxed option has been removed. `oxlint.config.ts` contains the preset plus
 stronger pre-existing Shelf coverage, not a collection of convenience disables.
 
-**Root lint genuinely fails on 45 remaining React diagnostics:** 37 `react/refs`,
-6 `react/set-state-in-effect`, and 2 `react/immutability`, in `App.tsx`, `Editor.tsx`
-and `AudioPlayer.tsx`. These are **not suppressed** or described as false
-positives. The PR is a draft pending a decision on behavior-sensitive lifecycle
-redesign. Passing runtime tests do not make those patterns compliant.
+The user subsequently authorized the React lifecycle redesign **locally**.
+All 45 previously exposed React diagnostics are resolved without new suppressions.
+Root lint passes with the actual defaults, stronger PR93 checks and unused-disable
+reporting. This supersedes the partial report at `31216c9`.
 
-**Recommendation:** the mechanical and boundary defaults are implementable and
-useful; keep that work. Do **not** claim complete default compliance or merge
-this PR yet. Decide whether to authorize the auth/editor/checkpoint/audio state
-redesign described below. Do not bypass the rules with microtasks, hide mutable
-state behind methods solely to evade analysis, or weaken save/auth behavior.
+**Recommendation:** default compliance is now implemented, including the larger
+state-ownership work. That work was materially more involved than mechanical
+style compliance. The full suite is still **not green**: two unchanged preview
+assertions fail on both the migration and freshly installed original main.
+Do not represent those failures as fixed or treat local completion as permission
+to integrate.
 
-No merge, main push or deployment is authorized. The clean dedicated branch
-`chore/cloudflare-oxlint` and `.worktrees/cloudflare-oxlint` remain for review.
-The primary `main` checkout remains separate and unchanged.
+The continuation is local-only: **no pushes, PR updates/comments/reviews, merges,
+deployments or main edits**. PR94 remains untouched by this continuation.
+`chore/cloudflare-oxlint` and `.worktrees/cloudflare-oxlint` remain intact;
+primary main stays separate at `8560f0612cb6feb1f730d3906859dbf71a863679`.
 
 ## Versions, compatibility and retained stronger checks
 
@@ -64,7 +65,7 @@ These deviations from stock are **stronger existing coverage**, not exceptions:
   overrides. Other stock test/JavaScript relaxations remain stock behavior.
 - Original ignore patterns, `src/server/tsconfig.json` discovery shim, NodeNext
   settings, both existing tsc checks, TypeScript version and Vite/server build
-  commands unchanged. Final traversal is **102 files**, versus original 97.
+  commands unchanged. Final traversal is **106 files**, versus original 97.
 - Pre-existing PR93 narrow suppressions retained (listed separately below).
 
 Knip now discovers tsrs through preset peers, so its former dependency-ignore
@@ -87,7 +88,7 @@ rules**, after the first phase's genuine fixes. The original first trial had
 | `typescript/array-type` | 117 | Default `Array<T>` notation applied. |
 | `typescript/no-unsafe-type-assertion` | 85 | Driver/query contracts, raw-value parsing, DOM generics/guards and declared test-owned browser hooks replace casts; only three precise native typing exceptions remain. |
 | `import/consistent-type-specifier-style` | 42 | Top-level type-only declarations replace mixed inline specifiers. |
-| `react/refs` | 39 | Two latest-callback writes moved to layout commit; **37 remain exposed** for redesign. |
+| `react/refs` | 39 | Commit-time callback publication, explicit workspace/editor lifecycle state, admitted draft/file identities and subscribed checkpoint snapshots remove all render-time ref access. |
 | `typescript/no-non-null-assertion` | 37 | Capture stable values, narrow filters, check required DOM/cache invariants; no blanket exception or silent optional chaining of required work. |
 | `typescript/no-unnecessary-type-assertion` | 33 | Provably redundant assertions removed. |
 | `typescript/no-unsafe-call` | 27 | Test wire schemas derive from shared contracts before method calls; required-note lookup fails explicitly if absent. |
@@ -100,7 +101,7 @@ rules**, after the first phase's genuine fixes. The original first trial had
 | `quality/no-known-value-widening` | 10 | Concrete lookup and log contracts, stable named view types; maps prevent inherited-key MIME lookup. |
 | `quality/no-conditional-empty-object-spread` | 8 | Optional payload/log fields assigned explicitly, retaining omission rather than replacing it with present-undefined fields. |
 | `typescript/consistent-type-imports` | 7 | Stock import() annotation policy; erased named imports and explicit test API shape. |
-| `react/set-state-in-effect` | 6 | **All six remain exposed**, not hidden behind asynchronous scheduling. |
+| `react/set-state-in-effect` | 6 | Derived metadata/state transitions, event-owned editor resets and real durable-storage I/O completions replace effect-driven cascades; no artificial scheduling. |
 | `quality/no-unsafe-dictionary-type` | 6 | Concrete log shapes and explicit viewport reflection; privacy tests preserve every extra log property. |
 | `eqeqeq` | 6 | Stock strict equality, explicitly preserving both null and undefined cases for task attributes. |
 | `unicorn/consistent-function-scoping` | 6 | Pure helpers hoisted; two browser-serialization helpers have exact line exceptions. |
@@ -109,7 +110,7 @@ rules**, after the first phase's genuine fixes. The original first trial had
 | `no-console` | 2 | Verification CLI explicitly writes the same newline-terminated stdout output. |
 | `react/button-has-type` | 2 | Button types moved out of shared spread props to the two JSX sites. |
 | `quality/no-unknown-returns` | 2 | Native IDB reader contract and actual Express response/void callback type. Raw metadata is parsed, not falsely asserted. |
-| `react/immutability` | 2 | **Both remain exposed** on the mutable checkpoint controller. |
+| `react/immutability` | 2 | Only the checkpoint module owns mutations; renderers read frozen snapshots through useSyncExternalStore, never mutable controller fields. |
 
 Other first-phase fixes remain: real dialog cleanup with red/green regression,
 unknown promise-catch parameters, true type-only imports, explicit callback
@@ -154,21 +155,58 @@ application defaults. Two additional unit regressions prove this evidence is not
 silently normalized away. The log parser is also loose so privacy checks still
 inspect unexpected fields rather than silently stripping secrets.
 
-## Decision required: remaining React lifecycle work
+## Implemented React lifecycle redesign
 
-These are not style findings or proven false positives. There are 45 diagnostics,
-often multiple labels on the same expression, so they do not represent 45 bugs.
+- **Workspace access:** `workspace-access.ts` models gate/open/locked transitions.
+  Verified offline access opens the workspace; later network failures cannot
+  unmount it. Confirmed expiry locks it, and cached auth data cannot unlock it.
+  Successful explicit authentication unlocks; late expiry after logout cannot
+  reopen a workspace. Four unit cases cover these transition groups.
+- **Editor ownership:** `editor-lifecycle.ts` owns admission, warming, closing,
+  preference and parked-snapshot invalidation. Draft keys are allocated at user
+  intent, not during render. Full note/attachment/blob/version identities still
+  govern reuse. Reconciliation never replaces a live editor's base snapshot.
+  Stale close/save/warm events cannot take ownership of a different editor.
+  Five unit cases cover identity, retention, version isolation and stale events.
+- **Sync entry:** editor status resets occur at open/close/delete events. The
+  network lock guard is published in layout, never by a speculative render.
+  Entry/re-entry first reads real durable local notes and queue state, then
+  starts synchronization. A read-generation fence prevents that initial read
+  from overwriting a later local commit. Network/visibility subscriptions are
+  removed while locked; unlocking re-reads durable state. This intentionally replaces the former
+  parallel effect-driven startup with storage-first startup, not a dummy await.
+- **Checkpoint ownership:** `CheckpointWriter` publishes stable frozen status
+  snapshots and subscriptions. Saved key and resulting note/version publish
+  atomically. React consumes them with `useSyncExternalStore`; only the writer
+  changes them. Input readers and write handlers bind after commit; native body
+  reads occur during schedule/flush, not render. The 500ms debounce, 2500ms bound,
+  serialized writes, latest-input loop, retry and deletion fence remain covered.
+  Five additional unit cases cover immutability/subscription, native-source
+  replacement, version handoff, capture failure recovery and reentrant flush.
+  The existing promise-assignment fence remains for real reentrancy safety,
+  not to defer React state setters past lint analysis.
+- **Upload identities:** file IDs are admitted during initialization/input events,
+  then rendered as immutable entries; a private WeakMap preserves same-file
+  identity without retaining removed files. Session IDs are lazy scalar state.
+- **Live reader safety:** the new auth regression exposed history reset on
+  unlock: restarting a live ProseMirror document changes its reader baseline,
+  which can return the original empty Markdown despite the edited DOM. History
+  now resets only when actually reopening a pristine parked editor. Unlocking
+  preserves the live reader/history and exact saved Markdown. A consumed initial
+  recording intent also stays consumed after lock/unlock rather than reopening.
+- **Audio ownership:** source availability is render state; refs only coalesce
+  imperative loading and own native resources. A failed local-byte lookup clears
+  availability and can retry restored bytes. A successfully obtained remote URL
+  remains available after native HTTP failure and retries via media.load().
+  Duration transitions preserve recording fallback, finite decoded measurements
+  and actual metadata changes without an effect-driven setter. Two new unit
+  cases and two browser cases cover these distinctions and unrelated saves.
 
-| Area | Why straightforward rule-silencing is unsafe | Proposed next work |
-| --- | --- | --- |
-| `src/client/App.tsx` | `workspaceOpened.current` controls auth/offline mounting and confirmed-expiry locking during render. Draft identities increment a ref inside useMemo. Effects reset editor sync/parked-editor state and initiate synchronization. Simply moving work to a passive effect or microtask changes mounting/version/status ordering. | Explicit auth/workspace and editor-session state transitions; allocate draft identity when opening a session, not during render; define synchronization/subscription ownership and keep offline cached access and 401 lock semantics. |
-| `src/client/components/Editor.tsx` | Render reads session/committed-note refs and a mutable CheckpointWriter; current code publishes latest callbacks during render and directly mutates the controller/subscription properties. Those values determine dirty state, checkpoint version, save retry and retained-dialog reuse. | Immutable controller snapshots and an external-store subscription (for example useSyncExternalStore), with explicit committed-note/session identity ownership. Preserve immediate local saves, exact version handoff and interruption/close guarantees. Do not merely hide field mutations inside methods to fool analysis. |
-| `src/client/components/AudioPlayer.tsx` | Render reads promise-ref availability for seeking; an effect updates duration from upload/server metadata while native playback also updates duration. | Own source availability and provided/measured duration as render state while preserving coalesced concurrent loads, object-URL cleanup and metadata/decoded-duration precedence. Test those transitions rather than defer the setter artificially. |
-
-The parent pane was notified without `--wait` and asked whether to authorize this
-redesign phase. Pending that decision, the rules stay **enabled and failing**;
-there is no permanent or temporary blanket React exclusion left in the config.
-This report must not be represented as a completed lint-clean migration.
+Three new browser regressions exercise consumed recording intent plus same-DOM
+reauthentication/persisted body, cached media URL retry/decoded-duration retention,
+and missing/restored local audio bytes. Each passed twice serially and in the
+complete run. No microtask workaround, broad exclusion or weakened assertion was
+used. Arbitrary abandoned concurrent renders are not exhaustively simulated.
 
 ## Every remaining exception
 
@@ -189,8 +227,8 @@ mechanical fixes (line numbers can move with future review).
   - `src/client/components/AddAudio.tsx:19`: document pointer target Node.
   - `src/client/components/NoteContextMenu.tsx:78,97`: pointer/keyboard targets Node.
   - `src/client/components/RichTextEditor.tsx:148,328`: Node containment and Element.closest.
-  - `src/client/components/Editor.tsx:241,247,325,344,382`: captured Element, editing HTMLElement, outside-click Node, active HTMLElement, native HTMLVideoElement arrow-key ownership.
-  - `src/client/App.tsx:266,272`: native HTMLElement keyboard targets.
+  - `src/client/components/Editor.tsx:249,255,333,352,390`: captured Element, editing HTMLElement, outside-click Node, active HTMLElement, native HTMLVideoElement arrow-key ownership.
+  - `src/client/App.tsx:269,275`: native HTMLElement keyboard targets.
   - `src/client/sw.ts:45`: reject FormData strings before File MIME/size checks.
   - `tests/e2e/audio-error-layout.spec.ts:41`: retain the native audio/error assertion.
   - `tests/e2e/note-autosave.spec.ts:23`: native active-element blur guard.
@@ -237,60 +275,58 @@ First-phase `603703d` complete run: **61 unit passed; 239 browser passed, 2
 failed**, both original 390px/1280px preview assertions. This is historical
 baseline evidence, **not** a claim that the revised defaults pass browsers.
 
-### Revised defaults verification
+### Local completion verification
 
-- Fresh `npm ci`: passed; dependency versions/peer tree verified again.
-- `npm run lint`: **FAILS, exactly 45 exposed React diagnostics** above. No other
-  rules, compiler errors or unused-disable diagnostics remain at this point.
-- Existing `npm run typecheck`, build, both Knip modes: passed. Normal Knip keeps
-  the existing redundant-server-entry hint.
-- Both direct `tsrs --noEmit -p` commands: passed.
-- Final unit suite: **69 passed in 10 files**, including six new boundary/MIME
-  cases and two test-wire-evidence regressions.
-- Temporary client/server/.test.ts probes detected TS2322 invalid assignments,
-  TS7006 implicit any, NodeNext **TS2835**, floating/misused promises, JSX void
-  callbacks, await-thenable and test unbound methods. Probes were removed; the
-  root diagnostic set returned to exactly the 45 known React findings.
-- Latest complete **`npm test`**: **69 unit tests passed; 242 browser tests
-  passed, 2 failed** (7.3 minutes for browsers, all 244 cases completed). Both
-  failures are the same baseline preview expectations, now
-  `tests/e2e/app.spec.ts:1186` (390px/1280px). Assertions still expect complete
-  text where the documented overview mounts a bounded excerpt. They were not
-  weakened. **The full suite is not green.** This supersedes the earlier revised
-  run with 240 passes / 2 failures before the two extra lifecycle cases existed.
-- Additional serial one-worker lifecycle run, each case repeated three times:
-  **6 passed**. This verifies changed drag callbacks during refresh and microphone
-  permission resolving after a committed lock. Both cases also pass in the
-  latest full run, as does the malformed-redirect checkpoint regression.
-- Loading-preview verification passed after the browser runs, including layout,
-  interruption, reduced motion and no browser errors. Final typecheck, both Knip
-  modes, 69 unit tests and `git diff --check` passed again.
-- Two isolated read-only Pi reviewers examined the revised source through
-  `d46a047`: no confirmed introduced bugs or documented-standard violations.
-  Standards identified missing targeted lifecycle regression coverage; the two
-  cases above were added and repeated successfully. They do not simulate every
-  abandoned concurrent render; that remains part of the explicit redesign gate.
-  Standards also noted that test-owned Window declarations assume individual
-  tests install their hooks before use. This is not runtime initialization or a
-  production guarantee; review found no introduced use-before-install.
-  Supplemental isolated review of `0d72cb4` found no confirmed bugs and verified
-  the tests meaningfully cover those committed transitions. A separate review of
-  `dbc4054` confirmed preservation of raw wire-equality evidence; future shared
-  schema evolution may require corresponding fixture updates. The final mechanical
-  Error-constructor cleanup followed the full run; isolated review of `68a76af`
-  found no issues. Real Node identity, 69 unit passes, typecheck/build and nine
-  focused conflict/audio/lifecycle browser passes verify that final cleanup.
-  Reviewers did not rerun checks, and no human approval or merge is claimed.
-- Audit high-severity gate passed; the same **4 moderate** glob/minimatch/PWA
-  chain findings remain. No forced audit fix or unrelated dependency upgrade.
+- Fresh `npm ci`, actual-default root lint with unused-disable reporting,
+  existing typecheck/build, both Knip modes and both direct tsrs compilations:
+  **pass**. Normal Knip retains its existing redundant-server-entry hint.
+- Unit suite: **85 passed in 12 files** (69 at the prior partial tip).
+- Fresh temporary client/server/test probes again detected **TS2322, TS7006,
+  TS2835**, floating/misused promises including JSX, await-thenable and test
+  unbound methods. They were removed; root lint returned to **zero diagnostics**.
+- Complete **`npm test`** through source `a946f6f`: **85 units passed;
+  245 browsers passed, 2 failed**, all 247 cases, 7.4 minutes. Both failures are
+  `app.spec.ts:1186`, the unchanged 390px/1280px preview-text expectations.
+  Fresh original-main archive `8560f06` with its own `npm ci` reproduces both
+  failures at `app.spec.ts:1181`; a fresh `31216c9` archive also reproduces both.
+  They expect full text where the documented UI mounts a bounded excerpt.
+  **The full suite is not green. No assertion was relaxed.**
+- An earlier 34-case focused run had **33 passes / 1 unfinished-dialog failure**;
+  three immediate repetitions passed. A later ten-repeat loop reproduced it
+  once. Probes showed Playwright clock installation replaces the init-script
+  idle stub, allowing preparation before the intended uninitialized close.
+  A forced refresh/time-window reproduction failed on both `31216c9` and the
+  candidate. The test now reapplies the idle stub after clock installation and
+  adds two uninitialized preconditions. Original cleanup/body/version assertions
+  remain. The forced reproduction passes; the complete ready-dialog file then
+  passed **24/24** serial cases. All debug hooks and artificial probe waits were
+  removed. This is a test-precondition correction, not a runtime cleanup fix.
+- Initial new-regression runs exposed the live-reader reset described above.
+  A preliminary audio assertion incorrectly treated a native HTTP failure as
+  failed URL acquisition; inspecting the actual audioSource contract separated
+  remote-URL retry from real local-byte acquisition failure. The final distinct
+  cases verify both contracts rather than imposing a changed runtime behavior.
+- Loading-preview verification passes for layout, fast completion, interruption,
+  replay, reduced-motion toggle/OS preference and browser errors.
+- Audit high-severity gate passes; **4 existing moderate** glob/minimatch/PWA
+  findings remain. No force upgrade or unrelated production dependency change.
 
-Browser runs, preview verification and builds are serialized, using normal
-isolated local test servers/data, not a deployment. Diagnostic logs are under
-`/tmp/shelf-cf-defaults-*.log` in the implementation environment.
+Delivery requires two fresh isolated read-only Pi reviews of the **full migration
+against original main**, including standards/spec/coverage and behavioral safety.
+Their exact comparison SHAs, findings and follow-up results are recorded in the
+local handoff; historical reviews through `68a76af` are not substitutes for that
+new review. No human approval or remote PR review is claimed. Test-owned Window
+hook declarations still require each test to install its hook before use.
+
+Builds, tests and previews are serialized. Baselines use disposable archives,
+not the primary checkout. Current logs are `/tmp/shelf-cf-local-*`; older phase
+logs are `/tmp/shelf-cf-defaults-*`. No production application data or deployment was used.
 
 ## Diff size and lint runtime
 
-Revised direction versus `603703d`: **87 files, +1,848/-1,374 lines**. Complete PR versus main `8560f06`: **92 files, +3,144/-1,114 lines**.
+Complete migration versus main `8560f06`: **96 files, +3,816/-1,250 lines**.
+Local completion versus `31216c9`: **15 files, +822/-286 lines**.
+The precise changed-file list below includes all four new lifecycle source/test files.
 
 Mechanical style changes account for much of the breadth: the braces commit
 alone touched 59 files (+447/-449 including its config change); array/import
@@ -298,34 +334,30 @@ fixes also touch many of those files. That churn is implemented, not excluded.
 The full PR includes the original preset/plugin dependency lockfile addition.
 The exact complete file list follows below.
 
-Seven interleaved warm **`npm run lint`** samples per setup, one discarded warm-up
-each, including npm startup, same Node/npm/shared host/default threads:
+### Passing lint benchmark
+
+Two discarded warm-ups, then seven interleaved samples per setup, alternating
+order, same host/Node/default threads. Command in each installation:
+`./node_modules/.bin/oxlint --deny-warnings --report-unused-disable-directives`.
+This measures the lint executable directly, **excluding npm startup**.
 
 | Setup | Seven measured seconds | Median | Exit |
 | --- | --- | ---: | ---: |
-| Original main `8560f06`, original config/backend | 1.018, 1.211, 1.156, 1.073, 1.084, 1.259, 0.996 | **1.084s** | 0 |
-| Prior curated `603703d` | 1.627, 2.010, 1.721, 1.572, 1.869, 1.725, 1.676 | **1.721s** | 0 |
-| Implemented stock defaults | 1.578, 2.153, 1.698, 1.617, 1.599, 1.451, 1.573 | **1.599s** | **1** |
+| Fresh original main `8560f06`, original config/backend | 0.840, 0.837, 0.928, 0.824, 0.811, 0.934, 1.118 | **0.840s** | 0 every run |
+| Lint-clean stock defaults through `a946f6f` | 1.308, 1.235, 1.543, 1.308, 1.411, 1.315, 2.129 | **1.315s** | 0 every run |
 
-Stock-default median adds **0.515s (~48%)** versus original main. The 0.122s
-curated/default difference is within shared-host noise, not evidence of a
-speedup. Defaults still report the 45 React errors: this is **not a passing
-benchmark** or a final lint-clean runtime prediction.
+The passing-default median adds **0.475s (~57%)**. Original main has its own fresh
+installation and original tsrs pin; the task has its own fresh migration install.
+This compares complete configurations/toolchains/source sets (**97 / 106 files**),
+not an isolated backend or rule change. Browser/build/reviewer work was not running
+during measurement. Shared-host load and outliers remain uncontrolled; seven warm
+samples are not a formal performance study. No backend speedup is claimed.
 
-Sources/configs were separate `git archive` snapshots with unchanged dependencies
-symlinked from the task installation. Original Oxlint/tsrs were separately
-installed at their exact pins; observed native child paths verified the original
-backend really ran from that installation, not the task's newer tsrs. Original
-and curated lint commands passed; default exit 1 was checked on every sample.
-The added unit regression used for the original-MIME red check was removed from
-that snapshot before timing, preserving the original file set.
-
-Runs were serial after browser/build/reviewer activity finished, with ordering
-varied to reduce warm-cache/order bias. No debug timing instrumentation. Other
-host tenants remain uncontrolled. This measures total configurations/toolchains
-and their source sets (97 / 99 / 102 files), **not** an isolated backend switch or
-individual rule. Scratch snapshots/installations were removed afterwards. There
-is **no backend speedup claim**, and no tsc/build check was replaced.
+Historical npm-inclusive medians were main 1.084s, curated `603703d` 1.721s and
+partial defaults 1.599s. That last result exited 1 on 45 React findings and was
+**not** a passing benchmark. Those differently scoped numbers are not directly
+comparable to the new executable-only passing measurement. No tsc/build coverage
+was replaced to obtain these timings.
 
 ## Exact changed files (complete PR versus main)
 
@@ -361,6 +393,7 @@ src/client/components/NoteReading.tsx
 src/client/components/Photo.tsx
 src/client/components/RichTextEditor.tsx
 src/client/components/link-parts.ts
+src/client/editor-lifecycle.ts
 src/client/incoming-share.ts
 src/client/local-store.ts
 src/client/main.tsx
@@ -371,6 +404,7 @@ src/client/prepared-documents.ts
 src/client/rich-text.ts
 src/client/sw.ts
 src/client/visual-media.ts
+src/client/workspace-access.ts
 src/server/app.ts
 src/server/audio-files.ts
 src/server/auth.ts
@@ -422,9 +456,11 @@ tests/unit/api.test.ts
 tests/unit/audio.test.ts
 tests/unit/checkpoint-writer.test.ts
 tests/unit/database.test.ts
+tests/unit/editor-lifecycle.test.ts
 tests/unit/logging.test.ts
 tests/unit/prepared-documents.test.ts
 tests/unit/video.test.ts
+tests/unit/workspace-access.test.ts
 ```
 
 ## Sources and delivery
@@ -438,4 +474,4 @@ tests/unit/video.test.ts
 Repository workflow and official guidance were reread before the continuation.
 No GLOSSARY-MAP.md or GLOSSARY.md is present. Existing worktrees/edits were
 inspected and preserved. The task branch/worktree remain intact for the requested
-redesign decision and review; **no merge, deployment or main push occurred**.
+local review and handoff; **no push, PR operation, merge, deployment or main edit occurred during this continuation**.

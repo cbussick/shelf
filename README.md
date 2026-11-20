@@ -69,9 +69,11 @@ build output and dependencies, does not check every project/global diagnostic, a
 not compile the server. `src/server/tsconfig.json` lets lint discover the existing
 NodeNext server configuration; the compiler/build scripts still use `tsconfig.server.json`.
 Tests and other files outside a discovered project use the backend's inferred program.
-The default-preset migration is currently a **draft**: lint exposes 45 unresolved
-React lifecycle findings pending a redesign decision; they are not suppressed.
-See [the migration/decision report](docs/cloudflare-oxlint-audit.md) for versions,
+The default-preset migration is lint-clean, including explicit auth/editor
+lifecycles and subscribed immutable checkpoint snapshots. The full browser suite
+still has two unchanged baseline preview-assertion failures; local validation is
+not integration or deployment authorization.
+See [the migration report](docs/cloudflare-oxlint-audit.md) for versions,
 implemented fixes, strictly scoped exceptions, checks and cost, and
 [the original setup findings](docs/oxlint-audit.md) for PR93's historical baseline.
 
