@@ -71,8 +71,9 @@ NodeNext server configuration; the compiler/build scripts still use `tsconfig.se
 Tests and other files outside a discovered project use the backend's inferred program.
 The default-preset migration is lint-clean, including explicit auth/editor
 lifecycles and subscribed immutable checkpoint snapshots. The full browser suite
-still has two unchanged baseline preview-assertion failures; local validation is
-not integration or deployment authorization.
+still has two unchanged baseline preview failures and an intermittent mobile
+title-entry failure reproduced on main. Local validation is not integration or
+deployment authorization.
 See [the migration report](docs/cloudflare-oxlint-audit.md) for versions,
 implemented fixes, strictly scoped exceptions, checks and cost, and
 [the original setup findings](docs/oxlint-audit.md) for PR93's historical baseline.

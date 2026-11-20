@@ -1,6 +1,6 @@
 # Cloudflare preset defaults: implementation and local validation report
 
-## Current status: lint-clean; full test suite has two baseline failures
+## Current status: lint-clean; full test suite still has baseline failures
 
 PR #94 now evaluates **stock `@cloudflare/oxlint-config` defaults**, superseding
 the curated-policy recommendation at commit `603703d`. Mechanical changes were
@@ -16,7 +16,9 @@ reporting. This supersedes the partial report at `31216c9`.
 **Recommendation:** default compliance is now implemented, including the larger
 state-ownership work. That work was materially more involved than mechanical
 style compliance. The full suite is still **not green**: two unchanged preview
-assertions fail on both the migration and freshly installed original main.
+assertions fail on both the migration and freshly installed original main. The
+latest repeat also hit a mobile title-entry failure reproduced on original main
+in 2/10 serial repetitions; its root cause is not claimed fixed.
 Do not represent those failures as fixed or treat local completion as permission
 to integrate.
 
@@ -291,6 +293,14 @@ baseline evidence, **not** a claim that the revised defaults pass browsers.
   failures at `app.spec.ts:1181`; a fresh `31216c9` archive also reproduces both.
   They expect full text where the documented UI mounts a bounded excerpt.
   **The full suite is not green. No assertion was relaxed.**
+- Latest full repeat at `7b7cdd5`, after the clock-test correction: **85 units
+  passed; 244 browsers passed, 3 failed**, all 247 cases, 7.3 minutes. Besides
+  those two preview failures, `app.spec.ts:1075` at 390px could not find `Tall note 8`;
+  the card had its body but an empty title. Fresh original-main repetition of
+  the unchanged case (`app.spec.ts:1070`) produced **8 passes / 2 failures in 10**,
+  with the same missing-title symptom. This establishes an inherited intermittent
+  failure, not its exact cause. Assertions/timeouts and production code were not
+  changed to hide it. Both full-run outcomes are reported, not cherry-picked.
 - An earlier 34-case focused run had **33 passes / 1 unfinished-dialog failure**;
   three immediate repetitions passed. A later ten-repeat loop reproduced it
   once. Probes showed Playwright clock installation replaces the init-script
@@ -311,12 +321,18 @@ baseline evidence, **not** a claim that the revised defaults pass browsers.
 - Audit high-severity gate passes; **4 existing moderate** glob/minimatch/PWA
   findings remain. No force upgrade or unrelated production dependency change.
 
-Delivery requires two fresh isolated read-only Pi reviews of the **full migration
-against original main**, including standards/spec/coverage and behavioral safety.
-Their exact comparison SHAs, findings and follow-up results are recorded in the
-local handoff; historical reviews through `68a76af` are not substitutes for that
-new review. No human approval or remote PR review is claimed. Test-owned Window
-hook declarations still require each test to install its hook before use.
+Two fresh isolated read-only Pi processes reviewed the **complete 96-file,
+77-commit migration**, independently covering standards/spec/coverage and behavior.
+Both reported **zero blockers** against base
+`8560f0612cb6feb1f730d3906859dbf71a863679`, tip
+`7b7cdd5505ae6a157da9dfb57b863aedcb19eeb4`. One optional naming judgement noted
+that the image-upload fixture uses ReturnType of audioFile for their shared
+payload shape; no standard violation or runtime defect was identified. Reviewers
+ran no checks and changed no files. This evidence-only report refresh follows
+that comparison; final follow-up comparison pins/results are in the local handoff.
+No human approval or remote PR review is claimed. Historical reviews through
+`68a76af` are not substitutes for these fresh reviews. Test-owned Window hooks
+still require each test to install its hook before use.
 
 Builds, tests and previews are serialized. Baselines use disposable archives,
 not the primary checkout. Current logs are `/tmp/shelf-cf-local-*`; older phase
@@ -324,8 +340,8 @@ logs are `/tmp/shelf-cf-defaults-*`. No production application data or deploymen
 
 ## Diff size and lint runtime
 
-Complete migration versus main `8560f06`: **96 files, +3,816/-1,250 lines**.
-Local completion versus `31216c9`: **15 files, +822/-286 lines**.
+Complete migration versus main `8560f06`: **96 files, +3,833/-1,250 lines**.
+Local completion versus `31216c9`: **15 files, +841/-288 lines**.
 The precise changed-file list below includes all four new lifecycle source/test files.
 
 Mechanical style changes account for much of the breadth: the braces commit
