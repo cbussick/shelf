@@ -73,7 +73,9 @@ function UpdateNotice() {
 }
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: false } } });
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root');
+if (!root) { throw new Error('The application root is missing.'); }
+ReactDOM.createRoot(root).render(
   <React.StrictMode><QueryClientProvider client={queryClient}><App/><UpdateNotice/>
     <Toaster theme="dark" expand position="bottom-center" offset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }} mobileOffset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))', left: 16, right: 16 }} style={{ fontFamily: 'inherit' }} toastOptions={{ style: { background: colors.ink, borderColor: colors.ink, borderRadius: 10 }, cancelButtonStyle: { minHeight: 44 } }}/>
   </QueryClientProvider></React.StrictMode>,

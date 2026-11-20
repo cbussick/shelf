@@ -248,7 +248,8 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
         return false;
       },
       view(view) {
-        initialDoc = view.state.doc;
+        const originalDocument = view.state.doc;
+        initialDoc = originalDocument;
         rememberDocument(markdown, parsePreparedNode(initialDoc.toJSON()), generation);
         // Capture the pure parser, not the editor/context being destroyed. This
         // lets idle preparation reuse its schema without retaining a live view.
@@ -258,7 +259,7 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
           return parsePreparedNode(mergeAdjacentLists(EditorState.create({ schema: doc.type.schema, doc }).tr).doc.toJSON());
         }, generation);
         onSelection(activeFormats(view.state));
-        read = () => view.state.doc.eq(initialDoc!) ? markdown : serialize(view.state.doc);
+        read = () => view.state.doc.eq(originalDocument) ? markdown : serialize(view.state.doc);
         return {
           update(current, previous) {
             onSelection(activeFormats(current.state));

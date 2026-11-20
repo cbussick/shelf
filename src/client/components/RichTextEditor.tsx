@@ -119,14 +119,15 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   const reveal = (explicit = false) => {
     if (!instance.current || visible.current || gesture.current) {return;}
     const selection = window.getSelection();
-    const selecting = selection && !selection.isCollapsed && reading.current?.contains(selection.anchorNode);
+    const readingElement = reading.current;
+    const selecting = selection && !selection.isCollapsed && readingElement?.contains(selection.anchorNode);
     if (selecting && !explicit) {return;}
     restore.current.scroll = reading.current?.scrollTop ?? 0;
-    if (selecting && selection) {
+    if (selecting && selection && readingElement) {
       const range = selection.getRangeAt(0);
       const forward = range.startContainer === selection.anchorNode && range.startOffset === selection.anchorOffset;
-      const anchor = readingPosition(reading.current!, selection.anchorNode, selection.anchorOffset, forward ? 1 : -1);
-      const head = readingPosition(reading.current!, selection.focusNode, selection.focusOffset, forward ? -1 : 1);
+      const anchor = readingPosition(readingElement, selection.anchorNode, selection.anchorOffset, forward ? 1 : -1);
+      const head = readingPosition(readingElement, selection.focusNode, selection.focusOffset, forward ? -1 : 1);
       if (anchor === undefined || head === undefined || !previewSelection(instance.current.view().state.doc, anchor, head)) {
         setBlockedSelection(true);
         return;
@@ -161,7 +162,9 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     // Each effect owns its host. StrictMode's cancelled asynchronous mount can
     // finish safely without ever attaching a second editor to the live host.
     const host = document.createElement('div');
-    root.current!.append(host);
+    const element = root.current;
+    if (!element) { throw new Error('The editor host is not mounted.'); }
+    element.append(host);
     let noteEditor: NoteEditor | undefined;
     let mounting: Promise<unknown> | undefined;
     const fail = () => {
@@ -174,7 +177,7 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
     const cancelStart = afterNotePaint(() => {
       if (cancelled) {return;}
       try {
-        noteEditor = createNoteEditor({
+        const created = createNoteEditor({
           root: host,
           markdown: initial.current.initialValue,
           onChange: value => {
@@ -186,10 +189,11 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
           onSelection: formats => { if (!cancelled) {setActive(previous => previous.join() === formats.join() ? previous : formats);} },
           editable: () => visible.current && !callbacks.current.disabled,
         });
-        mounting = noteEditor.editor.create();
+        noteEditor = created;
+        mounting = created.editor.create();
         void mounting.then(() => {
           if (cancelled) {return;}
-          instance.current = noteEditor!;
+          instance.current = created;
           setMounted(true);
         }).catch(fail);
       } catch { fail(); }
@@ -229,7 +233,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       host.remove();
       // Milkdown 7.23 leaves a rejected create() in OnCreate; destroy() would
       // poll forever in that state. Destroy only successfully mounted editors.
-      if (noteEditor && mounting) {void mounting.then(() => noteEditor!.editor.destroy()).catch(() => {});}
+      const closing = noteEditor;
+      if (closing && mounting) {void mounting.then(() => closing.editor.destroy()).catch(() => {});}
     };
   }, []);
 

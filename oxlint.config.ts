@@ -61,12 +61,6 @@ export default defineConfig({
       'typescript/unbound-method': 'error',
     } },
     // Reviewed Shelf exceptions/options; rationale and migration inventory: docs/cloudflare-oxlint-audit.md.
-    // Established schema keys, mounted refs, nonempty caches and checked IDB identities.
-    // Do not substitute optional chaining that would silently skip required work.
-    { files: [
-      'src/client/components/{NoteReading,AudioPlayer,RichTextEditor,NoteBoard}.tsx',
-      'src/client/{prepared-documents,note-preparation,rich-text,local-store,main}.ts*',
-    ], rules: { 'typescript/no-non-null-assertion': 'off' } },
     // Imperative editor/recorder callbacks and retained checkpoint state intentionally use refs.
     // These components are not React-Compiler optimized; preserve tested save/lifecycle ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,AudioRecorder,RichTextEditor,Editor}.tsx'], rules: { 'react/refs': 'off' } },

@@ -201,13 +201,14 @@ export async function saveLocalNote(value: {
   }
   const current = parseOptionalNote(await notes.get(id));
   const existingOperation = parseOptionalOperation(await outbox.get(id));
-  const changedElsewhere = !redirect.path.length && current && value.baseNote && contentKey(current) !== contentKey(value.baseNote);
+  const baseNote = value.baseNote;
+  const changedElsewhere = !redirect.path.length && current && baseNote && contentKey(current) !== contentKey(baseNote);
   if (changedElsewhere && existingOperation && existingOperation.editorSession !== value.editorSession) {
     throw new Error('This note changed in another tab. Copy your latest changes before reopening it.');
   }
   // A remote refresh must not silently advance an open editor's write version.
   // Acknowledgements with unchanged content can safely advance it, however.
-  const expectedVersion = existingOperation?.expectedVersion ?? (changedElsewhere ? value.baseNote!.version : current?.version ?? value.version ?? 0);
+  const expectedVersion = existingOperation?.expectedVersion ?? (changedElsewhere && baseNote ? baseNote.version : current?.version ?? value.version ?? 0);
   const currentImages = new Map(current?.images.map(image => [image.id, image]));
   // Reconcile upload metadata without discarding the editor's orientation.
   const reconciledImages = [...new Map(images.map(image => [image.id, {
@@ -259,7 +260,11 @@ export async function reorderLocalNotes(ids: Array<string>): Promise<void> {
   const current = z.array(localNoteSchema).parse(await transaction.objectStore('notes').getAll());
   const byId = new Map(current.map(note => [note.id, note]));
   if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some(id => !byId.has(id))) {throw new Error('Invalid note order.');}
-  for (const [position, id] of ids.entries()) {await transaction.objectStore('notes').put({ ...byId.get(id)!, position });}
+  for (const [position, id] of ids.entries()) {
+    const note = byId.get(id);
+    if (!note) { throw new Error('Invalid note order.'); }
+    await transaction.objectStore('notes').put({ ...note, position });
+  }
   await transaction.objectStore('meta').put({ token: crypto.randomUUID() }, 'pendingOrder');
   await transaction.done;
 }
@@ -314,10 +319,10 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
       if (entry.type === 'delete') {
         await api.deleteNote(entry.noteId, entry.expectedVersion);
       } else if (note) {
-        const localImages = note.images.filter(image => image.blobId);
-        const localAudio = note.audio.filter(audio => audio.blobId);
+        const localImages = note.images.filter((image): image is LocalImage & { blobId: string } => Boolean(image.blobId));
+        const localAudio = note.audio.filter((audio): audio is LocalAudio & { blobId: string } => Boolean(audio.blobId));
         const files = await Promise.all(localImages.map(async image => {
-          const blob = parseBlob(await database.get('blobs', image.blobId!));
+          const blob = parseBlob(await database.get('blobs', image.blobId));
           return new File([blob], image.alt || 'image', { type: image.mimeType });
         }));
         const retainedImageIds = note.images.filter(image => !image.blobId).map(image => image.id);
@@ -330,7 +335,7 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
           retainedAudioIds: note.audio.filter(audio => !audio.blobId).map(audio => audio.id),
           newAudio: localAudio.map(audio => ({ id: audio.id, duration: audio.duration && audio.duration <= MAX_RECORDING_SECONDS ? audio.duration : null })),
         }, files, await Promise.all(localAudio.map(async audio => {
-          const blob = parseBlob(await database.get('blobs', audio.blobId!));
+          const blob = parseBlob(await database.get('blobs', audio.blobId));
           return new File([blob], audio.name || 'recording', { type: audio.mimeType });
         })));
         database = await getDatabase();
@@ -345,7 +350,7 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
           // Keep audio added on this device available offline, but never download
           // every other device's recordings merely to show a note card.
           if (latestNote?.audio.some(attachment => attachment.id === audio.id)) {
-            const blob = parseBlob(await transaction.objectStore('blobs').get(audio.blobId!));
+            const blob = parseBlob(await transaction.objectStore('blobs').get(audio.blobId));
             await transaction.objectStore('blobs').put(blob, `audio:${audio.id}`);
           }
         }

@@ -41,7 +41,9 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
     positions.current = null;
     if (!before || matchMedia('(prefers-reduced-motion: reduce)').matches) {return;}
     board.current?.querySelectorAll<HTMLElement>('[data-item-id]').forEach(item => {
-      const old = before.get(item.dataset.itemId!);
+      const id = item.dataset.itemId;
+      if (!id) { throw new Error('A note card is missing its identity.'); }
+      const old = before.get(id);
       if (!old || item.dataset.itemId === drag.current?.source) {return;}
       const next = item.getBoundingClientRect();
       const dx = old.left - next.left, dy = old.top - next.top;
@@ -49,7 +51,11 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
     });
   }, [displayed]);
   const snapshot = () => {
-    positions.current = new Map(Array.from(board.current?.querySelectorAll<HTMLElement>('[data-item-id]') ?? [], item => [item.dataset.itemId!, item.getBoundingClientRect()]));
+    positions.current = new Map(Array.from(board.current?.querySelectorAll<HTMLElement>('[data-item-id]') ?? [], item => {
+      const id = item.dataset.itemId;
+      if (!id) { throw new Error('A note card is missing its identity.'); }
+      return [id, item.getBoundingClientRect()] as const;
+    }));
   };
   const removeGhost = () => { ghost.current?.remove(); ghost.current = null; };
   const activate = (id: string) => {
@@ -241,7 +247,9 @@ function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: Array<
       const gap = innerWidth <= 700 ? 12 : innerWidth <= 1100 ? 16 : 20;
       for (const element of board.querySelectorAll<HTMLElement>(':scope > *')) {
         const column = heights.indexOf(Math.min(...heights));
-        const height = Math.ceil(element.firstElementChild!.getBoundingClientRect().height);
+        const content = element.firstElementChild;
+        if (!content) { throw new Error('A note card is missing its measured content.'); }
+        const height = Math.ceil(content.getBoundingClientRect().height);
         element.style.gridColumn = String(column + 1);
         element.style.gridRow = `${heights[column] + 1} / span ${height + gap}`;
         heights[column] += height + gap;

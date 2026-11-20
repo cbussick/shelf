@@ -42,7 +42,9 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
     };
   }, [errorToastId]);
   const load = async () => {
-    if (!source.current) {source.current = (file ? Promise.resolve(URL.createObjectURL(file)) : audioSource(audio!)).then(url => {
+    if (!source.current) {
+      const pending = file ? Promise.resolve(URL.createObjectURL(file)) : audio ? audioSource(audio) : Promise.reject(new Error('No audio source is available.'));
+      source.current = pending.then(url => {
       if (url.startsWith('blob:')) {
         if (!mounted.current) { URL.revokeObjectURL(url); throw new Error('Player closed.'); }
         objectUrl.current = url;

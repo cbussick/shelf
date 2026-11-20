@@ -10,7 +10,8 @@ const markTags = new Map(Object.entries({ strong: 'strong', emphasis: 'em', inli
 export function NoteReading({ document }: { document: PreparedNode }) {
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const element = root.current!;
+    const element = root.current;
+    if (!element) { throw new Error('The note reading surface is not mounted.'); }
     element.dataset.noteDocumentSize = String(nodeSize(document));
     element.replaceChildren(renderNode(element.ownerDocument, document));
     return () => element.replaceChildren();

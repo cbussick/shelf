@@ -41,9 +41,11 @@ export function rememberDocument(source: string, document: PreparedNode, owner: 
   documents.set(source, { document, bytes: size });
   bytes += size;
   while (documents.size > MAX_ENTRIES || bytes > MAX_BYTES) {
-    const oldest = documents.keys().next().value!;
-    bytes -= documents.get(oldest)!.bytes;
-    documents.delete(oldest);
+    const oldest = documents.entries().next().value;
+    if (!oldest) { throw new Error('Document cache accounting exceeds its contents.'); }
+    const [key, entry] = oldest;
+    bytes -= entry.bytes;
+    documents.delete(key);
   }
 }
 
