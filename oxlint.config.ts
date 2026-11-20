@@ -121,7 +121,8 @@ export default defineConfig({
 
     // Keep readable byte/sample-rate constants; separator grouping is not a safety check.
     { files: ['**/*'], rules: { 'unicorn/numeric-separators-style': 'off' } },
-    { files: ['**/*'], rules: { 'no-console': 'off' } },
+    // Standalone verification CLI prints its result; app logging still forbids console.
+    { files: ['docs/previews/loading/verify.mjs'], rules: { 'no-console': 'off' } },
     { files: ['**/*'], rules: { 'react/immutability': 'off' } },
     { files: ['**/*'], rules: { 'react/button-has-type': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-unknown-returns': 'off' } },
