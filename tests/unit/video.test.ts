@@ -1,4 +1,4 @@
-import { noteListResponseSchema } from '../../src/shared/contracts';
+import { noteListResponseSchema, noteResponseSchema } from '../fixtures/note-responses';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,7 +9,7 @@ import type { Express } from 'express';
 import { createApp } from '../../src/server/app';
 import { openDatabase } from '../../src/server/database';
 import type { AppDatabase } from '../../src/server/database';
-import { MAX_VIDEO_BYTES, noteResponseSchema } from '../../src/shared/contracts';
+import { MAX_VIDEO_BYTES } from '../../src/shared/contracts';
 import { validateVisualFile, visualDimensions } from '../../src/client/visual-media';
 import { wavAudio } from '../fixtures/audio';
 

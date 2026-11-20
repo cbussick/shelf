@@ -1,4 +1,4 @@
-import { noteResponseSchema, noteListResponseSchema } from '../../src/shared/contracts';
+import { noteResponseSchema, noteListResponseSchema } from '../fixtures/note-responses';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -138,6 +138,24 @@ describe('image rotation', () => {
 });
 
 const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] as Array<string> });
+
+describe('wire-response test contracts', () => {
+  const image = { id: crypto.randomUUID(), url: `/api/images/${crypto.randomUUID()}`, alt: '', mimeType: 'image/jpeg', width: 1, height: 1, size: 1, rotation: 0, unexpected: 'keep-image-field' };
+  const note = { id: crypto.randomUUID(), title: '', body: '', color: 'paper', pinned: false, position: 0, version: 1, createdAt: '2026-11-20T00:00:00.000Z', updatedAt: '2026-11-20T00:00:00.000Z', images: [image], audio: [], unexpected: 'keep-note-field' };
+
+  it('retains extra wire fields so equality assertions cannot silently lose them', () => {
+    const response = { note, unexpected: 'keep-response-field' };
+    expect(noteResponseSchema.parse(response)).toEqual(response);
+    expect(noteListResponseSchema.parse({ notes: [note] })).toEqual({ notes: [note] });
+  });
+
+  it('does not supply absent fields that the application schema normally defaults', () => {
+    const { audio: _audio, ...withoutAudio } = note;
+    const { rotation: _rotation, ...withoutRotation } = image;
+    expect(() => noteResponseSchema.parse({ note: withoutAudio })).toThrow();
+    expect(() => noteResponseSchema.parse({ note: { ...note, images: [withoutRotation] } })).toThrow();
+  });
+});
 
 describe('audio attachments', () => {
 
