@@ -94,8 +94,6 @@ export default defineConfig({
     { files: ['src/client/rich-text.ts', 'tests/e2e/{app,autosave-conflicts,image-rotation,video}.spec.ts'], rules: { 'typescript/no-unsafe-return': 'off' } },
     // Open lookup dictionaries and stable return unions are deliberate contracts, not lost evidence.
     { files: ['src/client/{App.tsx,audio.ts}', 'src/client/components/NoteReading.tsx', 'src/server/logging.ts'], rules: { 'quality/no-known-value-widening': 'off' } },
-    // Conditional omission is intentional for optional sync/error metadata and browser options.
-    { files: ['src/client/local-store.ts', 'src/server/logging.ts', 'tests/e2e/{audio-error-layout,sync-layout}.spec.ts'], rules: { 'quality/no-conditional-empty-object-spread': 'off' } },
     // Unknown is intentional for sanitized structured logs and readonly viewport fault injection.
     { files: ['src/server/logging.ts', 'tests/unit/logging.test.ts', 'tests/e2e/mobile-editor-keyboard.spec.ts'], rules: { 'quality/no-unsafe-dictionary-type': 'off' } },
     // `value == null` intentionally matches null AND undefined in optional task attrs.

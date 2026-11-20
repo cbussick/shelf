@@ -8,6 +8,10 @@ import multer from 'multer';
 export const logger = pino({ base: { service: 'shelf' }, timestamp: pino.stdTimeFunctions.isoTime });
 
 const requests = new WeakMap<Response, { logger: Logger; error?: Record<string, unknown> }>();
+type RequestCompletion = {
+  method: string; route: string; status: number; durationMs: number;
+  aborted?: true; error?: Record<string, unknown>;
+};
 
 // Error messages, causes and arbitrary error properties can contain note text,
 // SQL parameters, upload filenames or malformed JSON. Retain only server stack
@@ -59,12 +63,13 @@ export function requestLogging(log: Logger): RequestHandler {
       const route = typeof request.route?.path === 'string' ? request.route.path : '(unmatched)';
       if (route === '/healthz' && response.statusCode < 400 && !aborted) {return;}
       const level = response.statusCode >= 500 ? 'error' : response.statusCode >= 400 || aborted ? 'warn' : 'info';
-      context.logger[level]({
+      const entry: RequestCompletion = {
         method: request.method, route, status: response.statusCode,
         durationMs: Math.round((performance.now() - started) * 100) / 100,
-        ...(aborted ? { aborted: true } : {}),
-        ...(context.error ? { error: context.error } : {}),
-      }, 'request completed');
+      };
+      if (aborted) { entry.aborted = true; }
+      if (context.error) { entry.error = context.error; }
+      context.logger[level](entry, 'request completed');
     };
     response.once('finish', complete);
     response.once('close', complete);

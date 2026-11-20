@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/isolated-test';
 import { audioFile, editorFor, openCard } from '../fixtures/audio-ui';
+import type { NoteMultipart } from '../fixtures/audio-ui';
 import AxeBuilder from '@axe-core/playwright';
 
 for (const width of [390, 820, 1280]) {
@@ -7,12 +8,11 @@ for (const width of [390, 820, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     for (let index = 0; index < 8; index++) {
       const id = crypto.randomUUID();
-      const response = await page.request.put(`/api/notes/${id}`, {
-        multipart: {
-          payload: JSON.stringify({ id, title: index === 7 ? '' : `Neighbor ${index}`, body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] }),
-          ...(index === 7 ? { audio: audioFile() } : {}),
-        },
-      });
+      const multipart: NoteMultipart = {
+        payload: JSON.stringify({ id, title: index === 7 ? '' : `Neighbor ${index}`, body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] }),
+      };
+      if (index === 7) { multipart.audio = audioFile(); }
+      const response = await page.request.put(`/api/notes/${id}`, { multipart });
       expect(response.ok()).toBe(true);
     }
     await page.route('**/api/audio/**', route => route.abort('connectionfailed'));

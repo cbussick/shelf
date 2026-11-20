@@ -99,7 +99,8 @@ export async function localSyncOverview(): Promise<LocalSyncOverview> {
   };
 }
 
-export async function noteSyncState(id: string, editorSession?: string): Promise<{ note?: LocalNote; pending: boolean; error?: string }> {
+type NoteSyncState = { note?: LocalNote; pending: boolean; error?: string };
+export async function noteSyncState(id: string, editorSession?: string): Promise<NoteSyncState> {
   const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'meta']);
   ({ id } = await followRedirects(transaction.objectStore('meta'), id, editorSession));
@@ -109,7 +110,9 @@ export async function noteSyncState(id: string, editorSession?: string): Promise
   ]);
   await transaction.done;
   const pending = parseOptionalOperation(operation);
-  return { note: parseOptionalNote(note), pending: Boolean(pending), ...(pending?.error ? { error: pending.error } : {}) };
+  const state: NoteSyncState = { note: parseOptionalNote(note), pending: Boolean(pending) };
+  if (pending?.error) { state.error = pending.error; }
+  return state;
 }
 
 export async function hasLocalData(): Promise<boolean> {
@@ -164,11 +167,16 @@ export async function saveLocalNote(value: {
       if (mapped === null) {return [];}
       const rotation = rotations.get(image.id);
       if (rotation !== undefined) {rotations.set(mapped, rotation);}
-      return [{ ...image, id: mapped, ...(image.blobId ? { blobId: `blob:${mapped}` } : {}) }];
+      const redirected = { ...image, id: mapped };
+      if (image.blobId) { redirected.blobId = `blob:${mapped}`; }
+      return [redirected];
     });
     retainedAudio = retainedAudio?.flatMap(audio => {
       const mapped = remap(audio.id);
-      return mapped === null ? [] : [{ ...audio, id: mapped, ...(audio.blobId ? { blobId: `blob:${mapped}` } : {}) }];
+      if (mapped === null) { return []; }
+      const redirected = { ...audio, id: mapped };
+      if (audio.blobId) { redirected.blobId = `blob:${mapped}`; }
+      return [redirected];
     });
     newAudioIds = (value.newAudio ?? []).map((_, index) => {
       const oldId = newAudioIds?.[index] ?? crypto.randomUUID();
