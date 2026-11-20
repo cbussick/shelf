@@ -1,5 +1,5 @@
 import { props } from '@stylexjs/stylex';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { CheckpointWriter } from '../checkpoint-writer';
 import { imageRotationSchema, isVideo, VISUAL_ACCEPT, noteColorSchema } from '../../shared/contracts';
 import type { ImageRotation, NoteColor } from '../../shared/contracts';
@@ -10,13 +10,24 @@ import { LocalPhoto } from './NoteBoard';
 import { Icon } from './Icon';
 import { ImageMosaic } from './ImageMosaic';
 import { Photo } from './Photo';
-import { audioFileKey, validateAudioFile } from '../audio';
+import { validateAudioFile } from '../audio';
 import { AddAudio } from './AddAudio';
 import { AudioPlayer } from './AudioPlayer';
 import { AudioRecorder } from './AudioRecorder';
 import { RichTextEditor } from './RichTextEditor';
 import type { RichTextHandle } from './RichTextEditor';
 const colors = noteColorSchema.options;
+
+type EditorFile = Readonly<{ file: File; id: string }>;
+function createEditorFiles(images: Array<File>, audio: Array<File>) {
+  const ids = new WeakMap<File, string>();
+  const identify = (file: File): EditorFile => {
+    let id = ids.get(file);
+    if (!id) { id = crypto.randomUUID(); ids.set(file, id); }
+    return { file, id };
+  };
+  return { images: images.map(identify), audio: audio.map(identify), identify };
+}
 
 export type EditorValue = {
   id?: string; title: string; body: string; color: NoteColor; pinned: boolean;
@@ -48,27 +59,22 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   const [color, setColor] = useState<NoteColor>(note?.color ?? 'paper');
   const [pinned, setPinned] = useState(note?.pinned ?? false);
   const [retainedImages, setRetainedImages] = useState(note?.images ?? []);
-  const [newImages, setNewImages] = useState<Array<File>>(initialImages);
+  const [fileRegistry] = useState(() => createEditorFiles(initialImages, initialAudio));
+  const [imageInputs, setImageInputs] = useState(fileRegistry.images);
+  const [audioInputs, setAudioInputs] = useState(fileRegistry.audio);
+  const newImages = useMemo(() => imageInputs.map(input => input.file), [imageInputs]);
+  const newAudio = useMemo(() => audioInputs.map(input => input.file), [audioInputs]);
   const [rotations, setRotations] = useState(new Map<File, ImageRotation>());
-  const newImageRotations = newImages.map(file => rotations.get(file) ?? 0);
+  const newImageRotations = useMemo(() => newImages.map(file => rotations.get(file) ?? 0), [newImages, rotations]);
   const [retainedAudio, setRetainedAudio] = useState(note?.audio ?? []);
-  const [newAudio, setNewAudio] = useState<Array<File>>(initialAudio);
-  const [recordingOpen, setRecordingOpen] = useState(false);
+  const [recordingOpen, setRecordingOpen] = useState(initialRecording);
   const hasAudio = retainedAudio.length + newAudio.length > 0;
   const editorPhoto = props(styles.editorPhoto, hasAudio && styles.mixedEditorPhoto);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [, renderCheckpoint] = useState(0);
-  const sessionId = useRef(note?.id ?? crypto.randomUUID());
-  const editorSession = useRef(crypto.randomUUID());
-  const committedNote = useRef(note);
-  const attachmentIds = useRef(new WeakMap<File, string>());
-  const fileId = (file: File) => {
-    let id = attachmentIds.current.get(file);
-    if (!id) { id = crypto.randomUUID(); attachmentIds.current.set(file, id); }
-    return id;
-  };
+  const [sessionId] = useState(() => note?.id ?? crypto.randomUUID());
+  const [editorSession] = useState(() => crypto.randomUUID());
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const newImageUrls = useMemo(() => newImages.map(file => URL.createObjectURL(file)), [newImages]);
   useEffect(() => () => newImageUrls.forEach(url => URL.revokeObjectURL(url)), [newImageUrls]);
@@ -77,44 +83,42 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     ...newImages.map((file, index) => ({ src: newImageUrls[index], alt: file.name, mimeType: file.type, rotation: newImageRotations[index], removal: { kind: 'new' as const, index } })),
   ];
   const previewKind = previewIndex !== null && gallery[previewIndex] && galleryVideo(gallery[previewIndex]) ? 'video' : 'image';
-  const value: EditorValue = { id: sessionId.current, editorSession: editorSession.current, title: title.trim(), body, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio, newImageIds: newImages.map(fileId), newAudioIds: newAudio.map(fileId) };
-  const latest = useRef({ value, onSave });
-  latest.current = { value, onSave };
-  const [writer] = useState(() => new CheckpointWriter<EditorValue>(note || (!initialImages.length && !initialAudio.length) ? snapshot(value) : '', () => latest.current.value, snapshot, async checkpoint => {
-    committedNote.current = await latest.current.onSave({ ...checkpoint, baseNote: committedNote.current, version: committedNote.current?.version, createdAt: committedNote.current?.createdAt });
-  }, checkpoint => Boolean(committedNote.current) || !emptyValue(checkpoint)));
+  const value = useMemo<EditorValue>(() => ({ id: sessionId, editorSession, title: title.trim(), body, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio, newImageIds: imageInputs.map(input => input.id), newAudioIds: audioInputs.map(input => input.id) }), [sessionId, editorSession, title, body, color, pinned, retainedImages, newImages, newImageRotations, retainedAudio, newAudio, imageInputs, audioInputs]);
+  const writeCheckpoint = useCallback((checkpoint: EditorValue, committed: LocalNote | undefined) => onSave({ ...checkpoint, baseNote: committed, version: committed?.version, createdAt: committed?.createdAt }), [onSave]);
+  const [writer] = useState(() => new CheckpointWriter<EditorValue, LocalNote>({
+    capture: () => value, savedKey: note || (!initialImages.length && !initialAudio.length) ? snapshot(value) : '',
+    committed: note, key: snapshot, write: writeCheckpoint,
+    canWrite: (checkpoint, committed) => Boolean(committed) || !emptyValue(checkpoint),
+  }));
+  const checkpoint = useSyncExternalStore(writer.subscribe, writer.getSnapshot, writer.getSnapshot);
+  const committedNote = checkpoint.committed;
   const key = snapshot(value);
-  const dirty = key !== writer.savedKey;
-  const saveFailed = Boolean(writer.error);
-  const flush = () => {
-    try {
-      if (dirty) {latest.current.value = { ...latest.current.value, body: bodyInput.current?.read() ?? body };}
-      return writer.flush();
-    } catch (error_) { writer.error = error_; writer.changed(); return Promise.resolve(false); }
-  };
-  const flushRef = useRef(flush);
-  flushRef.current = flush;
+  const dirty = key !== checkpoint.savedKey;
+  const saveFailed = Boolean(checkpoint.error);
+  useLayoutEffect(() => {
+    writer.connect(() => ({ ...value, body: bodyInput.current?.read() ?? value.body }), writeCheckpoint);
+  }, [writer, value, writeCheckpoint]);
+  const flushOnExit = useEffectEvent(() => { void writer.flush(); });
   useEffect(() => {
     writer.resume();
-    writer.changed = () => renderCheckpoint(count => count + 1);
-    return () => { writer.changed = () => {}; void writer.stop(); };
+    return () => { void writer.stop(); };
   }, [writer]);
   useEffect(() => { if (open && !deleting) {writer.schedule();} }, [writer, key, open, deleting]);
-  useEffect(() => { onDirtyChange?.(dirty || writer.saving); }, [dirty, writer.saving, onDirtyChange]);
+  useEffect(() => { onDirtyChange?.(dirty || checkpoint.saving); }, [dirty, checkpoint.saving, onDirtyChange]);
   useEffect(() => {
     if (!open) {return;}
-    const hidden = () => { if (document.visibilityState === 'hidden') {void flushRef.current();} };
-    const pagehide = () => { void flushRef.current(); };
+    const hidden = () => { if (document.visibilityState === 'hidden') { flushOnExit(); } };
+    const pagehide = () => { flushOnExit(); };
     document.addEventListener('visibilitychange', hidden);
     addEventListener('pagehide', pagehide);
     return () => { document.removeEventListener('visibilitychange', hidden); removeEventListener('pagehide', pagehide); };
   }, [open]);
   useEffect(() => {
-    if (!open || (!dirty && !writer.saving)) {return;}
+    if (!open || (!dirty && !checkpoint.saving)) {return;}
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     addEventListener('beforeunload', warn);
     return () => removeEventListener('beforeunload', warn);
-  }, [open, dirty, writer.saving]);
+  }, [open, dirty, checkpoint.saving]);
 
   useEffect(() => {
     const element = dialog.current;
@@ -122,11 +126,9 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
       bodyInput.current?.restartReading();
       element?.showModal();
       if (element) {element.scrollTop = 0;}
-      // Mount the recorder only after the editor is in the browser's top layer.
-      if (initialRecording) {setRecordingOpen(true);}
     } else {element?.close();}
     return () => element?.close();
-  }, [open, note, initialRecording, locked]);
+  }, [open, note, locked]);
   useEffect(() => {
     const viewport = window.visualViewport;
     const element = dialog.current;
@@ -145,7 +147,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   }, []);
   const requestClose = () => {
     if (saving || deleting || recordingOpen) {return;}
-    if (!dirty && !writer.saving) {return onClose(canRetainReady.current && Boolean(note) && bodyInput.current?.isReady());}
+    if (!dirty && !checkpoint.saving) {return onClose(canRetainReady.current && Boolean(note) && bodyInput.current?.isReady());}
     if (saveFailed) {return discardDialog.current?.showModal();}
     void saveAndClose();
   };
@@ -159,7 +161,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     if (!image) {return;}
     if (previewIndex !== null) {setPreviewIndex(gallery.length === 1 ? null : Math.min(previewIndex, gallery.length - 2));}
     if (image.kind === 'retained') {setRetainedImages(images => images.filter(item => item.id !== image.id));}
-    else {setNewImages(files => files.filter((_, index) => index !== image.index));}
+    else {setImageInputs(inputs => inputs.filter((_, index) => index !== image.index));}
   };
   const rotateImage = (step: -90 | 90) => {
     if (previewIndex === null || saving) {return;}
@@ -182,12 +184,14 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
       catch (error_) { setError(error_ instanceof Error ? error_.message : 'Could not attach this file.'); }
     }
     if (retainedImages.length + newImages.length + accepted.length > 6) {return setError('Up to 6 images or videos per note.');}
-    setNewImages(current => [...current, ...accepted]);
+    const added = accepted.map(fileRegistry.identify);
+    setImageInputs(current => [...current, ...added]);
   };
   const addAudio = (files: Array<File>) => {
     try {
       files.forEach(validateAudioFile);
-      setNewAudio(current => [...current, ...files]);
+      const added = files.map(fileRegistry.identify);
+      setAudioInputs(current => [...current, ...added]);
       setError('');
     } catch (error_) { setError(error_ instanceof Error ? error_.message : 'Could not attach this audio.'); }
   };
@@ -199,7 +203,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     const audio = audioToRemove.current;
     audioToRemove.current = null;
     if (audio?.kind === 'retained') {setRetainedAudio(current => current.filter(item => item.id !== audio.id));}
-    else if (audio?.kind === 'new') {setNewAudio(current => current.filter(file => file !== audio.file));}
+    else if (audio?.kind === 'new') {setAudioInputs(current => current.filter(input => input.file !== audio.file));}
   };
   const pasteImages = (event: React.ClipboardEvent<HTMLDialogElement>) => {
     if (saving) {return;}
@@ -213,25 +217,27 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   };
   const saveAndClose = async () => {
     setSaving(true);
-    if (await flush()) {onClose();}
+    if (await writer.flush()) {onClose();}
     else {setSaving(false);}
   };
   const remove = async () => {
     setDeleting(true);
     await writer.stop(); // Fence queued checkpoints before deleting, including a first upload.
     try {
-      if (committedNote.current) {await onDelete(committedNote.current, editorSession.current);}
+      const saved = writer.getSnapshot().committed;
+      if (saved) {await onDelete(saved, editorSession);}
       else {onClose();}
     } catch (error_) {
       setError(error_ instanceof Error ? error_.message : 'Could not delete this note.');
       writer.resume(); setDeleting(false);
     }
   };
-  const localError = saveFailed ? saveError(writer.error) : '';
-  const status = saveFailed ? 'Changes not saved' : dirty || writer.saving ? 'Saving…' : !committedNote.current ? '' : syncState === 'offline' ? 'Saved on this device · Offline' : syncState === 'error' ? 'Saved on this device · Sync failed' : syncState === 'synced' ? 'Saved' : 'Syncing…';
-  const syncFailed = !saveFailed && !dirty && !writer.saving && syncState === 'error';
-  const showSyncError = Boolean(committedNote.current && syncError && !saveFailed && !dirty && !writer.saving);
-  const retry = saveFailed ? () => void flush() : syncFailed ? onRetrySync : undefined;
+  const localError = saveFailed ? saveError(checkpoint.error) : '';
+  const status = saveFailed ? 'Changes not saved' : dirty || checkpoint.saving ? 'Saving…' : !committedNote ? '' : syncState === 'offline' ? 'Saved on this device · Offline' : syncState === 'error' ? 'Saved on this device · Sync failed' : syncState === 'synced' ? 'Saved' : 'Syncing…';
+  const syncFailed = !saveFailed && !dirty && !checkpoint.saving && syncState === 'error';
+  const showSyncError = Boolean(committedNote && syncError && !saveFailed && !dirty && !checkpoint.saving);
+  const showRetry = saveFailed || syncFailed && onRetrySync !== undefined;
+  const retry = () => { if (saveFailed) { void writer.flush(); } else { onRetrySync?.(); } };
   return <>
     <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'}
       onInputCapture={() => { canRetainReady.current = false; }}
@@ -260,7 +266,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
             <span>Updated <time dateTime={note.updatedAt}>{formatTimestamp(note.updatedAt)}</time></span>
           </div>}
           <div {...props(styles.headerActions)}>
-            {(note || committedNote.current) && <button type="button" aria-label="Delete note" disabled={deleting} onClick={() => deleteDialog.current?.showModal()} {...props(styles.iconButton, styles.deleteIcon)}><Icon name="trash"/></button>}
+            {(note || committedNote) && <button type="button" aria-label="Delete note" disabled={deleting} onClick={() => deleteDialog.current?.showModal()} {...props(styles.iconButton, styles.deleteIcon)}><Icon name="trash"/></button>}
             <button type="button" aria-label={pinned ? 'Unpin note' : 'Pin note'} aria-pressed={pinned} onClick={() => setPinned(value => !value)} {...props(styles.pinText, pinned && styles.pinned)}><Icon name={pinned ? 'pin-filled' : 'pin'} width={18}/></button>
             <button type="button" data-close-note aria-label="Close note" disabled={saving} onClick={requestClose} {...props(styles.iconButton)}><Icon name="x"/></button>
           </div>
@@ -273,7 +279,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
         {hasAudio && <section aria-label="Audio attachments" {...props(styles.audioList)}>
           <h3 {...props(styles.audioListHeading)}>Audio · {retainedAudio.length + newAudio.length} {retainedAudio.length + newAudio.length === 1 ? 'file' : 'files'}</h3>
           {retainedAudio.map(audio => <AudioPlayer key={audio.id} audio={audio} onRemove={() => requestAudioRemoval({ kind: 'retained', id: audio.id })}/>)}
-          {newAudio.map(file => <AudioPlayer key={audioFileKey(file)} file={file} onRemove={() => requestAudioRemoval({ kind: 'new', file })}/>)}
+          {audioInputs.map(({ file, id }) => <AudioPlayer key={id} file={file} onRemove={() => requestAudioRemoval({ kind: 'new', file })}/>)}
         </section>}
         </div>
         <div {...props(styles.editorFields)}>
@@ -287,7 +293,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
           <button type="button" aria-label="Attach an image or video" onClick={() => input.current?.click()} {...props(styles.iconButton)}><Icon name="image"/></button>
           <input ref={input} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }}/>
           <ColorPicker color={color} onChange={setColor}/>
-        </div><div data-testid="note-save-status" aria-live="off" {...props(styles.editorSaveStatus, saveFailed && styles.saveStatusError, syncFailed && styles.saveStatusWarning)}>{status && <><Icon name={saveFailed ? 'warning' : dirty || writer.saving ? 'clock' : syncFailed ? 'warning' : syncState === 'syncing' ? 'refresh' : 'check'} width={15} {...props(styles.saveStatusIcon)}/><span>{status}</span></>}</div>{retry && <button type="button" aria-label={saveFailed ? 'Retry save' : 'Retry sync'} disabled={writer.saving} onClick={retry} {...props(styles.editorRetry, saveFailed ? styles.saveStatusError : styles.saveStatusWarning)}>Retry</button>}<button type="button" data-close-note disabled={saving || deleting} onClick={requestClose} {...props(styles.secondary, styles.editorClose)}>Close</button></footer>
+        </div><div data-testid="note-save-status" aria-live="off" {...props(styles.editorSaveStatus, saveFailed && styles.saveStatusError, syncFailed && styles.saveStatusWarning)}>{status && <><Icon name={saveFailed ? 'warning' : dirty || checkpoint.saving ? 'clock' : syncFailed ? 'warning' : syncState === 'syncing' ? 'refresh' : 'check'} width={15} {...props(styles.saveStatusIcon)}/><span>{status}</span></>}</div>{showRetry && <button type="button" aria-label={saveFailed ? 'Retry save' : 'Retry sync'} disabled={checkpoint.saving} onClick={retry} {...props(styles.editorRetry, saveFailed ? styles.saveStatusError : styles.saveStatusWarning)}>Retry</button>}<button type="button" data-close-note disabled={saving || deleting} onClick={requestClose} {...props(styles.secondary, styles.editorClose)}>Close</button></footer>
       </div>
     </dialog>
     {recordingOpen && <AudioRecorder suspended={locked} onKeep={file => { addAudio([file]); setRecordingOpen(false); }} onClose={() => setRecordingOpen(false)}/>}
