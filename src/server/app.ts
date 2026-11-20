@@ -2,20 +2,21 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
 import { link, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import express, { type NextFunction, type Request, type Response } from 'express';
+import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { fileTypeFromFile } from 'file-type';
 import helmet from 'helmet';
 import multer from 'multer';
 import type { Logger } from 'pino';
-import sharp, { type Metadata } from 'sharp';
+import sharp from 'sharp';
+import type { Metadata } from 'sharp';
 import { ZodError } from 'zod';
-import {
-  authStatusSchema, credentialsSchema, deleteNoteSchema, noteIdParamsSchema, noteWriteSchema, reorderNotesSchema,
-  isVideo, MAX_VIDEO_BYTES, type Environment, type Note,
-} from '../shared/contracts.js';
+import { authStatusSchema, credentialsSchema, deleteNoteSchema, noteIdParamsSchema, noteWriteSchema, reorderNotesSchema, isVideo, MAX_VIDEO_BYTES } from '../shared/contracts.js';
+import type { Environment, Note } from '../shared/contracts.js';
 import { createOwner, createSession, destroySession, hasOwner, isAuthenticated, requireAuthentication, verifyOwner } from './auth.js';
-import { type AppDatabase, readNote, readNotes } from './database.js';
+import { readNote, readNotes } from './database.js';
+import type { AppDatabase } from './database.js';
 import { inspectAudio } from './audio-files.js';
 import { inspectVideo } from './video-files.js';
 import { withNoteUploads } from './note-uploads.js';

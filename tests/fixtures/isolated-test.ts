@@ -1,4 +1,5 @@
-import { test as base, expect, request, type APIRequestContext } from '@playwright/test';
+import { test as base, expect, request } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';

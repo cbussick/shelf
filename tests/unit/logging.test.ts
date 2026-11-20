@@ -7,7 +7,8 @@ import express from 'express';
 import pino from 'pino';
 import request from 'supertest';
 import { createApp } from '../../src/server/app';
-import { openDatabase, type AppDatabase } from '../../src/server/database';
+import { openDatabase } from '../../src/server/database';
+import type { AppDatabase } from '../../src/server/database';
 import { recordRequestError, requestLogging, safeError } from '../../src/server/logging';
 import type { Environment } from '../../src/shared/contracts';
 

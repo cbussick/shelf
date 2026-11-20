@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { noteColorSchema, type Environment, type Note } from '../shared/contracts.js';
+import { noteColorSchema } from '../shared/contracts.js';
+import type { Environment, Note } from '../shared/contracts.js';
 
 export type AppDatabase = Database.Database;
 

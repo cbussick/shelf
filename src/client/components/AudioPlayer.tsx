@@ -3,7 +3,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { audioTime, recordingDuration } from '../audio';
 import { styles } from '../app.stylex';
-import { audioSource, type LocalAudio } from '../local-store';
+import { audioSource } from '../local-store';
+import type { LocalAudio } from '../local-store';
 import { Icon } from './Icon';
 
 export function AudioPlayer({ audio, file, compact = false, onRemove }: {

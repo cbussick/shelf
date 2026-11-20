@@ -1,4 +1,5 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
+import type { Ref } from 'react';
 import { AllSelection, EditorState, NodeSelection, TextSelection } from '@milkdown/kit/prose/state';
 import { editorStateCtx } from '@milkdown/kit/core';
 import type { Node as ProseNode } from '@milkdown/kit/prose/model';
@@ -6,7 +7,8 @@ import { getPreparedDocument } from '../prepared-documents';
 import { afterNotePaint } from '../note-scheduling';
 import { NoteReading } from './NoteReading';
 import { closeHistory } from '@milkdown/kit/prose/history';
-import { createNoteEditor, formatCommand, MAX_NOTE_BODY, safeNoteLink, setNoteLink, syncNoteSelection, type Format } from '../rich-text';
+import { createNoteEditor, formatCommand, MAX_NOTE_BODY, safeNoteLink, setNoteLink, syncNoteSelection } from '../rich-text';
+import type { Format } from '../rich-text';
 import { Icon } from './Icon';
 import './rich-text.css';
 

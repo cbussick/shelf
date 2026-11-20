@@ -1,6 +1,7 @@
 import { openDB } from 'idb';
 import { z } from 'zod';
-import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema, type ImageRotation, type Note, type NoteAudio, type NoteColor, type NoteImage } from '../shared/contracts';
+import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema } from '../shared/contracts';
+import type { ImageRotation, Note, NoteAudio, NoteColor, NoteImage } from '../shared/contracts';
 import { api, ApiError, syncErrorDetails } from './api';
 import { audioMimeType, recordingDuration, validateAudioFile } from './audio';
 import { visualDimensions } from './visual-media';

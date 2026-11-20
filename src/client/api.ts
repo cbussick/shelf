@@ -1,8 +1,6 @@
 import type { ZodType } from 'zod';
-import {
-  authStatusSchema, credentialsSchema, errorResponseSchema, noteListResponseSchema, noteResponseSchema,
-  okResponseSchema, reorderNotesSchema, type NoteWrite,
-} from '../shared/contracts';
+import { authStatusSchema, credentialsSchema, errorResponseSchema, noteListResponseSchema, noteResponseSchema, okResponseSchema, reorderNotesSchema } from '../shared/contracts';
+import type { NoteWrite } from '../shared/contracts';
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly body?: unknown) { super(message); }

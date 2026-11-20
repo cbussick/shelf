@@ -1,4 +1,5 @@
-import { MAX_AUDIO_BYTES, type NoteAudio } from '../shared/contracts';
+import { MAX_AUDIO_BYTES } from '../shared/contracts';
+import type { NoteAudio } from '../shared/contracts';
 
 const audioFileIds = new WeakMap<File, string>();
 export function audioFileKey(file: File): string {

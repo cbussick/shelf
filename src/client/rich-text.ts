@@ -3,7 +3,8 @@ import { commonmark, imageSchema, listItemKeymap, listItemSchema } from '@milkdo
 import { gfm } from '@milkdown/kit/preset/gfm';
 import { history } from '@milkdown/kit/plugin/history';
 import { clipboard } from '@milkdown/kit/plugin/clipboard';
-import { EditorState, Plugin, TextSelection, type Command, type Transaction } from '@milkdown/kit/prose/state';
+import { EditorState, Plugin, TextSelection } from '@milkdown/kit/prose/state';
+import type { Command, Transaction } from '@milkdown/kit/prose/state';
 import type { EditorView } from '@milkdown/kit/prose/view';
 import { setBlockType, toggleMark, wrapIn } from '@milkdown/kit/prose/commands';
 import { liftListItem, sinkListItem, wrapInList } from '@milkdown/kit/prose/schema-list';

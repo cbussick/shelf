@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import request, { type Agent } from 'supertest';
+import request from 'supertest';
+import type { Agent } from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../../src/server/app';
-import { openDatabase, type AppDatabase } from '../../src/server/database';
-import { MAX_AUDIO_BYTES, type Environment } from '../../src/shared/contracts';
+import { openDatabase } from '../../src/server/database';
+import type { AppDatabase } from '../../src/server/database';
+import { MAX_AUDIO_BYTES } from '../../src/shared/contracts';
+import type { Environment } from '../../src/shared/contracts';
 import { wavAudio } from '../fixtures/audio';
 
 let directory: string;

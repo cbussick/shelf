@@ -68,8 +68,6 @@ export default defineConfig({
       'src/client/components/{AddAudio,Editor,NoteBoard,NoteContextMenu,NoteReading,RichTextEditor}.tsx',
       'src/client/{incoming-share,local-store,note-preparation,sw}.ts', 'tests/**/*.ts',
     ], rules: { 'typescript/no-unsafe-type-assertion': 'off' } },
-    // Inline `type` specifiers are already explicit and avoid splitting mixed imports.
-    { files: ['**/*'], rules: { 'import/consistent-type-specifier-style': 'off' } },
     // Established schema keys, mounted refs, nonempty caches and checked IDB identities.
     // Do not substitute optional chaining that would silently skip required work.
     { files: [

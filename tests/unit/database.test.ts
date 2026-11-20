@@ -3,7 +3,8 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openDatabase, readNote, readNotes, type AppDatabase } from '../../src/server/database';
+import { openDatabase, readNote, readNotes } from '../../src/server/database';
+import type { AppDatabase } from '../../src/server/database';
 
 let directory: string;
 let database: AppDatabase | undefined;

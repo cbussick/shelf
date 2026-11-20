@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { RequestHandler, Response } from 'express';
-import pino, { type Logger } from 'pino';
+import pino from 'pino';
+import type { Logger } from 'pino';
 import { ZodError } from 'zod';
 import multer from 'multer';
 

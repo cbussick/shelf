@@ -1,7 +1,8 @@
 import * as stylex from '@stylexjs/stylex';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckpointWriter } from '../checkpoint-writer';
-import { isVideo, VISUAL_ACCEPT, noteColorSchema, type ImageRotation, type NoteColor } from '../../shared/contracts';
+import { isVideo, VISUAL_ACCEPT, noteColorSchema } from '../../shared/contracts';
+import type { ImageRotation, NoteColor } from '../../shared/contracts';
 import { validateVisualFile } from '../visual-media';
 import { styles } from '../app.stylex';
 import type { LocalAudio, LocalImage, LocalNote } from '../local-store';
@@ -13,7 +14,8 @@ import { audioFileKey, validateAudioFile } from '../audio';
 import { AddAudio } from './AddAudio';
 import { AudioPlayer } from './AudioPlayer';
 import { AudioRecorder } from './AudioRecorder';
-import { RichTextEditor, type RichTextHandle } from './RichTextEditor';
+import { RichTextEditor } from './RichTextEditor';
+import type { RichTextHandle } from './RichTextEditor';
 const colors = noteColorSchema.options;
 
 export type EditorValue = {

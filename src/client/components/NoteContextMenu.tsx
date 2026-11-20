@@ -1,6 +1,8 @@
 import * as stylex from '@stylexjs/stylex';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { noteColorSchema, type NoteColor } from '../../shared/contracts';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
+import { noteColorSchema } from '../../shared/contracts';
+import type { NoteColor } from '../../shared/contracts';
 import type { LocalNote } from '../local-store';
 import { styles } from '../app.stylex';
 import { Icon } from './Icon';

@@ -1,4 +1,5 @@
-import { isVideo, type ImageRotation } from '../../shared/contracts';
+import { isVideo } from '../../shared/contracts';
+import type { ImageRotation } from '../../shared/contracts';
 import * as stylex from '@stylexjs/stylex';
 import { styles } from '../app.stylex';
 import { Icon } from './Icon';
