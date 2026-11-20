@@ -196,7 +196,7 @@ function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, o
     {sync && <span id={`note-sync-${note.id}`} data-testid="note-card-sync" {...props(styles.noteSyncStatus, Boolean(sync.error) && styles.saveStatusWarning)}><Icon name={sync.error ? 'cloud-warning' : 'clock'} width={14} {...props(styles.noteSyncIcon)}/><span {...props(styles.noteSyncLabel)}>{sync.error ? 'Sync failed' : 'Waiting to sync'}</span></span>}
   </>;
   const buttonProps = {
-    type: 'button' as const, 'data-note-id': note.id,
+    'data-note-id': note.id,
     'aria-label': `Open note: ${label}`,
     'aria-describedby': sync ? `note-sync-${note.id}` : undefined,
     title: 'Drag to reorder · arrow keys to move', onClick: onCardClick, onPointerDown,
@@ -205,9 +205,9 @@ function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, o
   };
   return <li data-item-id={note.id} {...props(styles.noteItem, dropTarget && styles.dropTarget)}>
     {hasLinks || note.audio.length > 0 ? <div {...props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>
-      <button {...buttonProps} {...props(styles.cardOverlay)}/>
+      <button type="button" {...buttonProps} {...props(styles.cardOverlay)}/>
       {content}
-    </div> : <button {...buttonProps} {...props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>{content}</button>}
+    </div> : <button type="button" {...buttonProps} {...props(styles.noteCard, styles[note.color], dropTarget && styles.dragPlaceholder)}>{content}</button>}
     {!dropTarget && <button type="button" data-pin-id={note.id} aria-label={`${note.pinned ? 'Unpin' : 'Pin'} note: ${label}`} aria-pressed={note.pinned} title={note.pinned ? 'Unpin note' : 'Pin note'} onClick={() => onPin(note)} {...props(styles.pin, styles.pinVisibility, note.pinned && styles.pinned)}><Icon name={note.pinned ? 'pin-filled' : 'pin'} width={18}/></button>}
   </li>;
 }

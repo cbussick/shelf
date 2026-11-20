@@ -94,8 +94,6 @@ export default defineConfig({
     // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.
     // This is not mutation of React state; replacing its tested protocol is outside lint migration.
     { files: ['src/client/components/Editor.tsx'], rules: { 'react/immutability': 'off' } },
-    // Both flagged buttons spread buttonProps, which already contains `type: 'button' as const`.
-    { files: ['src/client/components/NoteBoard.tsx'], rules: { 'react/button-has-type': 'off' } },
     // IDB's get contract is deliberately unknown until parsed; Express ignores handler return values.
     // Neither adapter should claim unvalidated bytes are a domain value.
     { files: ['src/client/local-store.ts', 'src/server/note-uploads.ts'], rules: { 'quality/no-unknown-returns': 'off' } },
