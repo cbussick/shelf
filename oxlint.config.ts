@@ -107,7 +107,8 @@ export default defineConfig({
     // Browser evaluate() type annotations may name app modules without a runtime import.
     { files: ['**/*'], rules: { 'typescript/consistent-type-imports': ['error', { disallowTypeAnnotations: false }] } },
     { files: ['**/*'], rules: { 'no-promise-executor-return': 'off' } },
-    { files: ['**/*'], rules: { 'quality/no-unsafe-dictionary-type': 'off' } },
+    // Unknown is intentional for sanitized structured logs and readonly viewport fault injection.
+    { files: ['src/server/logging.ts', 'tests/unit/logging.test.ts', 'tests/e2e/mobile-editor-keyboard.spec.ts'], rules: { 'quality/no-unsafe-dictionary-type': 'off' } },
     { files: ['**/*'], rules: { 'eqeqeq': 'off' } },
     { files: ['**/*'], rules: { 'react/set-state-in-effect': 'off' } },
     { files: ['**/*'], rules: { 'unicorn/consistent-function-scoping': 'off' } },
