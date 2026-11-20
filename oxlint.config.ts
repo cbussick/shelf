@@ -131,7 +131,6 @@ export default defineConfig({
     // IDB's get contract is deliberately unknown until parsed; Express ignores handler return values.
     // Neither adapter should claim unvalidated bytes are a domain value.
     { files: ['src/client/local-store.ts', 'src/server/note-uploads.ts'], rules: { 'quality/no-unknown-returns': 'off' } },
-    { files: ['**/*'], rules: { 'unicorn/prefer-number-properties': 'off' } },
     { files: ['**/*'], rules: { '@nkzw/require-use-effect-arguments': 'off' } },
   ],
 });

@@ -567,7 +567,7 @@ test('image-only cards reserve only the compact sync slot without an empty conte
   const card = page.getByRole('button', { name: 'Open note: image.jpg' });
   await expect(card.getByRole('img')).toBeVisible();
   await expect(card.locator('span')).toHaveCount(0);
-  const dimensions = await card.evaluate(element => ({ card: element.getBoundingClientRect().height, image: element.querySelector('img')!.getBoundingClientRect().height, statusSlot: parseFloat(getComputedStyle(element).paddingBottom) }));
+  const dimensions = await card.evaluate(element => ({ card: element.getBoundingClientRect().height, image: element.querySelector('img')!.getBoundingClientRect().height, statusSlot: Number.parseFloat(getComputedStyle(element).paddingBottom) }));
   expect(dimensions.statusSlot).toBe(20);
   expect(dimensions.card - dimensions.image - dimensions.statusSlot).toBeLessThanOrEqual(2);
 
@@ -1196,7 +1196,7 @@ for (const width of [390, 1280]) {
       expect(await preview.textContent()).toBe(text);
       const dimensions = await preview.evaluate(element => {
         const style = getComputedStyle(element);
-        return { height: element.getBoundingClientRect().height, lineHeight: parseFloat(style.lineHeight), clamp: style.webkitLineClamp };
+        return { height: element.getBoundingClientRect().height, lineHeight: Number.parseFloat(style.lineHeight), clamp: style.webkitLineClamp };
       });
       expect(dimensions.clamp).toBe(String(lines));
       expect(dimensions.height).toBeLessThanOrEqual(lines * dimensions.lineHeight + 1);
