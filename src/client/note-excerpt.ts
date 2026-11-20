@@ -17,7 +17,7 @@ export function noteExcerpt(markdown: string): string {
     const content = (node.children ?? []).map(text).join('');
     if (node.type === 'link') {return content === node.url || content === node.url?.replace(/^https?:\/\//, '')
       ? content : `${content} (${node.url})`;}
-    if (node.type === 'listItem') {return `${node.checked == null ? '' : node.checked ? '☑ ' : '☐ '}${content}\n`;}
+    if (node.type === 'listItem') {return `${node.checked === null || node.checked === undefined ? '' : node.checked ? '☑ ' : '☐ '}${content}\n`;}
     if (['paragraph', 'heading', 'code', 'blockquote'].includes(node.type)) {return `${content}\n`;}
     return content;
   };

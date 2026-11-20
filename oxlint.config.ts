@@ -92,9 +92,6 @@ export default defineConfig({
     { files: ['src/client/rich-text.ts', 'tests/e2e/{app,autosave-conflicts,image-rotation,video}.spec.ts'], rules: { 'typescript/no-unsafe-return': 'off' } },
     // Unknown is intentional for sanitized structured logs and readonly viewport fault injection.
     { files: ['src/server/logging.ts', 'tests/unit/logging.test.ts', 'tests/e2e/mobile-editor-keyboard.spec.ts'], rules: { 'quality/no-unsafe-dictionary-type': 'off' } },
-    // `value == null` intentionally matches null AND undefined in optional task attrs.
-    // Keep strict equality everywhere else; do not change unchecked tasks' runtime behavior.
-    { files: ['**/*'], rules: { 'eqeqeq': ['error', 'always', { null: 'ignore' }] } },
     // Synchronize external audio/dialog/auth/sync lifecycles; moving these updates changes ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,Editor}.tsx'], rules: { 'react/set-state-in-effect': 'off' } },
     // Browser evaluate() closures must serialize in place; memo callbacks and local test helpers belong here.

@@ -76,10 +76,10 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
     }
     case 'list_item': {
       const item = dom.createElement('li');
-      item.dataset.task = String(attrs.checked != null);
+      item.dataset.task = String(attrs.checked !== null && attrs.checked !== undefined);
       item.dataset.checked = String(attrs.checked === true);
       const checkbox = dom.createElement('input');
-      checkbox.type = 'checkbox'; checkbox.hidden = attrs.checked == null;
+      checkbox.type = 'checkbox'; checkbox.hidden = attrs.checked === null || attrs.checked === undefined;
       checkbox.checked = attrs.checked === true; checkbox.disabled = true;
       checkbox.setAttribute('aria-label', text(node.content?.[0] ?? node) || 'Task');
       const content = wrap('div'); content.className = 'note-list-content';

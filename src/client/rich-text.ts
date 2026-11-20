@@ -52,7 +52,8 @@ function listItem(state: EditorState) {
 
 function checklist(): Command {
   return (state, dispatch) => {
-    const checked = listItem(state)?.attrs.checked == null ? false : null;
+    const current: unknown = listItem(state)?.attrs.checked;
+    const checked = current === null || current === undefined ? false : null;
     const apply: NonNullable<typeof dispatch> = tr => {
       const { from, to, $from } = tr.selection;
       let depth = $from.depth;
@@ -184,7 +185,8 @@ export function activeFormats(state: EditorState): Array<Format> {
     if (name === 'bullet_list') {active.push('bullet');}
     if (name === 'ordered_list') {active.push('ordered');}
   }
-  if (listItem(state)?.attrs.checked != null) {active.push('task');}
+  const checked: unknown = listItem(state)?.attrs.checked;
+  if (checked !== null && checked !== undefined) {active.push('task');}
   return active;
 }
 
@@ -281,7 +283,7 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
     const update = (next: ProseNode) => {
       if (next.type !== node.type) {return false;}
       current = next;
-      const task = next.attrs.checked != null;
+      const task = next.attrs.checked !== null && next.attrs.checked !== undefined;
       checkbox.hidden = !task;
       checkbox.checked = next.attrs.checked === true;
       checkbox.setAttribute('aria-label', next.firstChild?.textContent || 'Task');
