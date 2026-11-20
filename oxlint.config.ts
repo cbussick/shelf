@@ -102,7 +102,8 @@ export default defineConfig({
     { files: ['src/client/{App.tsx,audio.ts}', 'src/client/components/NoteReading.tsx', 'src/server/logging.ts'], rules: { 'quality/no-known-value-widening': 'off' } },
     // `caught` distinguishes exceptions from UI error state; naming is not a correctness issue.
     { files: ['**/*'], rules: { 'unicorn/catch-error-name': 'off' } },
-    { files: ['**/*'], rules: { 'quality/no-conditional-empty-object-spread': 'off' } },
+    // Conditional omission is intentional for optional sync/error metadata and browser options.
+    { files: ['src/client/local-store.ts', 'src/server/logging.ts', 'tests/e2e/{audio-error-layout,sync-layout}.spec.ts'], rules: { 'quality/no-conditional-empty-object-spread': 'off' } },
     { files: ['**/*'], rules: { 'typescript/consistent-type-imports': 'off' } },
     { files: ['**/*'], rules: { 'no-promise-executor-return': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-unsafe-dictionary-type': 'off' } },
