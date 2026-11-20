@@ -93,7 +93,9 @@ export default defineConfig({
     { files: ['**/*'], rules: { 'import/no-namespace': ['error', { ignore: ['@stylexjs/stylex'] }] } },
     // Same-realm DOM/File guards and trusted error subclasses must not become duck typing.
     { files: ['src/client/{App.tsx,sw.ts}', 'src/client/components/{RichTextEditor,Editor}.tsx', 'src/server/{app,logging}.ts', 'tests/e2e/{audio-error-layout,note-autosave}.spec.ts'], rules: { '@nkzw/no-instanceof': 'off' } },
-    { files: ['**/*'], rules: { 'typescript/no-unsafe-assignment': 'off' } },
+    // IDB reads are parsed after retrieval; ProseMirror attrs and Express route metadata are untyped.
+    // Do not invent a typed storage schema that pretends persisted bytes have been validated.
+    { files: ['src/client/{local-store,rich-text}.ts', 'src/server/logging.ts'], rules: { 'typescript/no-unsafe-assignment': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-return': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-known-value-widening': 'off' } },
     { files: ['**/*'], rules: { 'unicorn/catch-error-name': 'off' } },
