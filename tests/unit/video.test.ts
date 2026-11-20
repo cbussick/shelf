@@ -13,6 +13,12 @@ import { MAX_VIDEO_BYTES, noteResponseSchema } from '../../src/shared/contracts'
 import { validateVisualFile, visualDimensions } from '../../src/client/visual-media';
 import { wavAudio } from '../fixtures/audio';
 
+function file(type: string, size: number) {
+  const value = new File([], 'size-probe', { type });
+  Object.defineProperty(value, 'size', { value: size });
+  return value;
+}
+
 let directory: string;
 let database: AppDatabase;
 let app: Express;
@@ -151,7 +157,6 @@ describe('shared photo/video attachments', () => {
   });
 
   it('validates video and image size limits independently on the client', () => {
-    const file = (type: string, size: number) => ({ type, size }) as File;
     expect(() => validateVisualFile(file('video/mp4', MAX_VIDEO_BYTES))).not.toThrow();
     expect(() => validateVisualFile(file('video/mp4', MAX_VIDEO_BYTES + 1))).toThrow('100 MB');
     expect(() => validateVisualFile(file('image/jpeg', 21 * 1024 * 1024))).toThrow('20 MB');

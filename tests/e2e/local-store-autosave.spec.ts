@@ -59,6 +59,9 @@ test('stable attachment retries reuse pending bytes and uploaded metadata, inclu
     draft.retainedAudio = first.audio;
     draft.newImageRotations = [180];
     const retry = await storage.saveLocalNote(draft);
+    // Playwright serializes this callback into the browser; module hoisting would
+    // leave countBlobs undefined there (the closure cannot cross that boundary).
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const countBlobs = async () => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('shelf');
@@ -274,6 +277,8 @@ test('session redirects fence continued text and stable media retries, including
     const copy = (await storage.noteSyncState(draft.id!, draft.editorSession)).note!;
     const retry = await storage.saveLocalNote({ ...draft, title: 'Continued', body: 'New text', newImageRotations: [90] });
     const pending = await storage.noteSyncState(draft.id!, draft.editorSession);
+    // This helper must be inside the serialized browser callback, not Node's module scope.
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const uploadBlobKeys = async () => {
       const database = await new Promise<IDBDatabase>(resolve => {
         const request = indexedDB.open('shelf');

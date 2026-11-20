@@ -85,7 +85,7 @@ for (const width of [1506, 834, 390, 320]) {
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     let blockedId: string | undefined;
-    let release = () => {};
+    let release: (() => void) | undefined;
     let gate = Promise.resolve();
     await page.route('**/api/notes/*', async route => {
       if (route.request().method() === 'PUT' && route.request().url().endsWith(`/${blockedId}`)) {await gate;}
@@ -115,11 +115,11 @@ for (const width of [1506, 834, 390, 320]) {
           return { content: status.top < previous.bottom - 0.5, outside: status.bottom > card.bottom + 0.5 || status.left < card.left || status.right > card.right, overflow: element.scrollWidth > element.clientWidth };
         });
         expect(overlap).toEqual({ content: false, outside: false, overflow: false });
-        release();
+        release?.();
         await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
         await expect(status).toHaveCount(0);
         samePositions(before, await positions(page));
       }
-    } finally { release(); }
+    } finally { release?.(); }
   });
 }

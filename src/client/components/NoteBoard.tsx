@@ -11,6 +11,8 @@ import { LinkedText } from './LinkedText';
 import { linkParts } from './link-parts';
 import { noteExcerpt } from '../note-excerpt';
 
+const within = (event: Pick<PointerEvent, 'clientX' | 'clientY'>, rect: DOMRect) => event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+
 export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
   notes: Array<LocalNote>; pendingSync?: Readonly<Record<string, PendingNoteSync>>; heading?: string; label: string;
   onOpen: (note: LocalNote) => void; onPin: (note: LocalNote) => void;
@@ -93,7 +95,6 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
       }
     }, 400);}
   };
-  const within = (event: Pick<PointerEvent, 'clientX' | 'clientY'>, rect: DOMRect) => event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
   const noteAt = (event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
     const item = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-item-id]');
     return item && board.current?.contains(item) ? item.dataset.itemId : undefined;
