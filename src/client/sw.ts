@@ -28,6 +28,8 @@ registerRoute(
 );
 
 worker.addEventListener('message', event => {
+  // Browser message data is any; only this exact control token is acted on.
+  // oxlint-disable-next-line typescript/no-unsafe-member-access
   if (event.data?.type === 'SKIP_WAITING') void worker.skipWaiting();
 });
 

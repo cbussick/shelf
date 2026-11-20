@@ -129,6 +129,8 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
     const files = attachments.images ?? [];
     const audioFiles = attachments.audio ?? [];
     let rawPayload: unknown;
+    // Multer's field bag is any; parse JSON to unknown before schema validation below.
+    // oxlint-disable-next-line typescript/no-unsafe-member-access
     try { rawPayload = JSON.parse(String(request.body.payload)); }
     catch { return response.status(400).json({ error: 'Invalid note payload.' }); }
     const input = noteWriteSchema.parse(rawPayload);
