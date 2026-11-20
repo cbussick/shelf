@@ -3,7 +3,7 @@ import type { RequestHandler, Response } from 'express';
 import pino from 'pino';
 import type { Logger } from 'pino';
 import { ZodError } from 'zod';
-import multer from 'multer';
+import { MulterError } from 'multer';
 
 export const logger = pino({ base: { service: 'shelf' }, timestamp: pino.stdTimeFunctions.isoTime });
 
@@ -41,9 +41,7 @@ export function recordRequestError(response: Response, error: unknown): void {
       issues: error.issues.slice(0, 20).map(issue => ({ path: issue.path, code: issue.code })),
       issueCount: error.issues.length,
     };
-  // MulterError is an Error subclass; the preset only exempts bare *Error identifiers, not this qualified constructor.
-  // oxlint-disable-next-line @nkzw/no-instanceof
-  } else if (error instanceof multer.MulterError) {
+  } else if (error instanceof MulterError) {
     context.error = { code: error.code };
   } else {
     context.error = safeError(error);

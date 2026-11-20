@@ -7,7 +7,7 @@ import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { fileTypeFromFile } from 'file-type';
 import helmet from 'helmet';
-import multer from 'multer';
+import { MulterError } from 'multer';
 import type { Logger } from 'pino';
 import sharp from 'sharp';
 import type { Metadata } from 'sharp';
@@ -233,7 +233,7 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
       const removedFiles = database.transaction(() => {
         // File inspection yields to other requests. Recheck the version at commit.
         const latest = readNote(database, id);
-        if ((latest?.version ?? 0) !== input.expectedVersion) {throw new NoteConflict(latest);}
+        if ((latest?.version ?? 0) !== input.expectedVersion) {throw new NoteConflictError(latest);}
         if (prepared.some(image => database.prepare('SELECT id FROM images WHERE id=?').get(image.id))) {throw new ClientError('An uploaded image ID is already in use.');}
         if (preparedAudio.some(audio => database.prepare('SELECT id FROM audio WHERE id=?').get(audio.id))) {throw new ClientError('An uploaded audio ID is already in use.');}
         if (current) {
@@ -288,15 +288,11 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
 
   app.use('/api', (_request, response) => response.status(404).json({ error: 'Not found.' }));
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
-    // Only this trusted error class carries a conflict note; duck typing would accept untrusted fields.
-    // oxlint-disable-next-line @nkzw/no-instanceof
-    if (error instanceof NoteConflict) {return response.status(409).json({ error: 'This note changed on another device.', note: error.note });}
+    if (error instanceof NoteConflictError) {return response.status(409).json({ error: 'This note changed on another device.', note: error.note });}
     if (error instanceof ClientError) {return response.status(400).json({ error: error.message });}
     recordRequestError(response, error);
     if (error instanceof ZodError) {return response.status(400).json({ error: 'Invalid request.', issues: error.issues });}
-    // MulterError is an Error subclass; the preset only exempts bare *Error identifiers, not this qualified constructor.
-    // oxlint-disable-next-line @nkzw/no-instanceof
-    if (error instanceof multer.MulterError) {return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Audio and videos must be under 100 MB; images must be under 20 MB.' : error.message });}
+    if (error instanceof MulterError) {return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Audio and videos must be under 100 MB; images must be under 20 MB.' : error.message });}
     response.status(500).json({ error: 'Something went wrong.' });
   });
   return app;
@@ -323,6 +319,6 @@ function rejectCrossSiteRequests(request: Request, response: Response, next: Nex
 }
 
 class ClientError extends Error {}
-class NoteConflict extends Error {
+class NoteConflictError extends Error {
   constructor(readonly note: Note | undefined) { super('This note changed on another device.'); }
 }
