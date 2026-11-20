@@ -360,8 +360,9 @@ function ImagePreview({ gallery, index, onIndexChange, onRotate, onRemove, onClo
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    dialog.current?.showModal();
-    return () => dialog.current?.close();
+    const element = dialog.current;
+    element?.showModal();
+    return () => element?.close();
   }, []);
   const preview = gallery[index];
   const video = galleryVideo(preview);

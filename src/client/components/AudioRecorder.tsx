@@ -27,12 +27,13 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
     if (recorder.current?.state === 'recording') { setPhase('stopping'); recorder.current.stop(); }
   };
   useEffect(() => {
+    const element = dialog.current;
     active.current = true;
     return () => {
       active.current = false;
       if (recorder.current?.state === 'recording') recorder.current.stop();
       stream.current?.getTracks().forEach(track => track.stop());
-      dialog.current?.close();
+      element?.close();
     };
   }, []);
   useEffect(() => {
