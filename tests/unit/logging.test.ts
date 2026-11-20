@@ -6,6 +6,7 @@ import { Writable } from 'node:stream';
 import express from 'express';
 import pino from 'pino';
 import request from 'supertest';
+import { z } from 'zod';
 import { createApp } from '../../src/server/app';
 import { openDatabase } from '../../src/server/database';
 import type { AppDatabase } from '../../src/server/database';
@@ -15,7 +16,9 @@ import type { Environment } from '../../src/shared/contracts';
 let directory: string;
 let database: AppDatabase;
 let environment: Environment;
-let lines: Array<Record<string, unknown>>;
+// Preserve every extra property so privacy assertions still inspect the entire log.
+const logLineSchema = z.looseObject({ requestId: z.string().optional(), time: z.string().optional(), durationMs: z.number().optional() });
+let lines: Array<z.infer<typeof logLineSchema>>;
 let log: pino.Logger;
 
 beforeEach(async () => {
@@ -25,7 +28,7 @@ beforeEach(async () => {
   lines = [];
   log = pino({ timestamp: pino.stdTimeFunctions.isoTime }, new Writable({
     write(chunk, _encoding, done) {
-      lines.push(JSON.parse(String(chunk)));
+      lines.push(logLineSchema.parse(JSON.parse(String(chunk))));
       done();
     },
   }));
