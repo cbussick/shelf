@@ -7,6 +7,8 @@ import type { NoteColor } from '../shared/contracts';
 import { validateVisualFile } from './visual-media';
 import { workspaceAccess } from './workspace-access';
 import type { WorkspaceAccess } from './workspace-access';
+import { editorEntry, editorTransition } from './editor-lifecycle';
+import type { EditorLifecycle, EditorSession } from './editor-lifecycle';
 import { api, ApiError, sessionEvents, syncErrorDetails } from './api';
 import { styles } from './app.stylex';
 import { Auth, Brand } from './components/Auth';
@@ -26,15 +28,6 @@ import { clearLocalData, deleteLocalNote, hasLocalData, localNotes, localSyncOve
 import type { LocalNote, PendingNoteSync } from './local-store';
 
 type SyncState = 'connecting' | 'syncing' | 'synced' | 'local' | 'offline' | 'error';
-type EditorSession = { note?: LocalNote; files?: Array<File>; audio?: Array<File>; recording?: boolean; shareId?: string };
-
-// Include the full immutable note snapshot, including attachment/local-blob
-// identities. A parked dialog must never reuse stale save versions or content.
-function readyNoteIdentity(note: LocalNote) {
-  return JSON.stringify([note.id, note.title, note.body, note.color, note.pinned, note.position, note.createdAt, note.updatedAt, note.version,
-    note.images.map(image => [image.id, image.url, image.alt, image.mimeType, image.width, image.height, image.size, image.rotation, image.blobId]),
-    note.audio.map(audio => [audio.id, audio.url, audio.name, audio.mimeType, audio.size, audio.duration, audio.blobId])]);
-}
 
 export function App() {
   const queryClient = useQueryClient();
@@ -71,15 +64,17 @@ export function App() {
 function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlineEntry: boolean; locked: boolean; onSessionExpired: () => void; onLogout: () => void }) {
   const workspace = useRef<HTMLDivElement>(null);
   const lockedRef = useRef(locked);
-  lockedRef.current = locked;
+
   const unsaved = useRef(false);
   const setUnsaved = useCallback((dirty: boolean) => { unsaved.current = dirty; }, []);
   const activeNoteId = useRef<string | undefined>(undefined);
   const activeEditorSession = useRef<string | undefined>(undefined);
+  const activeEditorKeyRef = useRef<string | undefined>(undefined);
   const [editorSync, setEditorSync] = useState<EditorSyncState>('syncing');
   const [editorSyncError, setEditorSyncError] = useState<string>();
   const editorStatusRequest = useRef(0);
   useLayoutEffect(() => {
+    lockedRef.current = locked;
     if (locked) {
       // Top-layer dialogs ignore an ancestor's hidden/inert styling.
       workspace.current?.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach(dialog => dialog.close());
@@ -94,20 +89,13 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   }, [onSessionExpired]);
   const [notes, setNotes] = useState<Array<LocalNote>>([]);
   const [query, setQuery] = useState('');
-  const [editor, setEditor] = useState<EditorSession>();
-  const [parkedEditor, setParkedEditor] = useState<{ value: EditorSession & { note: LocalNote }; read: boolean }>();
-  const nextDraft = useRef(0);
-  const preferredReadyNote = useRef<string | undefined>(undefined);
-  const activeEditorKey = useMemo(() => editor?.note ? readyNoteIdentity(editor.note) : editor ? `draft:${nextDraft.current++}` : undefined, [editor]);
-  const parkedEditorKey = useMemo(() => parkedEditor ? readyNoteIdentity(parkedEditor.value.note) : undefined, [parkedEditor]);
-  const renderedEditor = editor ?? parkedEditor?.value;
-  useEffect(() => {
-    setParkedEditor(previous => {
-      if (!previous) {return previous;}
-      const current = notes.find(note => note.id === previous.value.note.id);
-      return current && readyNoteIdentity(current) === readyNoteIdentity(previous.value.note) ? previous : undefined;
-    });
-  }, [notes]);
+  const [lifecycle, setLifecycle] = useState<EditorLifecycle>({});
+  const reconciled = editorTransition(lifecycle, { type: 'notes', notes });
+  if (reconciled !== lifecycle) { setLifecycle(reconciled); }
+  const editor = lifecycle.active?.value;
+  const activeEditorKey = lifecycle.active?.key;
+  const parkedEditorKey = lifecycle.parked?.key;
+  const renderedEditor = editor ?? lifecycle.parked?.value;
   const [menu, setMenu] = useState<MenuTarget>();
   useEffect(() => clearPreparedDocuments, []);
   const [syncState, setSyncState] = useState<SyncState>(offlineEntry ? 'offline' : 'connecting');
@@ -149,7 +137,6 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const noteToDelete = useRef<LocalNote | null>(null);
   const closeMenu = useCallback(() => setMenu(undefined), []);
-  const openNote = useCallback((note: LocalNote) => { preferredReadyNote.current = note.id; setEditor({ note }); }, []);
   const showMenu = useCallback((note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => {
     setMenu({ note, x: event.clientX, y: event.clientY, origin: event.currentTarget });
   }, []);
@@ -179,14 +166,21 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       }
     }
   }, []);
-  useEffect(() => {
-    activeNoteId.current = editor?.note?.id;
+  const resetEditorStatus = useCallback((id?: string) => {
+    activeNoteId.current = id;
     activeEditorSession.current = undefined;
     unsaved.current = false;
     setEditorSync('syncing');
     setEditorSyncError(undefined);
     void updateEditorSync(navigator.onLine ? 'syncing' : 'offline');
-  }, [editor, updateEditorSync]);
+  }, [updateEditorSync]);
+  const openEditor = useCallback((value: EditorSession) => {
+    const entry = editorEntry(value, crypto.randomUUID());
+    activeEditorKeyRef.current = entry.key;
+    resetEditorStatus(value.note?.id);
+    setLifecycle(current => editorTransition(current, { type: 'open', entry }));
+  }, [resetEditorStatus]);
+  const openNote = useCallback((note: LocalNote) => { openEditor({ note }); }, [openEditor]);
   const reportSyncProgress = useCallback(async () => {
     await refreshOverview();
     await updateEditorSync(navigator.onLine ? 'syncing' : 'offline');
@@ -223,18 +217,28 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       } while (syncRequested.current && !lockedRef.current);
     } finally { syncing.current = false; }
   }, [notify, onSessionExpired, updateEditorSync, refreshOverview, reportSyncProgress]);
-  useEffect(() => { if (!locked) {void synchronize();} }, [locked, synchronize]);
-
   useEffect(() => {
-    void localNotes().then(setNotes).then(refreshOverview).then(synchronize);
+    if (locked) { return; }
+    let active = true;
+    const readVersion = overviewRequest.current;
+    // Entry/re-entry first reads durable local state. Start network work from
+    // that real I/O completion, not a synchronous effect-driven state cascade.
+    void localNotes().then(async local => {
+      if (!active) { return; }
+      if (readVersion === overviewRequest.current) { setNotes(local); }
+      await refreshOverview();
+      if (active) { await synchronize(); }
+    }).catch((error: unknown) => {
+      if (active) { setSyncError(syncErrorDetails(error)); setSyncState('error'); }
+    });
     const online = () => void synchronize();
     const offline = () => { setSyncState('offline'); void updateEditorSync('offline'); };
     const visible = () => { if (document.visibilityState === 'visible') {void synchronize();} };
     const interval = setInterval(() => { if (document.visibilityState === 'visible') {void synchronize();} }, 15_000);
     addEventListener('online', online); addEventListener('offline', offline); document.addEventListener('visibilitychange', visible);
     void navigator.storage?.persist?.();
-    return () => { clearInterval(interval); removeEventListener('online', online); removeEventListener('offline', offline); document.removeEventListener('visibilitychange', visible); };
-  }, [synchronize, updateEditorSync, refreshOverview]);
+    return () => { active = false; clearInterval(interval); removeEventListener('online', online); removeEventListener('offline', offline); document.removeEventListener('visibilitychange', visible); };
+  }, [locked, synchronize, updateEditorSync, refreshOverview]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -248,14 +252,14 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     let active = true;
     void getShare(id).then(files => {
       if (!active) {return;}
-      if (files?.length) {setEditor({ files, shareId: id });}
+      if (files?.length) {openEditor({ files, shareId: id });}
       else {notify('The shared image is no longer available. Please share it again.');}
       if (!files?.length) {history.replaceState(null, '', '/');}
     }).catch(() => {
       if (active) {notify('Could not open the shared image. Please share it again.');}
     });
     return () => { active = false; };
-  }, [notify]);
+  }, [notify, openEditor]);
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
@@ -265,7 +269,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       if (event.target instanceof HTMLElement && event.target.closest('input,textarea,[contenteditable]')) {return;}
       if (document.querySelector('dialog[open]') || event.metaKey || event.ctrlKey || event.altKey) {return;}
       if (event.key.toLowerCase() === 'f') { event.preventDefault(); document.querySelector<HTMLInputElement>('#search')?.focus(); }
-      if (event.key.toLowerCase() === 'n') { event.preventDefault(); setEditor({}); }
+      if (event.key.toLowerCase() === 'n') { event.preventDefault(); openEditor({}); }
       // Require same-document HTMLElement identity before focus/blur or keyboard handling.
       // oxlint-disable-next-line @nkzw/no-instanceof
       if (event.key.toLowerCase() === 'd' && !event.repeat && event.target instanceof HTMLElement) {
@@ -276,7 +280,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     };
     document.addEventListener('keydown', keydown);
     return () => document.removeEventListener('keydown', keydown);
-  }, [notes]);
+  }, [notes, openEditor]);
 
   useEffect(() => {
     const paste = (event: ClipboardEvent) => {
@@ -290,11 +294,11 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
         if (files.length > 6) {throw new Error('Up to 6 images or videos per note.');}
         files.forEach(validateVisualFile);
       } catch (error) { notify(error instanceof Error ? error.message : 'Could not attach these files.'); return; }
-      setEditor({ files });
+      openEditor({ files });
     };
     document.addEventListener('paste', paste);
     return () => document.removeEventListener('paste', paste);
-  }, [editor, notify]);
+  }, [editor, notify, openEditor]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -302,24 +306,18 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   }, [notes, query]);
   const warmReadyEditor = useCallback((id: string, source: string) => {
     const note = notes.find(note => note.id === id && note.body === source);
-    if (!note || note.body.length < 500 || note.images.length || note.audio.length) {return;}
-    setParkedEditor(previous => {
-      // Prefer the last actually read note. Otherwise warm the most expensive
-      // nearby candidate, with a hard limit of one fully initialized dialog.
-      if (previous && previous.value.note.id === note.id) {return previous;}
-      if (previous && note.id !== preferredReadyNote.current && (previous.read || previous.value.note.body.length >= note.body.length)) {return previous;}
-      return { value: { note }, read: note.id === preferredReadyNote.current };
-    });
+    if (note) { setLifecycle(current => editorTransition(current, { type: 'warm', note })); }
   }, [notes]);
-  useNotePreparation(filtered, locked || Boolean(editor), warmReadyEditor, preferredReadyNote.current);
+  useNotePreparation(filtered, locked || Boolean(editor), warmReadyEditor, lifecycle.preferred);
   // Opening a dialog must not rebuild every card or rerun masonry layout.
   const pinned = useMemo(() => filtered.filter(note => note.pinned), [filtered]);
   const others = useMemo(() => filtered.filter(note => !note.pinned), [filtered]);
 
   const save = async (value: EditorValue) => {
+    const ownerKey = value.editorSession ? lifecycle.active?.key : undefined;
     const saved = await persist(() => saveLocalNote(value));
-    if (editor) {
-      preferredReadyNote.current = saved.id;
+    if (ownerKey && ownerKey === activeEditorKeyRef.current) {
+      setLifecycle(current => editorTransition(current, { type: 'saved', key: ownerKey, id: saved.id }));
       activeNoteId.current = saved.id;
       activeEditorSession.current = value.editorSession;
       setEditorSync(navigator.onLine ? 'syncing' : 'offline');
@@ -331,7 +329,11 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     return saved;
   };
   const remove = async (note: LocalNote, editorSession?: string) => {
-    await persist(() => deleteLocalNote(note, editorSession)); setEditor(undefined); setNotes(await localNotes());
+    await persist(() => deleteLocalNote(note, editorSession));
+    activeEditorKeyRef.current = undefined;
+    resetEditorStatus();
+    setLifecycle(current => editorTransition(current, { type: 'deleted', id: note.id }));
+    setNotes(await localNotes());
     notify('Note permanently deleted'); void synchronize();
   };
   const pin = useCallback((note: LocalNote) => {
@@ -371,22 +373,25 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     try {
       if (files.length > 6) {throw new Error('Up to 6 images or videos per note.');}
       [...files].forEach(validateVisualFile);
-      setEditor({ files: [...files] });
+      openEditor({ files: [...files] });
     } catch (error) { notify(error instanceof Error ? error.message : 'Could not attach these files.'); }
   };
   const chooseAudio = (files: Array<File>) => {
-    try { files.forEach(validateAudioFile); setEditor({ audio: files }); }
+    try { files.forEach(validateAudioFile); openEditor({ audio: files }); }
     catch (error) { notify(error instanceof Error ? error.message : 'Could not attach this audio.'); }
   };
   const closeEditor = async (retainReady = false) => {
+    const active = lifecycle.active;
+    if (!active) { return; }
     if (editor?.shareId) {
       try { await discardShare(editor.shareId); }
       catch { notify('Could not remove the temporary shared image from this device.'); }
       history.replaceState(null, '', '/');
     }
-    const retain = Boolean(retainReady && editor?.note && !editor.note.images.length && !editor.note.audio.length);
-    setParkedEditor(retain && editor?.note ? { value: { note: editor.note }, read: true } : undefined);
-    setEditor(undefined);
+    if (active.key !== activeEditorKeyRef.current) { return; }
+    activeEditorKeyRef.current = undefined;
+    resetEditorStatus();
+    setLifecycle(current => editorTransition(current, { type: 'close', key: active.key, retainReady }));
   };
   const logout = async () => {
     if (unsaved.current) {return notify('Save your latest changes before signing out.');}
@@ -405,7 +410,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       <div {...props(styles.accountActions)}><button type="button" data-testid="sync-overview" aria-label={overviewLabel} title={status.label} onClick={() => syncDialog.current?.showModal()} {...props(styles.syncButton, hasSyncFailures && styles.saveStatusWarning)}><Icon name={hasSyncFailures ? 'cloud-warning' : status.icon}/><span>{overviewLabel}</span></button><button type="button" onClick={() => void logout()} {...props(styles.signOutButton)}>Sign out</button></div>
     </header>
     <main id="main" {...props(styles.workspace)}><section {...props(styles.pageHeading)}><h1 {...props(styles.h1)}>Your notes</h1></section>
-      <nav aria-label="Create a note" {...props(styles.floatingCapture)}><button type="button" aria-label="Add an image or video" onClick={() => imageInput.current?.click()} {...props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => setEditor({ recording: true })}/><span {...props(styles.mobileDivider)}/><button type="button" onClick={() => setEditor({})} {...props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
+      <nav aria-label="Create a note" {...props(styles.floatingCapture)}><button type="button" aria-label="Add an image or video" onClick={() => imageInput.current?.click()} {...props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => openEditor({ recording: true })}/><span {...props(styles.mobileDivider)}/><button type="button" onClick={() => openEditor({})} {...props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
       {pinned.length > 0 && <NoteBoard notes={pinned} pendingSync={pendingNotes} heading="Pinned" label="Pinned notes" onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/>}
       {others.length > 0 && <div {...props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} pendingSync={pendingNotes} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
       {filtered.length === 0 && <section {...props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...props(styles.secondary)}>Clear search</button>}</section>}
