@@ -8,7 +8,7 @@ test('rapid text edits sync without conflict', async ({ page }) => {
   const release = new Promise<void>(resolve => { releaseFirstSave = resolve; });
   let first = true;
   await page.route('**/api/notes/*', async route => {
-    if (!first || route.request().method() !== 'PUT') return route.continue();
+    if (!first || route.request().method() !== 'PUT') {return route.continue();}
     first = false;
     const response = await route.fetch();
     serverSaved();

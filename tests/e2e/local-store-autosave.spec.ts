@@ -20,7 +20,7 @@ test.beforeAll(async () => {
   });
   const outputs = Array.isArray(result) ? result : [result];
   const chunk = outputs.flatMap(output => 'output' in output ? output.output : []).find(output => output.type === 'chunk');
-  if (!chunk || chunk.type !== 'chunk') throw new Error('Storage test bundle missing');
+  if (!chunk || chunk.type !== 'chunk') {throw new Error('Storage test bundle missing');}
   storageScript = chunk.code;
 });
 
@@ -172,7 +172,7 @@ for (const failure of ['save', 'reorder'] as const) {
     await page.evaluate(async failure => {
       const { storage, draft } = window;
       await storage.saveLocalNote(draft);
-      if (failure === 'reorder') await storage.syncNotes();
+      if (failure === 'reorder') {await storage.syncNotes();}
       await storage.reorderLocalNotes([draft.id!]);
     }, failure);
     const requests: string[] = [];
@@ -388,7 +388,7 @@ test('conflict recovery reports the preserved copy id and keeps the server origi
       form.set('payload', JSON.stringify({ ...original, title: 'Server edit', expectedVersion: original.version, retainedImageIds: [], newImageIds: [], retainedAudioIds: [], newAudio: [] }));
       return form;
     })() });
-    if (!remote.ok) throw new Error(`Remote edit failed: ${remote.status}`);
+    if (!remote.ok) {throw new Error(`Remote edit failed: ${remote.status}`);}
     await storage.saveLocalNote({ ...draft, title: 'Local edit' });
     const sync = await storage.syncNotes();
     return { sync, originalId: original.id, copyState: await storage.noteSyncState(sync.conflictCopies[original.id]) };
@@ -412,7 +412,7 @@ test('overview counts visible pending saves, not deletions or reorder work, and 
     await storage.deleteLocalNote(removed);
     await storage.reorderLocalNotes([draft.id!]);
     const overview = await storage.localSyncOverview();
-    if (overview.pending !== 3 || Object.keys(overview.notes).join() !== draft.id) throw new Error('Overview must count notes separately from other work');
+    if (overview.pending !== 3 || Object.keys(overview.notes).join() !== draft.id) {throw new Error('Overview must count notes separately from other work');}
     return draft.id!;
   });
   await page.route(`**/api/notes/${id}`, route => route.fulfill({ status: 503, json: { error: 'Try this upload again later.' } }));
@@ -433,7 +433,7 @@ test('a failed stale upload does not attach its error to a newer edit', async ({
   let requested!: () => void;
   const started = new Promise<void>(resolve => { requested = resolve; });
   await page.route('**/api/notes/*', async route => {
-    if (route.request().method() !== 'PUT') return route.continue();
+    if (route.request().method() !== 'PUT') {return route.continue();}
     requested(); await held;
     await route.fulfill({ status: 500, json: { error: 'The old upload failed.' } });
   });

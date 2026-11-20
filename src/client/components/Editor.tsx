@@ -86,7 +86,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   const saveFailed = Boolean(writer.error);
   const flush = () => {
     try {
-      if (dirty) latest.current.value = { ...latest.current.value, body: bodyInput.current?.read() ?? body };
+      if (dirty) {latest.current.value = { ...latest.current.value, body: bodyInput.current?.read() ?? body };}
       return writer.flush();
     } catch (caught) { writer.error = caught; writer.changed(); return Promise.resolve(false); }
   };
@@ -97,18 +97,18 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     writer.changed = () => renderCheckpoint(count => count + 1);
     return () => { writer.changed = () => {}; void writer.stop(); };
   }, [writer]);
-  useEffect(() => { if (open && !deleting) writer.schedule(); }, [writer, key, open, deleting]);
+  useEffect(() => { if (open && !deleting) {writer.schedule();} }, [writer, key, open, deleting]);
   useEffect(() => { onDirtyChange?.(dirty || writer.saving); }, [dirty, writer.saving, onDirtyChange]);
   useEffect(() => {
-    if (!open) return;
-    const hidden = () => { if (document.visibilityState === 'hidden') void flushRef.current(); };
+    if (!open) {return;}
+    const hidden = () => { if (document.visibilityState === 'hidden') {void flushRef.current();} };
     const pagehide = () => { void flushRef.current(); };
     document.addEventListener('visibilitychange', hidden);
     addEventListener('pagehide', pagehide);
     return () => { document.removeEventListener('visibilitychange', hidden); removeEventListener('pagehide', pagehide); };
   }, [open]);
   useEffect(() => {
-    if (!open || (!dirty && !writer.saving)) return;
+    if (!open || (!dirty && !writer.saving)) {return;}
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     addEventListener('beforeunload', warn);
     return () => removeEventListener('beforeunload', warn);
@@ -119,16 +119,16 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     if (open && !locked) {
       bodyInput.current?.restartReading();
       element?.showModal();
-      if (element) element.scrollTop = 0;
+      if (element) {element.scrollTop = 0;}
       // Mount the recorder only after the editor is in the browser's top layer.
-      if (initialRecording) setRecordingOpen(true);
-    } else element?.close();
+      if (initialRecording) {setRecordingOpen(true);}
+    } else {element?.close();}
     return () => element?.close();
   }, [open, note, initialRecording, locked]);
   useEffect(() => {
     const viewport = window.visualViewport;
     const element = dialog.current;
-    if (!viewport || !element) return;
+    if (!viewport || !element) {return;}
     const update = () => {
       element.style.setProperty('--editor-viewport-height', `${viewport.height}px`);
       element.style.setProperty('--editor-viewport-top', `${viewport.offsetTop}px`);
@@ -142,9 +142,9 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     };
   }, []);
   const requestClose = () => {
-    if (saving || deleting || recordingOpen) return;
-    if (!dirty && !writer.saving) return onClose(canRetainReady.current && Boolean(note) && bodyInput.current?.isReady());
-    if (saveFailed) return discardDialog.current?.showModal();
+    if (saving || deleting || recordingOpen) {return;}
+    if (!dirty && !writer.saving) {return onClose(canRetainReady.current && Boolean(note) && bodyInput.current?.isReady());}
+    if (saveFailed) {return discardDialog.current?.showModal();}
     void saveAndClose();
   };
   const requestImageRemoval = (image: NonNullable<typeof imageToRemove.current>) => {
@@ -154,15 +154,15 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   const confirmImageRemoval = () => {
     const image = imageToRemove.current;
     imageToRemove.current = null;
-    if (!image) return;
-    if (previewIndex !== null) setPreviewIndex(gallery.length === 1 ? null : Math.min(previewIndex, gallery.length - 2));
-    if (image.kind === 'retained') setRetainedImages(images => images.filter(item => item.id !== image.id));
-    else setNewImages(files => files.filter((_, index) => index !== image.index));
+    if (!image) {return;}
+    if (previewIndex !== null) {setPreviewIndex(gallery.length === 1 ? null : Math.min(previewIndex, gallery.length - 2));}
+    if (image.kind === 'retained') {setRetainedImages(images => images.filter(item => item.id !== image.id));}
+    else {setNewImages(files => files.filter((_, index) => index !== image.index));}
   };
   const rotateImage = (step: -90 | 90) => {
-    if (previewIndex === null || saving) return;
+    if (previewIndex === null || saving) {return;}
     const item = gallery[previewIndex];
-    if (isVideo('image' in item ? item.image.mimeType : item.mimeType)) return;
+    if (isVideo('image' in item ? item.image.mimeType : item.mimeType)) {return;}
     const rotation = ((('image' in item ? item.image.rotation : item.rotation) + step + 360) % 360) as ImageRotation;
     if (item.removal.kind === 'retained') {
       const id = item.removal.id;
@@ -173,13 +173,13 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     }
   };
   const addFiles = (files: FileList | File[] | null) => {
-    if (!files?.length) return;
+    if (!files?.length) {return;}
     const accepted: File[] = [];
     for (const file of files) {
       try { validateVisualFile(file); accepted.push(file); }
       catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not attach this file.'); }
     }
-    if (retainedImages.length + newImages.length + accepted.length > 6) return setError('Up to 6 images or videos per note.');
+    if (retainedImages.length + newImages.length + accepted.length > 6) {return setError('Up to 6 images or videos per note.');}
     setNewImages(current => [...current, ...accepted]);
   };
   const addAudio = (files: File[]) => {
@@ -196,13 +196,13 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   const confirmAudioRemoval = () => {
     const audio = audioToRemove.current;
     audioToRemove.current = null;
-    if (audio?.kind === 'retained') setRetainedAudio(current => current.filter(item => item.id !== audio.id));
-    else if (audio?.kind === 'new') setNewAudio(current => current.filter(file => file !== audio.file));
+    if (audio?.kind === 'retained') {setRetainedAudio(current => current.filter(item => item.id !== audio.id));}
+    else if (audio?.kind === 'new') {setNewAudio(current => current.filter(file => file !== audio.file));}
   };
   const pasteImages = (event: React.ClipboardEvent<HTMLDialogElement>) => {
-    if (saving) return;
+    if (saving) {return;}
     const items = [...event.clipboardData.items].filter(item => item.kind === 'file' && (item.type.startsWith('image/') || isVideo(item.type)));
-    if (!items.length) return; // Leave normal text paste alone.
+    if (!items.length) {return;} // Leave normal text paste alone.
     event.preventDefault();
     addFiles(items.flatMap(item => {
       const file = item.getAsFile();
@@ -211,15 +211,15 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
   };
   const saveAndClose = async () => {
     setSaving(true);
-    if (await flush()) onClose();
-    else setSaving(false);
+    if (await flush()) {onClose();}
+    else {setSaving(false);}
   };
   const remove = async () => {
     setDeleting(true);
     await writer.stop(); // Fence queued checkpoints before deleting, including a first upload.
     try {
-      if (committedNote.current) await onDelete(committedNote.current, editorSession.current);
-      else onClose();
+      if (committedNote.current) {await onDelete(committedNote.current, editorSession.current);}
+      else {onClose();}
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not delete this note.');
       writer.resume(); setDeleting(false);
@@ -234,18 +234,18 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'}
       onInputCapture={() => { canRetainReady.current = false; }}
       onClickCapture={event => {
-        if (event.target instanceof Element && event.target.closest('button:not([data-close-note])')) canRetainReady.current = false;
+        if (event.target instanceof Element && event.target.closest('button:not([data-close-note])')) {canRetainReady.current = false;}
       }} onKeyDownCapture={event => {
       // ProseMirror consumes Escape. Handle it before the editing surface so
       // Shelf retains its existing save-on-Escape behavior.
       if (event.key === 'Escape' && !event.defaultPrevented && !event.nativeEvent.isComposing && event.target instanceof HTMLElement && event.target.closest('#note-body')) {
         event.preventDefault(); requestClose();
       }
-    }} onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onPasteCapture={event => { canRetainReady.current = false; pasteImages(event); }} onPointerDownCapture={event => { backdropPress.current = isDialogBackdrop(event); }} onPointerCancelCapture={() => { backdropPress.current = false; }} onClick={event => {
+    }} onCancel={event => { if (event.target !== event.currentTarget) {return;} event.preventDefault(); requestClose(); }} onPasteCapture={event => { canRetainReady.current = false; pasteImages(event); }} onPointerDownCapture={event => { backdropPress.current = isDialogBackdrop(event); }} onPointerCancelCapture={() => { backdropPress.current = false; }} onClick={event => {
       // A selection drag can start inside and produce a click on the backdrop.
       const startedOnBackdrop = backdropPress.current;
       backdropPress.current = false;
-      if (startedOnBackdrop && isDialogBackdrop(event)) requestClose();
+      if (startedOnBackdrop && isDialogBackdrop(event)) {requestClose();}
     }} {...stylex.props(styles.dialog, styles.editor, styles[color])}>
       <div {...stylex.props(styles.editorForm)}>
         <header {...stylex.props(styles.editorHeader)}>
@@ -294,7 +294,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
 }
 
 function isDialogBackdrop(event: React.MouseEvent<HTMLDialogElement>) {
-  if (event.target !== event.currentTarget) return false;
+  if (event.target !== event.currentTarget) {return false;}
   const rect = event.currentTarget.getBoundingClientRect();
   return event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
 }
@@ -311,13 +311,13 @@ function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: 
     editingFocus.current = null;
   };
   useEffect(() => {
-    if (!open) return;
-    if (!editingFocus.current) container.current?.querySelector<HTMLInputElement>('input:checked')?.focus();
+    if (!open) {return;}
+    if (!editingFocus.current) {container.current?.querySelector<HTMLInputElement>('input:checked')?.focus();}
     const dismiss = (event: PointerEvent) => {
       if (!container.current?.contains(event.target as Node)) { setOpen(false); editingFocus.current = null; }
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !editingFocus.current) return;
+      if (event.key !== 'Escape' || !editingFocus.current) {return;}
       event.preventDefault();
       event.stopPropagation();
       close();
@@ -336,7 +336,7 @@ function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: 
       // Cancel compatibility mousedown, not pointerdown: WebKit suppresses
       // the touch click if pointerdown is cancelled. Keep desktop focus behavior.
       event.preventDefault();
-    } else if (!open) editingFocus.current = null;
+    } else if (!open) {editingFocus.current = null;}
   }} onKeyDown={event => {
     if (event.key === 'Escape' && open) {
       event.preventDefault();
@@ -344,9 +344,9 @@ function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: 
       close();
     }
   }} {...stylex.props(styles.colorPickerAnchor)}>
-    <button ref={trigger} type="button" aria-label="Note color" aria-expanded={open} aria-controls="note-color-choices" onClick={() => { if (open) close(); else setOpen(true); }} {...stylex.props(styles.iconButton)}><Icon name="palette"/></button>
+    <button ref={trigger} type="button" aria-label="Note color" aria-expanded={open} aria-controls="note-color-choices" onClick={() => { if (open) {close();} else {setOpen(true);} }} {...stylex.props(styles.iconButton)}><Icon name="palette"/></button>
     {open && <div id="note-color-choices" {...stylex.props(styles.colorPopover)}>
-      <fieldset {...stylex.props(styles.colorPicker)}><legend className="sr-only">Note color</legend>{colors.map(option => <label key={option} {...stylex.props(styles.swatch, styles[option], option === 'paper' && styles.paperSwatch, option === color && styles.swatchSelected)}><input type="radio" name="color" value={option} checked={option === color} onClick={() => { if (option === color) close(); }} onChange={() => { onChange(option); close(); }} aria-label={option[0].toUpperCase() + option.slice(1)} {...stylex.props(styles.radio)}/></label>)}</fieldset>
+      <fieldset {...stylex.props(styles.colorPicker)}><legend className="sr-only">Note color</legend>{colors.map(option => <label key={option} {...stylex.props(styles.swatch, styles[option], option === 'paper' && styles.paperSwatch, option === color && styles.swatchSelected)}><input type="radio" name="color" value={option} checked={option === color} onClick={() => { if (option === color) {close();} }} onChange={() => { onChange(option); close(); }} aria-label={option[0].toUpperCase() + option.slice(1)} {...stylex.props(styles.radio)}/></label>)}</fieldset>
     </div>}
   </div>;
 }
@@ -367,7 +367,7 @@ function ImagePreview({ gallery, index, onIndexChange, onRotate, onRemove, onClo
   const preview = gallery[index];
   const video = galleryVideo(preview);
   const move = (step: number) => onIndexChange((index + step + gallery.length) % gallery.length);
-  return <dialog ref={dialog} aria-label="Image preview" onClose={onClose} onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }} onKeyDown={event => { if (event.target instanceof HTMLVideoElement) return; if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); } }} {...stylex.props(styles.previewDialog)}>
+  return <dialog ref={dialog} aria-label="Image preview" onClose={onClose} onClick={event => { if (event.target === event.currentTarget) {dialog.current?.close();} }} onKeyDown={event => { if (event.target instanceof HTMLVideoElement) {return;} if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); } }} {...stylex.props(styles.previewDialog)}>
     <div {...stylex.props(styles.previewStage)}><div {...stylex.props(styles.previewImage)}>
       {'image' in preview ? <LocalPhoto key={preview.image.id} image={preview.image} controls className={stylex.props(styles.previewPhoto).className}/> : <Photo key={preview.src} src={preview.src} mimeType={preview.mimeType} controls alt={preview.alt} rotation={preview.rotation} className={stylex.props(styles.previewPhoto).className}/>}
       <div {...stylex.props(styles.previewImageActions)}>

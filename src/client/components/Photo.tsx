@@ -11,7 +11,7 @@ function Video({ src, name, width, height, crop, className, controls }: {
   const player = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const video = player.current;
-    if (video && src && video.getAttribute('src') !== src) video.src = src;
+    if (video && src && video.getAttribute('src') !== src) {video.src = src;}
     return () => { video?.pause(); video?.removeAttribute('src'); video?.load(); };
   }, [src]);
   return <span {...stylex.props(styles.videoFrame, crop && styles.videoCrop)}>
@@ -26,10 +26,10 @@ export function Photo({ src, alt, width, height, rotation = 0, crop = false, cla
   src: string; alt: string; width?: number; height?: number; rotation?: ImageRotation; crop?: boolean; className?: string; mimeType?: string; controls?: boolean;
 }) {
   const [loaded, setLoaded] = useState({ width: 0, height: 0 });
-  if (isVideo(mimeType)) return <Video key={src} src={src} name={alt} width={width} height={height} crop={crop} className={className} controls={controls}/>;
+  if (isVideo(mimeType)) {return <Video key={src} src={src} name={alt} width={width} height={height} crop={crop} className={className} controls={controls}/>;}
   const w = width ?? loaded.width;
   const h = height ?? loaded.height;
-  if (!rotation || !w || !h) return <img src={src} alt={alt} width={width} height={height} className={className} onLoad={event => setLoaded({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}/>;
+  if (!rotation || !w || !h) {return <img src={src} alt={alt} width={width} height={height} className={className} onLoad={event => setLoaded({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}/>;}
   const sideways = rotation === 90 || rotation === 270;
   const displayWidth = sideways ? h : w;
   const displayHeight = sideways ? w : h;

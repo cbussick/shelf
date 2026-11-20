@@ -8,7 +8,7 @@ const formats = new Map([
 export async function inspectVideo(path: string) {
   const detected = await fileTypeFromFile(path);
   const extension = detected && formats.get(detected.mime);
-  if (!detected || !extension) throw new Error('Unsupported video container.');
+  if (!detected || !extension) {throw new Error('Unsupported video container.');}
   const metadata = await parseFile(path, { skipCovers: true });
   const track = metadata.format.trackInfo.find(track => track.type === TrackType.video)?.video;
   const width = track?.pixelWidth;

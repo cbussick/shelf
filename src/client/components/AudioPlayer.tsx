@@ -21,60 +21,60 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
   const [error, setError] = useState('');
   const errorToastId = useId();
   const playbackError = () => {
-    if (!mounted.current) return;
+    if (!mounted.current) {return;}
     if (compact) {
       toast.error(`Could not play ${name}`, {
         id: errorToastId, description: 'Check your connection and try again.', duration: 6000,
         cancel: { label: 'Dismiss', onClick: () => {} },
       });
-    } else setError('Could not play this audio. Check your connection or download it to play elsewhere.');
+    } else {setError('Could not play this audio. Check your connection or download it to play elsewhere.');}
   };
-  useEffect(() => { if (audio?.duration) setDuration(audio.duration); }, [audio?.duration]);
+  useEffect(() => { if (audio?.duration) {setDuration(audio.duration);} }, [audio?.duration]);
   useEffect(() => {
     mounted.current = true;
     const element = player.current;
     return () => {
       mounted.current = false;
       element?.pause();
-      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+      if (objectUrl.current) {URL.revokeObjectURL(objectUrl.current);}
       toast.dismiss(errorToastId);
     };
   }, [errorToastId]);
   const load = async () => {
-    if (!source.current) source.current = (file ? Promise.resolve(URL.createObjectURL(file)) : audioSource(audio!)).then(url => {
+    if (!source.current) {source.current = (file ? Promise.resolve(URL.createObjectURL(file)) : audioSource(audio!)).then(url => {
       if (url.startsWith('blob:')) {
         if (!mounted.current) { URL.revokeObjectURL(url); throw new Error('Player closed.'); }
         objectUrl.current = url;
       }
-      if (player.current) player.current.src = url;
+      if (player.current) {player.current.src = url;}
       return url;
-    }).catch((caught: unknown) => { source.current = undefined; throw caught; });
+    }).catch((caught: unknown) => { source.current = undefined; throw caught; });}
     return source.current;
   };
   const toggle = async () => {
     const element = player.current;
-    if (!element || loading) return;
+    if (!element || loading) {return;}
     if (!element.paused) { element.pause(); return; }
     setLoading(true); setError('');
     try {
       await load();
       if (mounted.current) {
-        if (element.error) element.load();
+        if (element.error) {element.load();}
         await element.play();
-        if (mounted.current) toast.dismiss(errorToastId);
+        if (mounted.current) {toast.dismiss(errorToastId);}
       }
     } catch {
       playbackError();
-    } finally { if (mounted.current) setLoading(false); }
+    } finally { if (mounted.current) {setLoading(false);} }
   };
   const updateDuration = () => {
     const seconds = player.current?.duration;
-    if (seconds && Number.isFinite(seconds)) setDuration(seconds);
+    if (seconds && Number.isFinite(seconds)) {setDuration(seconds);}
   };
   const download = async () => {
     try {
       const url = await load();
-      if (!mounted.current) return;
+      if (!mounted.current) {return;}
       const link = document.createElement('a');
       link.href = !url.startsWith('blob:') ? `${url}?download=1` : url;
       link.download = name;
@@ -91,7 +91,7 @@ export function AudioPlayer({ audio, file, compact = false, onRemove }: {
     <input type="range" aria-label={`Seek ${name}`} min={0} max={duration || 1} step={0.1} value={Math.min(position, duration || 1)} disabled={!duration || !source.current} onChange={event => { if (player.current) { player.current.currentTime = Number(event.target.value); setPosition(Number(event.target.value)); } }} {...stylex.props(styles.audioSeek)}/>
     {error && <p role="alert" {...stylex.props(styles.audioError)}>{error}</p>}
     <audio ref={player} preload="none" onPlay={() => {
-      document.querySelectorAll('audio').forEach(other => { if (other !== player.current) other.pause(); });
+      document.querySelectorAll('audio').forEach(other => { if (other !== player.current) {other.pause();} });
       setPlaying(true);
     }} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} onTimeUpdate={() => setPosition(player.current?.currentTime ?? 0)} onLoadedMetadata={updateDuration} onDurationChange={updateDuration} onError={() => { setPlaying(false); playbackError(); }}/>
   </div>;

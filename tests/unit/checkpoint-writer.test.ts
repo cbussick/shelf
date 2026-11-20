@@ -25,7 +25,7 @@ describe('local checkpoints', () => {
   it('serializes slow saves and acknowledges only their own snapshots', async () => {
     let release!: () => void;
     const blocked = new Promise<void>(resolve => { release = resolve; });
-    const write = vi.fn(async (value: string) => { if (value === 'first') await blocked; });
+    const write = vi.fn(async (value: string) => { if (value === 'first') {await blocked;} });
     const f = fixture(write);
     f.edit('first');
     const flush = f.writer.flush();
@@ -41,7 +41,7 @@ describe('local checkpoints', () => {
   it('commits a revert made while an older write is in flight', async () => {
     let release!: () => void;
     const blocked = new Promise<void>(resolve => { release = resolve; });
-    const f = fixture(vi.fn(async (value: string) => { if (value === 'temporary') await blocked; }));
+    const f = fixture(vi.fn(async (value: string) => { if (value === 'temporary') {await blocked;} }));
     f.edit('temporary'); const flush = f.writer.flush(); await Promise.resolve();
     f.edit('original'); release(); await flush;
     expect(f.write.mock.calls.map(([value]) => value)).toEqual(['temporary', 'original']);

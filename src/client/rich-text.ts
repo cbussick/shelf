@@ -24,14 +24,14 @@ export type Format = 'heading' | 'bold' | 'italic' | 'bullet' | 'ordered' | 'tas
 function mergeAdjacentLists(tr: Transaction) {
   const boundaries: number[] = [];
   tr.doc.descendants((node, pos) => {
-    if (node.type.name === 'bullet_list' || node.type.name === 'ordered_list') boundaries.push(pos);
+    if (node.type.name === 'bullet_list' || node.type.name === 'ordered_list') {boundaries.push(pos);}
   });
   for (const pos of boundaries.reverse()) {
     const { nodeBefore: before, nodeAfter: after } = tr.doc.resolve(pos);
-    if (!before || !after || before.type !== after.type) continue;
+    if (!before || !after || before.type !== after.type) {continue;}
     // A non-default ordered start is intentional unless it continues the list.
-    if (after.type.name === 'ordered_list' && after.attrs.order !== 1 && after.attrs.order !== before.attrs.order + before.childCount) continue;
-    if (!canJoin(tr.doc, pos)) continue;
+    if (after.type.name === 'ordered_list' && after.attrs.order !== 1 && after.attrs.order !== before.attrs.order + before.childCount) {continue;}
+    if (!canJoin(tr.doc, pos)) {continue;}
     const spread = before.attrs.spread || after.attrs.spread;
     tr.join(pos);
     if (spread !== before.attrs.spread) {
@@ -44,7 +44,7 @@ function mergeAdjacentLists(tr: Transaction) {
 function listItem(state: EditorState) {
   const { $from } = state.selection;
   for (let depth = $from.depth; depth > 0; depth--) {
-    if ($from.node(depth).type.name === 'list_item') return $from.node(depth);
+    if ($from.node(depth).type.name === 'list_item') {return $from.node(depth);}
   }
   return null;
 }
@@ -55,16 +55,16 @@ function checklist(): Command {
     const apply: NonNullable<typeof dispatch> = tr => {
       const { from, to, $from } = tr.selection;
       let depth = $from.depth;
-      while (depth > 0 && $from.node(depth).type.name !== 'list_item') depth--;
+      while (depth > 0 && $from.node(depth).type.name !== 'list_item') {depth--;}
       tr.doc.nodesBetween(from, to, (node, pos) => {
-        if (node.type.name !== 'list_item' || tr.doc.resolve(pos).depth + 1 !== depth) return;
+        if (node.type.name !== 'list_item' || tr.doc.resolve(pos).depth + 1 !== depth) {return;}
         tr.setNodeMarkup(pos, undefined, { ...node.attrs, checked });
         return false; // Format selected peers, never ancestors or their children.
       });
       dispatch?.(tr);
     };
     if (listItem(state)) {
-      if (dispatch) apply(state.tr);
+      if (dispatch) {apply(state.tr);}
       return true;
     }
     return wrapInList(state.schema.nodes.bullet_list!)(state, dispatch && apply);
@@ -77,10 +77,10 @@ function checklist(): Command {
 export function syncNoteSelection(view: EditorView) {
   const selection = view.dom.ownerDocument.getSelection();
   if (view.composing || !selection?.anchorNode || !selection.focusNode ||
-    !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) return;
+    !view.dom.contains(selection.anchorNode) || !view.dom.contains(selection.focusNode)) {return;}
   const anchor = view.posAtDOM(selection.anchorNode, selection.anchorOffset);
   const head = view.posAtDOM(selection.focusNode, selection.focusOffset);
-  if (anchor === view.state.selection.anchor && head === view.state.selection.head) return;
+  if (anchor === view.state.selection.anchor && head === view.state.selection.head) {return;}
   view.dispatch(view.state.tr.setSelection(TextSelection.between(view.state.doc.resolve(anchor), view.state.doc.resolve(head))).setMeta('addToHistory', false));
 }
 
@@ -113,17 +113,17 @@ export function moveRows(direction: -1 | 1): Command {
       if ($from.node(depth).type.name === 'list_item') { listDepth = depth - 1; break; }
     }
     const range = $from.blockRange($to, listDepth ? node => node === $from.node(listDepth) : undefined);
-    if (!range) return false;
+    if (!range) {return false;}
     const { parent, startIndex, endIndex, start, end } = range;
     const siblingIndex = direction < 0 ? startIndex - 1 : endIndex;
-    if (siblingIndex < 0 || siblingIndex >= parent.childCount) return false;
+    if (siblingIndex < 0 || siblingIndex >= parent.childCount) {return false;}
     const sibling = parent.child(siblingIndex);
     const rows: ProseNode[] = [];
-    for (let index = startIndex; index < endIndex; index++) rows.push(parent.child(index));
+    for (let index = startIndex; index < endIndex; index++) {rows.push(parent.child(index));}
     const replacement = Fragment.fromArray(direction < 0 ? [...rows, sibling] : [sibling, ...rows]);
     const from = direction < 0 ? start - sibling.nodeSize : start;
     const to = direction < 0 ? end : end + sibling.nodeSize;
-    if (!parent.canReplace(direction < 0 ? siblingIndex : startIndex, direction < 0 ? endIndex : siblingIndex + 1, replacement)) return false;
+    if (!parent.canReplace(direction < 0 ? siblingIndex : startIndex, direction < 0 ? endIndex : siblingIndex + 1, replacement)) {return false;}
     if (dispatch) {
       const tr = closeHistory(state.tr).replaceWith(from, to, replacement);
       // Map the original selection inside the moved content, not through the
@@ -133,7 +133,7 @@ export function moveRows(direction: -1 | 1): Command {
       tr.setSelection(bookmark.map(new Mapping([StepMap.offset(offset)])).resolve(tr.doc));
       dispatch(tr.scrollIntoView());
       // Subsequent typing should undo independently from this row move.
-      if (view) dispatch(closeHistory(view.state.tr));
+      if (view) {dispatch(closeHistory(view.state.tr));}
     }
     return true;
   };
@@ -151,18 +151,18 @@ export function setNoteLink(href: string | null): Command {
       let runFrom = start, runTo = start;
       $from.parent.forEach((node, offset) => {
         if (!current.isInSet(node.marks)) { runTo = -1; return; }
-        if (runTo !== start + offset) runFrom = start + offset;
+        if (runTo !== start + offset) {runFrom = start + offset;}
         runTo = start + offset + node.nodeSize;
         if (runFrom <= cursor && runTo >= cursor) { from = runFrom; to = runTo; }
       });
     }
-    if (!dispatch) return from !== to || href !== null;
+    if (!dispatch) {return from !== to || href !== null;}
     const tr = closeHistory(state.tr);
     if (from === to && href) {
       tr.insertText(href, from).addMark(from, from + href.length, type.create({ href }));
     } else {
       tr.removeMark(from, to, type);
-      if (href) tr.addMark(from, to, type.create({ href }));
+      if (href) {tr.addMark(from, to, type.create({ href }));}
     }
     dispatch(tr);
     return true;
@@ -174,16 +174,16 @@ export function activeFormats(state: EditorState): Format[] {
   const active: Format[] = [];
   for (const [format, name] of [['bold', 'strong'], ['italic', 'emphasis'], ['code', 'inlineCode']] as const) {
     const type = state.schema.marks[name]!;
-    if (empty ? type.isInSet(state.storedMarks ?? $from.marks()) : state.doc.rangeHasMark(from, to, type)) active.push(format);
+    if (empty ? type.isInSet(state.storedMarks ?? $from.marks()) : state.doc.rangeHasMark(from, to, type)) {active.push(format);}
   }
   for (let depth = $from.depth; depth > 0; depth--) {
     const name = $from.node(depth).type.name;
-    if (name === 'heading') active.push('heading');
-    if (name === 'blockquote') active.push('quote');
-    if (name === 'bullet_list') active.push('bullet');
-    if (name === 'ordered_list') active.push('ordered');
+    if (name === 'heading') {active.push('heading');}
+    if (name === 'blockquote') {active.push('quote');}
+    if (name === 'bullet_list') {active.push('bullet');}
+    if (name === 'ordered_list') {active.push('ordered');}
   }
-  if (listItem(state)?.attrs.checked != null) active.push('task');
+  if (listItem(state)?.attrs.checked != null) {active.push('task');}
   return active;
 }
 
@@ -205,7 +205,7 @@ function inertPastedHTML(html: string): string {
   template.innerHTML = html;
   for (const image of template.content.querySelectorAll('img')) {
     const span = document.createElement('span');
-    for (const [key, value] of Object.entries(imagePlaceholderAttributes({ src: image.getAttribute('src') ?? '', alt: image.alt, title: image.title }))) span.setAttribute(key, value);
+    for (const [key, value] of Object.entries(imagePlaceholderAttributes({ src: image.getAttribute('src') ?? '', alt: image.alt, title: image.title }))) {span.setAttribute(key, value);}
     span.textContent = `[Image: ${image.alt || 'use Attach an image'}]`;
     image.replaceWith(span);
   }
@@ -214,7 +214,7 @@ function inertPastedHTML(html: string): string {
     // Snapshot the live NamedNodeMap before removing attributes.
     // oxlint-disable-next-line unicorn/no-useless-spread
     for (const attribute of [...element.attributes]) {
-      if (/^on/i.test(attribute.name) || ['src', 'srcset', 'style', 'background', 'poster', 'autofocus'].includes(attribute.name.toLowerCase())) element.removeAttribute(attribute.name);
+      if (/^on/i.test(attribute.name) || ['src', 'srcset', 'style', 'background', 'poster', 'autofocus'].includes(attribute.name.toLowerCase())) {element.removeAttribute(attribute.name);}
     }
   }
   return template.innerHTML;
@@ -233,14 +233,14 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
     const serialize = (doc: ProseNode) => ctx.get(serializerCtx)(doc);
     return new Plugin({
       appendTransaction(transactions, _oldState, state) {
-        if (!transactions.some(tr => tr.docChanged)) return null;
+        if (!transactions.some(tr => tr.docChanged)) {return null;}
         const tr = mergeAdjacentLists(state.tr);
         return tr.docChanged ? tr : null;
       },
       filterTransaction(tr) {
-        if (!tr.docChanged) return true;
+        if (!tr.docChanged) {return true;}
         const size = initialDoc && tr.doc.eq(initialDoc) ? markdown.length : serialize(tr.doc).length;
-        if (size <= MAX_NOTE_BODY) return true;
+        if (size <= MAX_NOTE_BODY) {return true;}
         onLimit();
         return false;
       },
@@ -261,7 +261,7 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
         return {
           update(current, previous) {
             onSelection(activeFormats(current.state));
-            if (!current.state.doc.eq(previous.doc)) onChange(read());
+            if (!current.state.doc.eq(previous.doc)) {onChange(read());}
           },
         };
       },
@@ -278,7 +278,7 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
     contentDOM.className = 'note-list-content';
     dom.append(checkbox, contentDOM);
     const update = (next: ProseNode) => {
-      if (next.type !== node.type) return false;
+      if (next.type !== node.type) {return false;}
       current = next;
       const task = next.attrs.checked != null;
       checkbox.hidden = !task;
@@ -317,9 +317,9 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
           const structural = event.key === 'Tab' ||
             (event.altKey && ['ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft'].includes(event.key)) ||
             ((event.ctrlKey || event.metaKey) && ['[', ']'].includes(event.key));
-          if (view.editable && structural) syncNoteSelection(view);
+          if (view.editable && structural) {syncNoteSelection(view);}
           if (event.key === 'Tab') {
-            if (view.editable) formatCommand(event.shiftKey ? 'outdent' : 'indent', view.state)(view.state, view.dispatch, view);
+            if (view.editable) {formatCommand(event.shiftKey ? 'outdent' : 'indent', view.state)(view.state, view.dispatch, view);}
             // Always consume Tab, even when the list command cannot apply.
             return true;
           }

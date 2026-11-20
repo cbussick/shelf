@@ -10,9 +10,9 @@ async function trackDatabase(page: Page) {
     const open = IDBFactory.prototype.open;
     IDBFactory.prototype.open = function (...args) {
       const request = open.apply(this, args);
-      if (args[0] === 'shelf') request.addEventListener('success', () => {
+      if (args[0] === 'shelf') {request.addEventListener('success', () => {
         (window as unknown as { shelfDatabase: IDBDatabase }).shelfDatabase = request.result;
-      });
+      });}
       return request;
     };
   });
@@ -55,10 +55,10 @@ for (const closeMethod of ['button', 'header', 'escape', 'backdrop'] as const) {
     await expect(editor.getByRole('textbox', { name: 'Note', exact: true })).toHaveText('Unsaved changes');
     await expect(editor.getByRole('button', { name: 'Retry save', exact: true })).toBeVisible();
     const close = async () => {
-      if (closeMethod === 'button') await editor.getByRole('button', { name: 'Close', exact: true }).click();
-      else if (closeMethod === 'header') await editor.getByRole('button', { name: 'Close note' }).click();
-      else if (closeMethod === 'escape') await page.keyboard.press('Escape');
-      else await page.mouse.click(1, 1);
+      if (closeMethod === 'button') {await editor.getByRole('button', { name: 'Close', exact: true }).click();}
+      else if (closeMethod === 'header') {await editor.getByRole('button', { name: 'Close note' }).click();}
+      else if (closeMethod === 'escape') {await page.keyboard.press('Escape');}
+      else {await page.mouse.click(1, 1);}
     };
     await close();
     const confirmation = page.getByRole('dialog', { name: 'Close without saving?' });

@@ -8,7 +8,7 @@ test('unmounting the audio recorder closes the effect-owned dialog', async ({ pa
   await expect(recorder).toBeVisible();
   // Keep the node, not its React ref: unmount clears the ref before passive cleanup.
   const element = await recorder.elementHandle();
-  if (!element) throw new Error('Recorder dialog did not mount');
+  if (!element) {throw new Error('Recorder dialog did not mount');}
   await recorder.getByRole('button', { name: 'Close audio recorder' }).click();
   await expect(recorder).toHaveCount(0);
   await expect.poll(() => element.evaluate(node => node.hasAttribute('open'))).toBe(false);

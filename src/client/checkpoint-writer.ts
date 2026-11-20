@@ -15,7 +15,7 @@ export class CheckpointWriter<T> {
 
   schedule() {
     clearTimeout(this.timer);
-    if (this.stopped) return;
+    if (this.stopped) {return;}
     if (this.key(this.capture()) === this.savedKey) {
       this.firstChange = undefined;
       if (this.error) { this.error = undefined; this.changed(); }
@@ -27,15 +27,15 @@ export class CheckpointWriter<T> {
 
   flush(): Promise<boolean> {
     clearTimeout(this.timer);
-    if (this.stopped) return Promise.resolve(false);
-    if (this.running) return this.running;
+    if (this.stopped) {return Promise.resolve(false);}
+    if (this.running) {return this.running;}
     // Assign the promise before capture/write can re-enter flush (e.g. a close).
     this.running = Promise.resolve().then(async () => {
       try {
         while (!this.stopped) {
           const value = this.capture();
           const key = this.key(value);
-          if (key === this.savedKey) break;
+          if (key === this.savedKey) {break;}
           if (!this.canWrite(value)) { this.savedKey = key; break; }
           this.firstChange = undefined;
           this.saving = true; this.error = undefined; this.changed();

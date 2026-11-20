@@ -658,7 +658,7 @@ test('pastes clipboard images into new and existing notes without disrupting tex
   await body.focus();
   expect(await pasteImage()).toBe(false);
   await expect(page.getByRole('button', { name: 'View image 2' })).toBeVisible();
-  for (let index = 3; index <= 6; index++) expect(await pasteImage()).toBe(false);
+  for (let index = 3; index <= 6; index++) {expect(await pasteImage()).toBe(false);}
   await expect(page.getByText('2 more images')).toBeVisible();
   expect(await pasteImage()).toBe(false);
   await expect(page.getByRole('alert')).toContainText('Up to 6 images or videos per note.');
@@ -753,7 +753,7 @@ for (const width of [390, 1440]) {
       for (let y = 0; y < info.height; y++) {
         for (let x = 0; x < info.width; x++) {
           const offset = (y * info.width + x) * info.channels;
-          if (data[offset] > 200 && data[offset + 1] > 200 && data[offset + 2] > 200) rows.push(y);
+          if (data[offset] > 200 && data[offset + 1] > 200 && data[offset + 2] > 200) {rows.push(y);}
         }
       }
       expect(rows.length).toBeGreaterThan(0);
@@ -790,7 +790,7 @@ for (const width of [390, 1440]) {
       expect(trashBox.y).toBe(closeBox.y);
       expect(trashBox.x).toBeGreaterThanOrEqual(imageBox.x);
       expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(imageBox.y + imageBox.height);
-      if (index === 0) await preview.getByRole('button', { name: 'Next image' }).click();
+      if (index === 0) {await preview.getByRole('button', { name: 'Next image' }).click();}
     }
     await preview.getByRole('button', { name: 'Close image preview' }).click();
     await expect(preview).not.toBeVisible();
@@ -835,8 +835,8 @@ for (const width of [390, 1440]) {
     expect(closeBox.x - removeBox!.x - removeBox!.width).toBeCloseTo(8, 0);
     expect(closeBox.y).toBe(removeBox!.y);
     const bounds = await preview.boundingBox();
-    if (width === 390) expect(bounds?.width).toBe(width);
-    else expect(bounds?.width).toBeGreaterThan(800);
+    if (width === 390) {expect(bounds?.width).toBe(width);}
+    else {expect(bounds?.width).toBeGreaterThan(800);}
     await page.keyboard.press('Escape');
     await expect(preview).not.toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(`Photo preview ${width}`);
@@ -926,7 +926,7 @@ test('shows the same image mosaic on cards and in the editor', async ({ page }) 
       expect(boxes[2]!.x).toBe(boxes[0]!.x);
       expect(boxes[3]!.x).toBe(boxes[1]!.x);
     }
-    if (count > 4) await expect(editor.getByText(`${count - 4} more ${count === 5 ? 'image' : 'images'}`)).toBeVisible();
+    if (count > 4) {await expect(editor.getByText(`${count - 4} more ${count === 5 ? 'image' : 'images'}`)).toBeVisible();}
     if (count === 6) {
       await editor.getByRole('button', { name: 'View image 4' }).click();
       const preview = page.getByRole('dialog', { name: 'Image preview' });
@@ -941,8 +941,8 @@ test('shows the same image mosaic on cards and in the editor', async ({ page }) 
     const cardBoxes = await card.evaluate(element => Array.from(element.querySelectorAll('img'), image => image.getBoundingClientRect().toJSON()));
     expect(cardBoxes[0].width).toBeGreaterThan(0);
     expect(cardBoxes[0].y).toBe(cardBoxes[1].y);
-    if (count === 3) expect(cardBoxes[2].width).toBeGreaterThan(cardBoxes[0].width * 1.9);
-    if (count > 4) await expect(card.getByText(`${count - 4} more ${count === 5 ? 'image' : 'images'}`)).toBeVisible();
+    if (count === 3) {expect(cardBoxes[2].width).toBeGreaterThan(cardBoxes[0].width * 1.9);}
+    if (count > 4) {await expect(card.getByText(`${count - 4} more ${count === 5 ? 'image' : 'images'}`)).toBeVisible();}
     await card.click();
     await page.getByRole('button', { name: 'Delete note' }).click();
     await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note' }).click();

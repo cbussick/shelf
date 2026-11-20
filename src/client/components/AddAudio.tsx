@@ -12,9 +12,9 @@ export function AddAudio({ onUpload, onRecord, bottom = false, disabled = false 
   const trigger = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {return;}
     container.current?.querySelector<HTMLButtonElement>('[data-audio-action]')?.focus();
-    const dismiss = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) setOpen(false); };
+    const dismiss = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) {setOpen(false);} };
     document.addEventListener('pointerdown', dismiss);
     return () => document.removeEventListener('pointerdown', dismiss);
   }, [open]);
@@ -26,6 +26,6 @@ export function AddAudio({ onUpload, onRecord, bottom = false, disabled = false 
       <button type="button" data-audio-action onClick={() => input.current?.click()} {...stylex.props(styles.contextMenuItem)}><Icon name="upload" width={18}/>Upload audio file</button>
       <button type="button" onClick={() => { setOpen(false); onRecord(); }} {...stylex.props(styles.contextMenuItem)}><Icon name="microphone" width={18}/>Record with microphone</button>
     </div>}
-    <input ref={input} type="file" accept={AUDIO_ACCEPT} multiple hidden onChange={event => { if (event.target.files?.length) onUpload([...event.target.files]); event.target.value = ''; setOpen(false); }}/>
+    <input ref={input} type="file" accept={AUDIO_ACCEPT} multiple hidden onChange={event => { if (event.target.files?.length) {onUpload([...event.target.files]);} event.target.value = ''; setOpen(false); }}/>
   </div>;
 }

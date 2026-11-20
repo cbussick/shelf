@@ -252,7 +252,7 @@ test('conflict copies retain audio and uploaded audio does not autoplay or downl
   expect(notes).toHaveLength(2);
   expect(notes.every((saved: { audio: unknown[] }) => saved.audio.length === 1)).toBe(true);
   const requests: string[] = [];
-  page.on('request', request => { if (request.url().includes('/api/audio/')) requests.push(request.url()); });
+  page.on('request', request => { if (request.url().includes('/api/audio/')) {requests.push(request.url());} });
   await page.reload();
   await expect(page.getByRole('button', { name: 'Play Keep me.wav' })).toHaveCount(2);
   expect(requests).toEqual([]);

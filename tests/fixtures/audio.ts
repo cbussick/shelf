@@ -16,6 +16,6 @@ export function wavAudio(seconds = 1): Buffer {
   buffer.writeUInt16LE(16, 34);
   buffer.write('data', 36);
   buffer.writeUInt32LE(samples * 2, 40);
-  for (let sample = 0; sample < samples; sample++) buffer.writeInt16LE(Math.round(2000 * Math.sin(2 * Math.PI * 440 * sample / sampleRate)), 44 + sample * 2);
+  for (let sample = 0; sample < samples; sample++) {buffer.writeInt16LE(Math.round(2000 * Math.sin(2 * Math.PI * 440 * sample / sampleRate)), 44 + sample * 2);}
   return buffer;
 }

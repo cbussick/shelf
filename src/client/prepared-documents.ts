@@ -22,16 +22,16 @@ export const hasDocumentParser = () => parse !== undefined;
 
 export function getPreparedDocument(source: string): PreparedNode | undefined {
   const entry = documents.get(source);
-  if (!entry) return;
+  if (!entry) {return;}
   documents.delete(source);
   documents.set(source, entry);
   return entry.document;
 }
 
 export function rememberDocument(source: string, document: PreparedNode, owner: number) {
-  if (owner !== generation) return;
+  if (owner !== generation) {return;}
   const size = (source.length + JSON.stringify(document).length) * 2;
-  if (size > MAX_BYTES) return;
+  if (size > MAX_BYTES) {return;}
   const previous = documents.get(source);
   if (previous) { bytes -= previous.bytes; documents.delete(source); }
   documents.set(source, { document, bytes: size });
@@ -44,12 +44,12 @@ export function rememberDocument(source: string, document: PreparedNode, owner: 
 }
 
 export function installDocumentParser(parser: (source: string) => PreparedNode, owner: number) {
-  if (owner === generation) parse = parser;
+  if (owner === generation) {parse = parser;}
 }
 
 export function prepareDocument(source: string): PreparedNode | undefined {
   const existing = getPreparedDocument(source);
-  if (existing || !parse) return existing;
+  if (existing || !parse) {return existing;}
   const document = parse(source);
   rememberDocument(source, document, generation);
   return document;

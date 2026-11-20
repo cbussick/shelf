@@ -30,7 +30,7 @@ test('opening and closing an existing empty note does not delete or rewrite it',
     const form = new FormData();
     form.set('payload', JSON.stringify(payload));
     const response = await fetch(`/api/notes/${payload.id}`, { method: 'PUT', body: form });
-    if (!response.ok) throw new Error('Could not seed empty note');
+    if (!response.ok) {throw new Error('Could not seed empty note');}
   });
   const before = (await (await request.get('/api/notes')).json()).notes[0];
   await page.reload();

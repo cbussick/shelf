@@ -26,24 +26,24 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   const positions = useRef<Map<string, DOMRect> | null>(null);
   const [placement, setPlacement] = useState<{ source: string; target: string } | null>(null);
   const displayed = useMemo(() => {
-    if (!placement) return notes;
+    if (!placement) {return notes;}
     const ordered = [...notes];
     const from = ordered.findIndex(note => note.id === placement.source);
     const to = ordered.findIndex(note => note.id === placement.target);
-    if (from >= 0 && to >= 0) ordered.splice(to, 0, ...ordered.splice(from, 1));
+    if (from >= 0 && to >= 0) {ordered.splice(to, 0, ...ordered.splice(from, 1));}
     return ordered;
   }, [notes, placement]);
   useMasonry(board, displayed);
   useLayoutEffect(() => {
     const before = positions.current;
     positions.current = null;
-    if (!before || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!before || matchMedia('(prefers-reduced-motion: reduce)').matches) {return;}
     board.current?.querySelectorAll<HTMLElement>('[data-item-id]').forEach(item => {
       const old = before.get(item.dataset.itemId!);
-      if (!old || item.dataset.itemId === drag.current?.source) return;
+      if (!old || item.dataset.itemId === drag.current?.source) {return;}
       const next = item.getBoundingClientRect();
       const dx = old.left - next.left, dy = old.top - next.top;
-      if (dx || dy) item.animate([{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }], { duration: 180, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' });
+      if (dx || dy) {item.animate([{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }], { duration: 180, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' });}
     });
   }, [displayed]);
   const snapshot = () => {
@@ -52,7 +52,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   const removeGhost = () => { ghost.current?.remove(); ghost.current = null; };
   const activate = (id: string) => {
     const card = Array.from(board.current?.querySelectorAll<HTMLElement>('[data-item-id]') ?? []).find(item => item.dataset.itemId === id)?.firstElementChild as HTMLElement | undefined;
-    if (!card) return;
+    if (!card) {return;}
     const rect = card.getBoundingClientRect();
     const copy = card.cloneNode(true) as HTMLElement;
     copy.removeAttribute('data-note-id');
@@ -66,7 +66,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   useEffect(() => {
     // Touch-action stays auto so a normal swipe can scroll. Once held, block scrolling while dragging.
     const preventScroll = (event: TouchEvent) => {
-      if (drag.current?.touch && drag.current.active) event.preventDefault();
+      if (drag.current?.touch && drag.current.active) {event.preventDefault();}
     };
     document.addEventListener('touchmove', preventScroll, { passive: false });
     return () => { document.removeEventListener('touchmove', preventScroll); clearTimeout(timer.current); removeGhost(); };
@@ -75,23 +75,23 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
     clearTimeout(timer.current);
     drag.current = null;
     removeGhost();
-    if (preview.current) snapshot();
+    if (preview.current) {snapshot();}
     preview.current = null;
     setPlacement(null);
   };
   const start = (event: React.PointerEvent<HTMLButtonElement>, id: string) => {
-    if (event.button !== 0 || !event.isPrimary) return;
+    if (event.button !== 0 || !event.isPrimary) {return;}
     cancel();
     event.currentTarget.setPointerCapture(event.pointerId);
     const touch = event.pointerType === 'touch';
     drag.current = { source: id, pointerId: event.pointerId, touch, active: false, startX: event.clientX, startY: event.clientY, origin: event.currentTarget.getBoundingClientRect() };
-    if (touch) timer.current = setTimeout(() => {
+    if (touch) {timer.current = setTimeout(() => {
       if (drag.current?.pointerId === event.pointerId) {
         drag.current.active = true;
         suppressClick.current = id;
         activate(id);
       }
-    }, 400);
+    }, 400);}
   };
   const within = (event: Pick<PointerEvent, 'clientX' | 'clientY'>, rect: DOMRect) => event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
   const noteAt = (event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
@@ -100,15 +100,15 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   };
   const move = (event: PointerEvent) => {
     const active = drag.current;
-    if (!active || active.pointerId !== event.pointerId) return;
+    if (!active || active.pointerId !== event.pointerId) {return;}
     if (!active.active) {
-      if (Math.hypot(event.clientX - active.startX, event.clientY - active.startY) < 6) return;
+      if (Math.hypot(event.clientX - active.startX, event.clientY - active.startY) < 6) {return;}
       if (active.touch) { cancel(); return; } // A swipe before the hold is a scroll, not a drag.
       active.active = true;
       suppressClick.current = active.source;
       activate(active.source);
     }
-    if (ghost.current) ghost.current.style.transform = `translate3d(${event.clientX - active.startX}px, ${event.clientY - active.startY}px, 0)`;
+    if (ghost.current) {ghost.current.style.transform = `translate3d(${event.clientX - active.startX}px, ${event.clientY - active.startY}px, 0)`;}
     // The target moves into the source's old slot during preview. Returning there must undo
     // the proposed reorder, not keep targeting the card now occupying that slot.
     if (within(event, active.origin)) {
@@ -128,14 +128,14 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   };
   const end = (event: PointerEvent) => {
     const active = drag.current;
-    if (!active || active.pointerId !== event.pointerId) return;
+    if (!active || active.pointerId !== event.pointerId) {return;}
     const id = active.active && !within(event, active.origin) ? noteAt(event) : undefined;
     const insideBoard = board.current?.getBoundingClientRect();
     const inBoard = insideBoard && within(event, insideBoard);
     const destination = within(event, active.origin) ? undefined : id && id !== active.source ? id : inBoard ? preview.current?.target : undefined;
     cancel();
-    if (destination && destination !== active.source) onReorder(active.source, destination);
-    if (active.active) setTimeout(() => { if (suppressClick.current === active.source) suppressClick.current = undefined; }, 0);
+    if (destination && destination !== active.source) {onReorder(active.source, destination);}
+    if (active.active) {setTimeout(() => { if (suppressClick.current === active.source) {suppressClick.current = undefined;} }, 0);}
   };
   // Captured pointers can be lost when React moves a card in the masonry grid.
   // Listen at the document so release and cancellation still finish the drag.
@@ -159,11 +159,11 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
         onPointerDown={event => start(event, note.id)}
         onCardClick={() => { if (suppressClick.current === note.id) { suppressClick.current = undefined; return; } onOpen(note); }}
         onKeyDown={event => {
-          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowUp' && event.key !== 'ArrowRight' && event.key !== 'ArrowDown') return;
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowUp' && event.key !== 'ArrowRight' && event.key !== 'ArrowDown') {return;}
           event.preventDefault();
           const index = notes.findIndex(item => item.id === note.id);
           const next = notes[index + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1)];
-          if (next) onReorder(note.id, next.id);
+          if (next) {onReorder(note.id, next.id);}
         }}/>) }
     </ul>
   </section>;
@@ -200,7 +200,7 @@ function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, o
     'aria-label': `Open note: ${label}`,
     'aria-describedby': sync ? `note-sync-${note.id}` : undefined,
     title: 'Drag to reorder · arrow keys to move', onClick: onCardClick, onPointerDown,
-    onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => { event.preventDefault(); if (navigator.maxTouchPoints === 0) onContextMenu(note, event); },
+    onContextMenu: (event: React.MouseEvent<HTMLButtonElement>) => { event.preventDefault(); if (navigator.maxTouchPoints === 0) {onContextMenu(note, event);} },
     onDragStart: (event: React.DragEvent<HTMLButtonElement>) => event.preventDefault(), onKeyDown,
   };
   return <li data-item-id={note.id} {...stylex.props(styles.noteItem, dropTarget && styles.dropTarget)}>
@@ -218,11 +218,11 @@ export function LocalPhoto({ image, className, crop, controls }: { image: LocalI
     let objectUrl = '';
     let active = true;
     void imageSource(image).then(url => {
-      if (image.blobId) objectUrl = url;
-      if (active) setSource(url);
-      else if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (image.blobId) {objectUrl = url;}
+      if (active) {setSource(url);}
+      else if (objectUrl) {URL.revokeObjectURL(objectUrl);}
     });
-    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+    return () => { active = false; if (objectUrl) {URL.revokeObjectURL(objectUrl);} };
   }, [image]);
   return <Photo src={source} alt={image.alt} mimeType={image.mimeType} controls={controls} width={image.width} height={image.height} rotation={image.rotation} crop={crop} className={className ?? stylex.props(styles.photo).className}/>;
 }
@@ -230,7 +230,7 @@ export function LocalPhoto({ image, className, crop, controls }: { image: LocalI
 function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: LocalNote[]) {
   useLayoutEffect(() => {
     const board = ref.current;
-    if (!board) return;
+    if (!board) {return;}
     const layout = () => {
       const columns = Number(getComputedStyle(board).getPropertyValue('--columns')) || 4;
       const heights = Array(columns).fill(0) as number[];
@@ -249,7 +249,7 @@ function useMasonry(ref: React.RefObject<HTMLUListElement | null>, notes: LocalN
     // Grid row spans keep the board size fixed when a card's content changes.
     // Observe the measured cards too, including async image loads and audio errors.
     for (const item of board.children) {
-      if (item.firstElementChild) observer.observe(item.firstElementChild);
+      if (item.firstElementChild) {observer.observe(item.firstElementChild);}
     }
     layout();
     return () => observer.disconnect();

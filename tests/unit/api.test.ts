@@ -178,7 +178,7 @@ describe('audio attachments', () => {
     await setup();
     const input = payload();
     let upload = agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input));
-    for (let index = 0; index < 9; index++) upload = upload.attach('audio', wavAudio(), { filename: `${index}.wav`, contentType: 'audio/wav' });
+    for (let index = 0; index < 9; index++) {upload = upload.attach('audio', wavAudio(), { filename: `${index}.wav`, contentType: 'audio/wav' });}
     const created = await upload.attach('images', 'tests/fixtures/image.jpg');
     expect(created.status).toBe(201);
     expect(created.body.note.audio.map((audio: { name: string }) => audio.name)).toEqual(Array.from({ length: 9 }, (_, index) => `${index}.wav`));

@@ -31,11 +31,11 @@ registerRoute(
 worker.addEventListener('message', event => {
   // Browser message data is any; only this exact control token is acted on.
   // oxlint-disable-next-line typescript/no-unsafe-member-access
-  if (event.data?.type === 'SKIP_WAITING') void worker.skipWaiting();
+  if (event.data?.type === 'SKIP_WAITING') {void worker.skipWaiting();}
 });
 
 worker.addEventListener('fetch', event => {
-  if (event.request.method !== 'POST' || new URL(event.request.url).pathname !== '/share-target') return;
+  if (event.request.method !== 'POST' || new URL(event.request.url).pathname !== '/share-target') {return;}
   event.respondWith((async () => {
     try {
       const form = await event.request.formData();
@@ -44,7 +44,7 @@ worker.addEventListener('fetch', event => {
         !(value instanceof File) ||
         !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(value.type) ||
         value.size > 20 * 1024 * 1024 || value.size === 0
-      )) return Response.redirect('/?shareError=invalid', 303);
+      )) {return Response.redirect('/?shareError=invalid', 303);}
       const id = await stageShare(files as File[]);
       return Response.redirect(`/?share=${encodeURIComponent(id)}`, 303);
     } catch {

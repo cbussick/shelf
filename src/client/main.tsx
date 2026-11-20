@@ -33,7 +33,7 @@ function UpdateNotice() {
       }
     };
     updates.addEventListener('available', show);
-    if (updateAvailable) show();
+    if (updateAvailable) {show();}
     addEventListener('online', connection); addEventListener('offline', connection);
     document.addEventListener('visibilitychange', check);
     const interval = setInterval(check, 60_000);
@@ -52,9 +52,9 @@ function UpdateNotice() {
       // Workers installed by older releases did not handle SKIP_WAITING. Fall back to
       // unregistering only if the new worker is still waiting after the request.
       setTimeout(() => {
-        if (navigator.serviceWorker.controller !== controller || !navigator.onLine) return;
+        if (navigator.serviceWorker.controller !== controller || !navigator.onLine) {return;}
         void navigator.serviceWorker.getRegistration().then(async registration => {
-          if (registration?.waiting) await registration.unregister();
+          if (registration?.waiting) {await registration.unregister();}
           location.reload();
         }).catch(() => setApplying(false));
       }, 3000);

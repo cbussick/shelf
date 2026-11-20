@@ -26,7 +26,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
   const cancelSubmenuClose = () => clearTimeout(closeTimer.current);
   const closeColors = () => {
     cancelSubmenuClose();
-    if (submenu.current?.contains(document.activeElement)) colorTrigger.current?.focus({ preventScroll: true });
+    if (submenu.current?.contains(document.activeElement)) {colorTrigger.current?.focus({ preventScroll: true });}
     focusColors.current = false;
     setColorsOpen(false);
   };
@@ -46,7 +46,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
   };
   useLayoutEffect(() => {
     const element = menu.current;
-    if (!element) return;
+    if (!element) {return;}
     const rect = element.getBoundingClientRect();
     element.style.left = `${Math.max(8, Math.min(target.x, innerWidth - rect.width - 8))}px`;
     element.style.top = `${Math.max(8, Math.min(target.y, innerHeight - rect.height - 8))}px`;
@@ -58,7 +58,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
     const element = submenu.current;
     const parent = menu.current;
     const trigger = colorTrigger.current;
-    if (!colorsOpen || !element || !parent || !trigger) return;
+    if (!colorsOpen || !element || !parent || !trigger) {return;}
     const rect = element.getBoundingClientRect();
     const anchor = parent.getBoundingClientRect();
     const right = anchor.right + 4;
@@ -71,7 +71,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
     }
   }, [colorsOpen, target]);
   useEffect(() => {
-    const dismiss = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) onClose(); };
+    const dismiss = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) {onClose();} };
     const escape = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); onClose(); target.origin.focus({ preventScroll: true }); }
     };
@@ -110,7 +110,7 @@ export function NoteContextMenu({ target, onClose, onOpen, onPin, onDelete, onCo
   };
   return <div ref={menu} role="menu" aria-label="Note actions" {...stylex.props(styles.contextMenu)} style={{ left: target.x, top: target.y }} onKeyDown={navigate} onFocus={event => {
     const item = event.target as HTMLElement;
-    if (item !== colorTrigger.current && item.parentElement === menu.current) closeColors();
+    if (item !== colorTrigger.current && item.parentElement === menu.current) {closeColors();}
   }}>
     <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onDelete)} {...stylex.props(styles.contextMenuDanger)}><Icon name="trash"/>Delete</button>
     <button type="button" role="menuitem" tabIndex={-1} onClick={() => choose(onPin)} {...stylex.props(styles.contextMenuItem)}><Icon name={target.note.pinned ? 'pin-filled' : 'pin'}/>{target.note.pinned ? 'Unpin' : 'Pin'}</button>

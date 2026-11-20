@@ -13,10 +13,10 @@ export function Auth({ setupRequired, onAuthenticated, sessionExpired = false }:
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const parsed = passwordSchema.safeParse(password);
-    if (!parsed.success && setupRequired) return setError(parsed.error.issues[0]?.message ?? 'Choose a stronger password.');
+    if (!parsed.success && setupRequired) {return setError(parsed.error.issues[0]?.message ?? 'Choose a stronger password.');}
     setBusy(true); setError('');
     try {
-      if (setupRequired) await api.setup(password); else await api.login(password);
+      if (setupRequired) {await api.setup(password);} else {await api.login(password);}
       await onAuthenticated();
       setBusy(false);
     } catch (caught) {

@@ -36,7 +36,7 @@ function openDatabase() {
       database.createObjectStore('meta');
     },
     terminated() {
-      if (databasePromise === opening) databasePromise = undefined;
+      if (databasePromise === opening) {databasePromise = undefined;}
     },
   });
   return opening;
@@ -52,8 +52,8 @@ async function getDatabase() {
     await probe.done;
     return database;
   } catch (error) {
-    if (databasePromise === opening) databasePromise = undefined;
-    if (!(error instanceof DOMException && error.name === 'InvalidStateError')) throw error;
+    if (databasePromise === opening) {databasePromise = undefined;}
+    if (!(error instanceof DOMException && error.name === 'InvalidStateError')) {throw error;}
     (await opening).close();
     return databasePromise ??= openDatabase();
   }
@@ -127,7 +127,7 @@ export async function saveLocalNote(value: {
   retainedImages: LocalImage[]; newImages: File[]; newImageIds?: string[]; newImageRotations?: ImageRotation[]; version?: number; createdAt?: string;
   retainedAudio?: LocalAudio[]; newAudio?: File[]; newAudioIds?: string[];
 }): Promise<LocalNote> {
-  for (const file of value.newAudio ?? []) validateAudioFile(file);
+  for (const file of value.newAudio ?? []) {validateAudioFile(file);}
   const now = new Date().toISOString();
   let id = value.id ?? crypto.randomUUID();
   let images = [...value.retainedImages];
@@ -135,10 +135,10 @@ export async function saveLocalNote(value: {
   const blobs: { id: string; file: File }[] = [];
   for (const [index, file] of value.newImages.entries()) {
     const dimensions = await prepareVisual(file);
-    if (dimensions.width * dimensions.height > 40_000_000) throw new Error('Images and videos may contain up to 40 megapixels.');
+    if (dimensions.width * dimensions.height > 40_000_000) {throw new Error('Images and videos may contain up to 40 megapixels.');}
     const imageId = value.newImageIds?.[index] ?? crypto.randomUUID();
     const rotation = value.newImageRotations?.[index];
-    if (rotation !== undefined) rotations.set(imageId, rotation);
+    if (rotation !== undefined) {rotations.set(imageId, rotation);}
     const blobId = `blob:${imageId}`;
     blobs.push({ id: blobId, file });
     images.push({ id: imageId, blobId, url: '', alt: file.name, mimeType: file.type as LocalImage['mimeType'], size: file.size, ...dimensions, rotation: value.newImageRotations?.[index] ?? 0 });
@@ -149,20 +149,20 @@ export async function saveLocalNote(value: {
   const outbox = transaction.objectStore('outbox');
   const redirect = await followRedirects(transaction.objectStore('meta'), id, value.editorSession);
   id = redirect.id;
-  if (redirect.deleted) throw new Error('This editor’s note has been deleted.');
+  if (redirect.deleted) {throw new Error('This editor’s note has been deleted.');}
   let retainedAudio = value.retainedAudio;
   let newAudioIds = value.newAudioIds;
   for (const { key, value: target } of redirect.path) {
     const remap = (attachmentId: string) => {
-      if (Object.values(target.attachments).includes(attachmentId)) return attachmentId;
-      if (!(attachmentId in target.attachments)) target.attachments[attachmentId] = crypto.randomUUID();
+      if (Object.values(target.attachments).includes(attachmentId)) {return attachmentId;}
+      if (!(attachmentId in target.attachments)) {target.attachments[attachmentId] = crypto.randomUUID();}
       return target.attachments[attachmentId];
     };
     images = images.flatMap(image => {
       const mapped = remap(image.id);
-      if (mapped === null) return [];
+      if (mapped === null) {return [];}
       const rotation = rotations.get(image.id);
-      if (rotation !== undefined) rotations.set(mapped, rotation);
+      if (rotation !== undefined) {rotations.set(mapped, rotation);}
       return [{ ...image, id: mapped, ...(image.blobId ? { blobId: `blob:${mapped}` } : {}) }];
     });
     retainedAudio = retainedAudio?.flatMap(audio => {
@@ -194,13 +194,13 @@ export async function saveLocalNote(value: {
     ...(currentImages.get(image.id) ?? image),
     rotation: rotations.get(image.id) ?? currentImages.get(image.id)?.rotation ?? image.rotation,
   }])).values()];
-  if (reconciledImages.length > 6) throw new Error('Up to 6 images or videos per note.');
+  if (reconciledImages.length > 6) {throw new Error('Up to 6 images or videos per note.');}
   const currentAudio = new Map(current?.audio.map(attachment => [attachment.id, attachment]));
   const audioById = new Map((retainedAudio ?? current?.audio ?? []).map(attachment => [attachment.id, currentAudio.get(attachment.id) ?? attachment]));
   for (const [index, file] of (value.newAudio ?? []).entries()) {
     const audioId = newAudioIds?.[index] ?? crypto.randomUUID();
-    if (!audioId) continue;
-    if (audioById.has(audioId)) continue;
+    if (!audioId) {continue;}
+    if (audioById.has(audioId)) {continue;}
     const existing = currentAudio.get(audioId);
     if (existing) { audioById.set(audioId, existing); continue; }
     const blobId = `blob:${audioId}`;
@@ -212,7 +212,7 @@ export async function saveLocalNote(value: {
   // Do not recreate their reclaimed blobs or rewrite still-pending bytes.
   const existingBlobIds = new Set([...(current?.images ?? []), ...(current?.audio ?? [])].map(attachment => attachment.blobId));
   const neededBlobIds = new Set([...reconciledImages, ...audio].map(attachment => attachment.blobId));
-  for (const blob of blobs) if (neededBlobIds.has(blob.id) && !existingBlobIds.has(blob.id)) await transaction.objectStore('blobs').put(blob.file, blob.id);
+  for (const blob of blobs) {if (neededBlobIds.has(blob.id) && !existingBlobIds.has(blob.id)) {await transaction.objectStore('blobs').put(blob.file, blob.id);}}
   const position = current?.position ?? Math.min(0, ...((await notes.getAll()).map(item => parseNote(item).position))) - 1;
   const note: LocalNote = {
     id, title: redirect.path.length ? conflictTitle(value.title) : value.title, body: value.body, color: value.color, pinned: value.pinned,
@@ -222,10 +222,10 @@ export async function saveLocalNote(value: {
     version: current?.version ?? value.version ?? 0,
     images: reconciledImages, audio,
   };
-  for (const attachment of current?.audio ?? []) if (!audio.some(item => item.id === attachment.id)) {
-    for (const key of audioBlobKeys(attachment)) await transaction.objectStore('blobs').delete(key);
-  }
-  for (const image of current?.images ?? []) if (image.blobId && !reconciledImages.some(item => item.id === image.id)) await transaction.objectStore('blobs').delete(image.blobId);
+  for (const attachment of current?.audio ?? []) {if (!audio.some(item => item.id === attachment.id)) {
+    for (const key of audioBlobKeys(attachment)) {await transaction.objectStore('blobs').delete(key);}
+  }}
+  for (const image of current?.images ?? []) {if (image.blobId && !reconciledImages.some(item => item.id === image.id)) {await transaction.objectStore('blobs').delete(image.blobId);}}
   await notes.put(note);
   await outbox.put({ noteId: id, type: 'save', expectedVersion, mutationId: crypto.randomUUID(), editorSession: value.editorSession });
   await transaction.objectStore('meta').put(true, 'initialized');
@@ -238,8 +238,8 @@ export async function reorderLocalNotes(ids: string[]): Promise<void> {
   const transaction = database.transaction(['notes', 'meta'], 'readwrite');
   const current = z.array(localNoteSchema).parse(await transaction.objectStore('notes').getAll());
   const byId = new Map(current.map(note => [note.id, note]));
-  if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some(id => !byId.has(id))) throw new Error('Invalid note order.');
-  for (const [position, id] of ids.entries()) await transaction.objectStore('notes').put({ ...byId.get(id)!, position });
+  if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some(id => !byId.has(id))) {throw new Error('Invalid note order.');}
+  for (const [position, id] of ids.entries()) {await transaction.objectStore('notes').put({ ...byId.get(id)!, position });}
   await transaction.objectStore('meta').put({ token: crypto.randomUUID() }, 'pendingOrder');
   await transaction.done;
 }
@@ -248,7 +248,7 @@ export async function deleteLocalNote(note: LocalNote, editorSession?: string): 
   const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'blobs', 'meta'], 'readwrite');
   const redirect = await followRedirects(transaction.objectStore('meta'), note.id, editorSession);
-  if (editorSession) await transaction.objectStore('meta').put({ id: redirect.id, attachments: {}, deleted: true }, redirectKey(editorSession, redirect.id));
+  if (editorSession) {await transaction.objectStore('meta').put({ id: redirect.id, attachments: {}, deleted: true }, redirectKey(editorSession, redirect.id));}
   note = { ...note, id: redirect.id };
   const notes = transaction.objectStore('notes');
   const outbox = transaction.objectStore('outbox');
@@ -257,11 +257,11 @@ export async function deleteLocalNote(note: LocalNote, editorSession?: string): 
   await notes.delete(note.id);
   // A version-zero save may already be in flight. Keep its deletion queued so
   // the server acknowledgement can advance the expected version before deleting.
-  if (!current?.version && !operation) await outbox.delete(note.id);
-  else await outbox.put({ noteId: note.id, type: 'delete', expectedVersion: operation?.expectedVersion ?? current?.version ?? note.version, mutationId: crypto.randomUUID() });
+  if (!current?.version && !operation) {await outbox.delete(note.id);}
+  else {await outbox.put({ noteId: note.id, type: 'delete', expectedVersion: operation?.expectedVersion ?? current?.version ?? note.version, mutationId: crypto.randomUUID() });}
   const attachments = current ?? (redirect.path.length ? { images: [], audio: [] } : note);
-  for (const image of attachments.images) if (image.blobId) await transaction.objectStore('blobs').delete(image.blobId);
-  for (const audio of attachments.audio) for (const key of audioBlobKeys(audio)) await transaction.objectStore('blobs').delete(key);
+  for (const image of attachments.images) {if (image.blobId) {await transaction.objectStore('blobs').delete(image.blobId);}}
+  for (const audio of attachments.audio) {for (const key of audioBlobKeys(audio)) {await transaction.objectStore('blobs').delete(key);}}
   await transaction.done;
 }
 
@@ -270,12 +270,12 @@ async function recordSyncError(entry: z.infer<typeof outboxSchema>, error?: stri
   const transaction = database.transaction('outbox', 'readwrite');
   const current = parseOptionalOperation(await transaction.store.get(entry.noteId));
   // A failed old upload must not label a newer edit or deletion as failed.
-  if (current?.mutationId === entry.mutationId) await transaction.store.put({ ...current, error });
+  if (current?.mutationId === entry.mutationId) {await transaction.store.put({ ...current, error });}
   await transaction.done;
 }
 
 async function reportSyncFailure(entry: z.infer<typeof outboxSchema>, error: unknown, onProgress?: () => Promise<void>) {
-  if (error instanceof ApiError && error.status === 401 || typeof navigator !== 'undefined' && !navigator.onLine) return;
+  if (error instanceof ApiError && error.status === 401 || typeof navigator !== 'undefined' && !navigator.onLine) {return;}
   try { await recordSyncError(entry, syncErrorDetails(error)); await onProgress?.(); }
   catch { /* Keep the original failure if the local database also failed. */ }
 }
@@ -349,7 +349,7 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
       }
       database = await getDatabase();
       const latestOperation = parseOptionalOperation(await database.get('outbox', entry.noteId));
-      if (latestOperation?.mutationId === entry.mutationId) await database.delete('outbox', entry.noteId);
+      if (latestOperation?.mutationId === entry.mutationId) {await database.delete('outbox', entry.noteId);}
       await onProgress?.();
     } catch (error) {
       if (error instanceof ApiError && error.status === 409 && note && entry.type === 'save') {
@@ -363,7 +363,7 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
           database = await getDatabase();
           const operation = parseOptionalOperation(await database.get('outbox', entry.noteId));
           const latest = parseOptionalNote(await database.get('notes', entry.noteId));
-          if (operation?.type !== 'save' || !latest) break;
+          if (operation?.type !== 'save' || !latest) {break;}
           let copy: Awaited<ReturnType<typeof cloneAsConflict>>;
           try { copy = await cloneAsConflict(latest); }
           catch (error) {
@@ -376,7 +376,7 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
             const currentOperation = parseOptionalOperation(await database.get('outbox', entry.noteId));
             // A removal can reclaim a blob while copying waits for a fetch.
             // If its owner changed, prepare the newer edit instead of failing.
-            if (currentOperation?.mutationId !== operation.mutationId) continue;
+            if (currentOperation?.mutationId !== operation.mutationId) {continue;}
             await reportSyncFailure(operation, error, onProgress);
             throw error;
           }
@@ -384,16 +384,16 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
           const transaction = database.transaction(['notes', 'outbox', 'blobs', 'meta'], 'readwrite');
           const currentOperation = parseOptionalOperation(await transaction.objectStore('outbox').get(entry.noteId));
           if (currentOperation?.mutationId !== operation.mutationId) { await transaction.done; continue; }
-          for (const attachment of copy.blobs) await transaction.objectStore('blobs').put(attachment.blob, attachment.blobId);
+          for (const attachment of copy.blobs) {await transaction.objectStore('blobs').put(attachment.blob, attachment.blobId);}
           await transaction.objectStore('outbox').delete(entry.noteId);
-          for (const audio of latest.audio) if (!serverNote?.audio.some(attachment => attachment.id === audio.id)) {
-            for (const key of audioBlobKeys(audio)) await transaction.objectStore('blobs').delete(key);
-          }
-          if (serverNote) await transaction.objectStore('notes').put(serverNote);
-          else await transaction.objectStore('notes').delete(entry.noteId);
+          for (const audio of latest.audio) {if (!serverNote?.audio.some(attachment => attachment.id === audio.id)) {
+            for (const key of audioBlobKeys(audio)) {await transaction.objectStore('blobs').delete(key);}
+          }}
+          if (serverNote) {await transaction.objectStore('notes').put(serverNote);}
+          else {await transaction.objectStore('notes').delete(entry.noteId);}
           await transaction.objectStore('notes').put(copy.note);
           await transaction.objectStore('outbox').put({ ...copy.operation, editorSession: operation.editorSession });
-          if (operation.editorSession) await transaction.objectStore('meta').put({ id: copy.note.id, attachments: copy.attachmentIds }, redirectKey(operation.editorSession, entry.noteId));
+          if (operation.editorSession) {await transaction.objectStore('meta').put({ id: copy.note.id, attachments: copy.attachmentIds }, redirectKey(operation.editorSession, entry.noteId));}
           await transaction.done;
           await removeBlobs(latest);
           conflictCopies[entry.noteId] = copy.note.id;
@@ -424,14 +424,14 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
       await api.reorderNotes((await localNotes()).map(note => note.id));
       database = await getDatabase();
       const latest = await database.get('meta', 'pendingOrder') as typeof order;
-      if (latest?.token === order.token) await database.delete('meta', 'pendingOrder');
+      if (latest?.token === order.token) {await database.delete('meta', 'pendingOrder');}
     } catch (error) {
-      if (!(error instanceof ApiError && [0, 401, 409].includes(error.status))) throw error;
-      if (error.status === 0 || error.status === 401) connection = error.status === 0 ? 'offline' : 'unauthorized';
+      if (!(error instanceof ApiError && [0, 401, 409].includes(error.status))) {throw error;}
+      if (error.status === 0 || error.status === 401) {connection = error.status === 0 ? 'offline' : 'unauthorized';}
     }
   }
 
-  if (connection !== 'unauthorized') try {
+  if (connection !== 'unauthorized') {try {
     const remote = await api.notes();
     database = await getDatabase();
     const remoteIds = new Set(remote.notes.map(note => note.id));
@@ -440,42 +440,42 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
     const transaction = database.transaction(['notes', 'outbox', 'meta', 'blobs'], 'readwrite');
     const pendingOrder = await transaction.objectStore('meta').get('pendingOrder');
     const pending = new Set(z.array(outboxSchema).parse(await transaction.objectStore('outbox').getAll()).map(item => item.noteId));
-    for (const note of remote.notes) if (!pending.has(note.id)) {
+    for (const note of remote.notes) {if (!pending.has(note.id)) {
       const local = parseOptionalNote(await transaction.objectStore('notes').get(note.id));
-      for (const audio of local?.audio ?? []) if (!note.audio.some(attachment => attachment.id === audio.id)) {
-        for (const key of audioBlobKeys(audio)) await transaction.objectStore('blobs').delete(key);
-      }
+      for (const audio of local?.audio ?? []) {if (!note.audio.some(attachment => attachment.id === audio.id)) {
+        for (const key of audioBlobKeys(audio)) {await transaction.objectStore('blobs').delete(key);}
+      }}
       await transaction.objectStore('notes').put(pendingOrder && local ? { ...note, position: local.position } : note);
-    }
+    }}
     for (const local of z.array(localNoteSchema).parse(await transaction.objectStore('notes').getAll())) {
       if (local.version > 0 && !pending.has(local.id) && !remoteIds.has(local.id)) {
         await transaction.objectStore('notes').delete(local.id);
-        for (const audio of local.audio) for (const key of audioBlobKeys(audio)) await transaction.objectStore('blobs').delete(key);
+        for (const audio of local.audio) {for (const key of audioBlobKeys(audio)) {await transaction.objectStore('blobs').delete(key);}}
       }
     }
     await transaction.objectStore('meta').put(true, 'initialized');
     await transaction.done;
   } catch (error) {
-    if (!(error instanceof ApiError && (error.status === 0 || error.status === 401))) throw error;
+    if (!(error instanceof ApiError && (error.status === 0 || error.status === 401))) {throw error;}
     connection = error.status === 0 ? 'offline' : 'unauthorized';
-  }
+  }}
   return { notes: await localNotes(), pending: await pendingLocalChanges(), conflict, conflictCopies, missingAttachments, connection };
 }
 
 export async function audioSource(audio: LocalAudio): Promise<string> {
   const database = await getDatabase();
   const blob = audio.blobId ? await database.get('blobs', audio.blobId) ?? await database.get('blobs', `audio:${audio.id}`) : await database.get('blobs', `audio:${audio.id}`);
-  if (blob !== undefined) return URL.createObjectURL(parseBlob(blob));
-  if (audio.blobId) throw new Error('This recording is no longer available on this device.');
+  if (blob !== undefined) {return URL.createObjectURL(parseBlob(blob));}
+  if (audio.blobId) {throw new Error('This recording is no longer available on this device.');}
   return audio.url;
 }
 
 export async function imageSource(image: LocalImage): Promise<string> {
-  if (!image.blobId) return image.url;
+  if (!image.blobId) {return image.url;}
   const blob = await (await getDatabase()).get('blobs', image.blobId);
   // An editor can still hold the pre-upload shape after acknowledgement.
   // Attachment IDs remain stable, so its synced URL is deterministic.
-  if (blob === undefined) return `/api/images/${image.id}`;
+  if (blob === undefined) {return `/api/images/${image.id}`;}
   return URL.createObjectURL(parseBlob(blob));
 }
 
@@ -488,7 +488,7 @@ async function cloneAsConflict(note: LocalNote) {
   const attachmentIds: Record<string, string | null> = {};
   for (const image of note.images) {
     let blob: Blob;
-    if (image.blobId) blob = parseBlob(await database.get('blobs', image.blobId));
+    if (image.blobId) {blob = parseBlob(await database.get('blobs', image.blobId));}
     else {
       try { blob = await attachmentBlob(image.url); }
       catch (error) {
@@ -506,9 +506,9 @@ async function cloneAsConflict(note: LocalNote) {
   for (const attachment of note.audio) {
     const cached = await database.get('blobs', attachment.blobId ?? `audio:${attachment.id}`);
     let blob: Blob;
-    if (cached !== undefined) blob = parseBlob(cached);
+    if (cached !== undefined) {blob = parseBlob(cached);}
     else {
-      if (attachment.blobId) throw new Error('A pending recording is missing from this device.');
+      if (attachment.blobId) {throw new Error('A pending recording is missing from this device.');}
       try { blob = await attachmentBlob(attachment.url); }
       catch (error) {
         if (error instanceof ApiError && [404, 410].includes(error.status)) { missingAttachments.push(attachment.name || 'Audio'); attachmentIds[attachment.id] = null; continue; }
@@ -534,14 +534,14 @@ const redirectKey = (session: string, id: string) => `editorRedirect:${session}:
 // writer must serialize, including media prepared before the conflict committed.
 async function followRedirects(meta: { get(key: string): Promise<unknown> }, id: string, session?: string) {
   const path: { key: string; value: EditorRedirect }[] = [];
-  if (session) while (true) {
+  if (session) {while (true) {
     const key = redirectKey(session, id);
     const value = await meta.get(key) as EditorRedirect | undefined;
-    if (!value) break;
+    if (!value) {break;}
     path.push({ key, value });
-    if (id === value.id) break; // A terminal tombstone fences writers already targeting the copy.
+    if (id === value.id) {break;} // A terminal tombstone fences writers already targeting the copy.
     id = value.id;
-  }
+  }}
   return { id, path, deleted: path.some(target => target.value.deleted) };
 }
 
@@ -572,6 +572,6 @@ async function attachmentBlob(url: string): Promise<Blob> {
   let response: Response;
   try { response = await fetch(url); }
   catch { throw new ApiError('Could not download the attachment to preserve this conflict.', 0); }
-  if (!response.ok) throw new ApiError('Could not download the attachment to preserve this conflict.', response.status);
+  if (!response.ok) {throw new ApiError('Could not download the attachment to preserve this conflict.', response.status);}
   return response.blob();
 }

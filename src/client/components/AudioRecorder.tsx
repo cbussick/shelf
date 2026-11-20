@@ -31,7 +31,7 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
     active.current = true;
     return () => {
       active.current = false;
-      if (recorder.current?.state === 'recording') recorder.current.stop();
+      if (recorder.current?.state === 'recording') {recorder.current.stop();}
       stream.current?.getTracks().forEach(track => track.stop());
       element?.close();
     };
@@ -46,12 +46,12 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
       }
     } else {
       // Reopen above the parent editor after its own reveal effect has run.
-      queueMicrotask(() => { if (!cancelled) dialog.current?.showModal(); });
+      queueMicrotask(() => { if (!cancelled) {dialog.current?.showModal();} });
     }
     return () => { cancelled = true; };
   }, [suspended]);
   useEffect(() => {
-    if (phase !== 'recording') return;
+    if (phase !== 'recording') {return;}
     const tick = () => {
       const elapsed = Math.floor((Date.now() - startedAt.current) / 1000);
       setSeconds(Math.min(elapsed, MAX_RECORDING_SECONDS));
@@ -83,23 +83,23 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
         return;
       }
       const mimeType = recordingTypes.find(type => MediaRecorder.isTypeSupported(type));
-      if (!mimeType) throw new Error('This browser cannot record a supported audio format. Upload a recording instead.');
+      if (!mimeType) {throw new Error('This browser cannot record a supported audio format. Upload a recording instead.');}
       const capture = new MediaRecorder(microphone, { mimeType, audioBitsPerSecond: 96_000 });
       recorder.current = capture;
       const chunks: Blob[] = [];
       let size = 0;
       capture.ondataavailable = event => {
-        if (!event.data.size) return;
+        if (!event.data.size) {return;}
         chunks.push(event.data); size += event.data.size;
         if (size >= MAX_AUDIO_BYTES && capture.state === 'recording') {
-          if (active.current) setNotice('Recording stopped at the file-size limit.');
+          if (active.current) {setNotice('Recording stopped at the file-size limit.');}
           stop();
         }
       };
       capture.onerror = () => { if (active.current) { setNotice('Recording was interrupted. Review the captured audio before keeping it.'); stop(); } };
       capture.onstop = () => {
         microphone.getTracks().forEach(track => track.stop());
-        if (!active.current) return;
+        if (!active.current) {return;}
         const blob = new Blob(chunks, { type: capture.mimeType });
         if (!blob.size || blob.size > MAX_AUDIO_BYTES) {
           setError(blob.size ? 'This recording exceeded 100 MB and cannot be attached. Try a shorter recording.' : 'No audio was captured. Try recording again.');
@@ -120,7 +120,7 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
       capture.start(1000); setPhase('recording');
     } catch (caught) {
       stream.current?.getTracks().forEach(track => track.stop());
-      if (!active.current) return;
+      if (!active.current) {return;}
       setError(caught instanceof DOMException && caught.name === 'NotAllowedError'
         ? 'Microphone access was denied. Allow it in your browser’s site settings, or upload a recording.'
         : caught instanceof DOMException && caught.name === 'NotFoundError' ? 'No microphone was found. Connect one, or upload a recording.'
@@ -129,8 +129,8 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
     }
   };
   const requestClose = () => {
-    if (phase === 'ready') onClose();
-    else setConfirmDiscard(true);
+    if (phase === 'ready') {onClose();}
+    else {setConfirmDiscard(true);}
   };
   return <dialog ref={dialog} aria-labelledby="audio-recorder-title" onCancel={event => { event.preventDefault(); requestClose(); }} {...stylex.props(styles.dialog, styles.smallDialog)}>
     <header {...stylex.props(styles.audioRecorderHeader)}><h2 id="audio-recorder-title" {...stylex.props(styles.dialogTitle)}>Record audio</h2><button type="button" aria-label="Close audio recorder" onClick={requestClose} {...stylex.props(styles.iconButton)}><Icon name="x"/></button></header>
@@ -142,7 +142,7 @@ export function AudioRecorder({ onKeep, onClose, suspended = false }: { onKeep: 
     {confirmDiscard ? <><p>Discard this recording?</p><div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => setConfirmDiscard(false)} {...stylex.props(styles.secondary)}>Go back</button><button type="button" onClick={onClose} {...stylex.props(styles.danger)}>Discard recording</button></div></> : <div {...stylex.props(styles.dialogActions)}>
       {phase === 'ready' && <button type="button" onClick={() => void start()} {...stylex.props(styles.primary)}><Icon name="microphone" width={18}/>Start recording</button>}
       {phase === 'recording' && <button type="button" onClick={stop} {...stylex.props(styles.primary)}><Icon name="stop" width={18}/>Stop recording</button>}
-      {phase === 'preview' && <><button type="button" onClick={onClose} {...stylex.props(styles.secondary)}>Discard</button><button type="button" onClick={() => { if (file) onKeep(file); }} {...stylex.props(styles.primary)}>Add to note</button></>}
+      {phase === 'preview' && <><button type="button" onClick={onClose} {...stylex.props(styles.secondary)}>Discard</button><button type="button" onClick={() => { if (file) {onKeep(file);} }} {...stylex.props(styles.primary)}>Add to note</button></>}
     </div>}
   </dialog>;
 }

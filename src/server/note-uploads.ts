@@ -18,7 +18,7 @@ export function withNoteUploads(directory: string, handler: (request: Request, r
     try {
       await new Promise<void>((resolve, reject) => { upload(request, response, error => error ? reject(error) : resolve()); });
       const files = (request.files ?? {}) as Record<string, Express.Multer.File[]>;
-      for (const group of Object.values(files)) for (const file of group) await chmod(file.path, 0o600);
+      for (const group of Object.values(files)) {for (const file of group) {await chmod(file.path, 0o600);}}
       return await handler(request, response);
     } finally {
       await rm(temporary, { recursive: true, force: true }).catch((error: unknown) => requestLogger(response).error({ error: safeError(error) }, 'Could not remove temporary upload files.'));

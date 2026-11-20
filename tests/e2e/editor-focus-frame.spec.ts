@@ -25,7 +25,7 @@ for (const [browserName, engine] of [['chromium', chromium], ['webkit', webkit]]
         });
         // A separate inset clipping viewport prevents partially visible glyphs
         // from being painted underneath the stationary focus ring.
-        for (const inset of ['top', 'bottom', 'left', 'right'] as const) expect((await geometry())[inset]).toBeGreaterThanOrEqual(4);
+        for (const inset of ['top', 'bottom', 'left', 'right'] as const) {expect((await geometry())[inset]).toBeGreaterThanOrEqual(4);}
         expect((await geometry()).scrolls).toBe(true);
         const before = await frame.boundingBox();
         await body.evaluate(element => { element.scrollTop = 317; });

@@ -37,7 +37,7 @@ export function App() {
   const expireSession = useCallback(() => {
     setSessionExpired(true);
     // Repeated 401s must not keep resetting the auth query's freshness window.
-    if (queryClient.getQueryData<{ authenticated: boolean }>(['auth'])?.authenticated !== false) queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false });
+    if (queryClient.getQueryData<{ authenticated: boolean }>(['auth'])?.authenticated !== false) {queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false });}
   }, [queryClient]);
   // Attempt auth even offline so a paused query cannot trap startup on the splash.
   const auth = useQuery({ queryKey: ['auth'], queryFn: api.authStatus, retry: false, networkMode: 'always', refetchOnReconnect: true });
@@ -47,21 +47,21 @@ export function App() {
   // Cached authenticated access must keep the workspace/editor mounted even if
   // a background auth refetch fails while returning to an offline tab.
   const confirmedExpiry = workspaceOpened.current && !unreachable && (auth.data?.authenticated === false || auth.error instanceof ApiError && auth.error.status === 401);
-  useLayoutEffect(() => { if (confirmedExpiry) setSessionExpired(true); }, [confirmedExpiry]);
+  useLayoutEffect(() => { if (confirmedExpiry) {setSessionExpired(true);} }, [confirmedExpiry]);
   const authenticated = async () => {
     const result = await auth.refetch();
-    if (result.error || !result.data?.authenticated) throw new Error('Could not confirm your session. Check your connection and try signing in again.');
+    if (result.error || !result.data?.authenticated) {throw new Error('Could not confirm your session. Check your connection and try signing in again.');}
     setSessionExpired(false);
   };
-  if (!workspaceOpened.current && (auth.isPending || (needsOfflineAccess && offlineAccess.isPending))) return <Loading/>;
+  if (!workspaceOpened.current && (auth.isPending || (needsOfflineAccess && offlineAccess.isPending))) {return <Loading/>;}
   const allowed = auth.data?.authenticated || (unreachable && offlineAccess.data);
-  if (allowed) workspaceOpened.current = true;
+  if (allowed) {workspaceOpened.current = true;}
   if (workspaceOpened.current) {
     const locked = sessionExpired || confirmedExpiry;
     return <><NotesApp offlineEntry={!auth.data?.authenticated} locked={locked} onSessionExpired={expireSession} onLogout={() => { workspaceOpened.current = false; setSessionExpired(false); queryClient.setQueryData(['offline-access'], false); queryClient.setQueryData(['auth'], { authenticated: false, setupRequired: false }); void queryClient.invalidateQueries({ queryKey: ['auth'] }); }}/>{locked && <Auth setupRequired={false} sessionExpired onAuthenticated={authenticated}/>}</>;
   }
-  if (unreachable) return <main {...stylex.props(styles.loginPage)}><section role="alert" {...stylex.props(styles.loginCard)}><Brand/><h1 {...stylex.props(styles.loginTitle)}>Shelf is offline</h1><p {...stylex.props(styles.loginCopy)}>Connect to your server to open Shelf. Your notes could not be opened on this device.</p><button type="button" disabled={auth.isFetching} onClick={() => void auth.refetch()} {...stylex.props(styles.primary)}>Try again</button></section></main>;
-  if (auth.error) return <Auth setupRequired={false} onAuthenticated={authenticated}/>;
+  if (unreachable) {return <main {...stylex.props(styles.loginPage)}><section role="alert" {...stylex.props(styles.loginCard)}><Brand/><h1 {...stylex.props(styles.loginTitle)}>Shelf is offline</h1><p {...stylex.props(styles.loginCopy)}>Connect to your server to open Shelf. Your notes could not be opened on this device.</p><button type="button" disabled={auth.isFetching} onClick={() => void auth.refetch()} {...stylex.props(styles.primary)}>Try again</button></section></main>;}
+  if (auth.error) {return <Auth setupRequired={false} onAuthenticated={authenticated}/>;}
   return <Auth setupRequired={auth.data?.setupRequired ?? false} onAuthenticated={authenticated}/>;
 }
 
@@ -100,7 +100,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   const renderedEditor = editor ?? parkedEditor?.value;
   useEffect(() => {
     setParkedEditor(previous => {
-      if (!previous) return previous;
+      if (!previous) {return previous;}
       const current = notes.find(note => note.id === previous.value.note.id);
       return current && readyNoteIdentity(current) === readyNoteIdentity(previous.value.note) ? previous : undefined;
     });
@@ -125,7 +125,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     const request = ++overviewRequest.current;
     try {
       const overview = await localSyncOverview();
-      if (request !== overviewRequest.current) return;
+      if (request !== overviewRequest.current) {return;}
       setPending(overview.pending);
       setPendingNotes(current => JSON.stringify(current) === JSON.stringify(overview.notes) ? current : overview.notes);
     } catch { /* Never replace a known queue with an empty one after a read failure. */ }
@@ -161,11 +161,11 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   const updateEditorSync = useCallback(async (connection: EditorSyncState, retrying = false) => {
     const request = ++editorStatusRequest.current;
     const id = activeNoteId.current;
-    if (!id) return;
+    if (!id) {return;}
     try {
       const state = await noteSyncState(id, activeEditorSession.current);
       if (request === editorStatusRequest.current && id === activeNoteId.current) {
-        if (state.note) activeNoteId.current = state.note.id;
+        if (state.note) {activeNoteId.current = state.note.id;}
         setEditorSyncError(state.pending ? state.error : undefined);
         setEditorSync(!state.pending && state.note?.version ? 'synced' : connection === 'offline' ? 'offline' : !retrying && state.error ? 'error' : 'syncing');
       }
@@ -189,7 +189,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     await updateEditorSync(navigator.onLine ? 'syncing' : 'offline');
   }, [refreshOverview, updateEditorSync]);
   const synchronize = useCallback(async () => {
-    if (lockedRef.current) return;
+    if (lockedRef.current) {return;}
     if (syncing.current) { syncRequested.current = true; return; }
     syncing.current = true;
     void updateEditorSync(navigator.onLine ? 'syncing' : 'offline', true);
@@ -207,9 +207,9 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
             setSyncError(result.connection === 'offline' ? 'The server is unreachable.' : undefined);
             setSyncState(result.connection === 'offline' || !navigator.onLine ? 'offline' : result.pending ? 'local' : 'synced');
           }
-          if (result.missingAttachments.length) notify(`Both versions were kept, but ${result.missingAttachments.length} attachment(s) had already been removed from the server and could not be copied.`);
-          else if (result.conflict) notify('Both versions were kept after a conflicting edit.');
-          if (result.conflict && result.pending) syncRequested.current = true;
+          if (result.missingAttachments.length) {notify(`Both versions were kept, but ${result.missingAttachments.length} attachment(s) had already been removed from the server and could not be copied.`);}
+          else if (result.conflict) {notify('Both versions were kept after a conflicting edit.');}
+          if (result.conflict && result.pending) {syncRequested.current = true;}
         } catch (error) {
           await refreshOverview();
           setSyncError(syncErrorDetails(error));
@@ -220,14 +220,14 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       } while (syncRequested.current && !lockedRef.current);
     } finally { syncing.current = false; }
   }, [notify, onSessionExpired, updateEditorSync, refreshOverview, reportSyncProgress]);
-  useEffect(() => { if (!locked) void synchronize(); }, [locked, synchronize]);
+  useEffect(() => { if (!locked) {void synchronize();} }, [locked, synchronize]);
 
   useEffect(() => {
     void localNotes().then(setNotes).then(refreshOverview).then(synchronize);
     const online = () => void synchronize();
     const offline = () => { setSyncState('offline'); void updateEditorSync('offline'); };
-    const visible = () => { if (document.visibilityState === 'visible') void synchronize(); };
-    const interval = setInterval(() => { if (document.visibilityState === 'visible') void synchronize(); }, 15_000);
+    const visible = () => { if (document.visibilityState === 'visible') {void synchronize();} };
+    const interval = setInterval(() => { if (document.visibilityState === 'visible') {void synchronize();} }, 15_000);
     addEventListener('online', online); addEventListener('offline', offline); document.addEventListener('visibilitychange', visible);
     void navigator.storage?.persist?.();
     return () => { clearInterval(interval); removeEventListener('online', online); removeEventListener('offline', offline); document.removeEventListener('visibilitychange', visible); };
@@ -241,24 +241,24 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       notify(shareError === 'invalid' ? 'Choose up to 6 JPG, PNG, WebP or GIF images under 20 MB.' : 'Could not receive the shared image. Try again.');
       history.replaceState(null, '', '/');
     }
-    if (!id) return;
+    if (!id) {return;}
     let active = true;
     void getShare(id).then(files => {
-      if (!active) return;
-      if (files?.length) setEditor({ files, shareId: id });
-      else notify('The shared image is no longer available. Please share it again.');
-      if (!files?.length) history.replaceState(null, '', '/');
+      if (!active) {return;}
+      if (files?.length) {setEditor({ files, shareId: id });}
+      else {notify('The shared image is no longer available. Please share it again.');}
+      if (!files?.length) {history.replaceState(null, '', '/');}
     }).catch(() => {
-      if (active) notify('Could not open the shared image. Please share it again.');
+      if (active) {notify('Could not open the shared image. Please share it again.');}
     });
     return () => { active = false; };
   }, [notify]);
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (lockedRef.current) return;
-      if (event.target instanceof HTMLElement && event.target.closest('input,textarea,[contenteditable]')) return;
-      if (document.querySelector('dialog[open]') || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (lockedRef.current) {return;}
+      if (event.target instanceof HTMLElement && event.target.closest('input,textarea,[contenteditable]')) {return;}
+      if (document.querySelector('dialog[open]') || event.metaKey || event.ctrlKey || event.altKey) {return;}
       if (event.key.toLowerCase() === 'f') { event.preventDefault(); document.querySelector<HTMLInputElement>('#search')?.focus(); }
       if (event.key.toLowerCase() === 'n') { event.preventDefault(); setEditor({}); }
       if (event.key.toLowerCase() === 'd' && !event.repeat && event.target instanceof HTMLElement) {
@@ -273,14 +273,14 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
 
   useEffect(() => {
     const paste = (event: ClipboardEvent) => {
-      if (lockedRef.current || event.defaultPrevented || editor || document.querySelector('dialog[open]')) return;
+      if (lockedRef.current || event.defaultPrevented || editor || document.querySelector('dialog[open]')) {return;}
       const files = [...(event.clipboardData?.items ?? [])]
         .filter(item => item.kind === 'file' && (item.type.startsWith('image/') || isVideo(item.type)))
         .flatMap(item => { const file = item.getAsFile(); return file ? [file] : []; });
-      if (!files.length) return; // Keep normal text paste untouched.
+      if (!files.length) {return;} // Keep normal text paste untouched.
       event.preventDefault();
       try {
-        if (files.length > 6) throw new Error('Up to 6 images or videos per note.');
+        if (files.length > 6) {throw new Error('Up to 6 images or videos per note.');}
         files.forEach(validateVisualFile);
       } catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach these files.'); return; }
       setEditor({ files });
@@ -295,12 +295,12 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   }, [notes, query]);
   const warmReadyEditor = useCallback((id: string, source: string) => {
     const note = notes.find(note => note.id === id && note.body === source);
-    if (!note || note.body.length < 500 || note.images.length || note.audio.length) return;
+    if (!note || note.body.length < 500 || note.images.length || note.audio.length) {return;}
     setParkedEditor(previous => {
       // Prefer the last actually read note. Otherwise warm the most expensive
       // nearby candidate, with a hard limit of one fully initialized dialog.
-      if (previous && previous.value.note.id === note.id) return previous;
-      if (previous && note.id !== preferredReadyNote.current && (previous.read || previous.value.note.body.length >= note.body.length)) return previous;
+      if (previous && previous.value.note.id === note.id) {return previous;}
+      if (previous && note.id !== preferredReadyNote.current && (previous.read || previous.value.note.body.length >= note.body.length)) {return previous;}
       return { value: { note }, read: note.id === preferredReadyNote.current };
     });
   }, [notes]);
@@ -337,17 +337,17 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   const changeColor = async (note: LocalNote, color: NoteColor) => {
     try {
       const current = (await localNotes()).find(item => item.id === note.id);
-      if (!current || current.color === color) return;
+      if (!current || current.color === color) {return;}
       await save({ ...current, color, retainedImages: current.images, newImages: [], retainedAudio: current.audio, newAudio: [] });
     } catch { notify('Could not change note color. Try again.'); }
   };
   const reorder = useCallback((source: string, target: string) => {
     const moving = notes.find(note => note.id === source);
-    if (!moving || moving.pinned !== notes.find(note => note.id === target)?.pinned) return;
+    if (!moving || moving.pinned !== notes.find(note => note.id === target)?.pinned) {return;}
     const group = notes.filter(note => note.pinned === moving.pinned);
     const from = group.findIndex(note => note.id === source);
     const to = group.findIndex(note => note.id === target);
-    if (from < 0 || to < 0 || from === to) return;
+    if (from < 0 || to < 0 || from === to) {return;}
     group.splice(to, 0, ...group.splice(from, 1));
     let index = 0;
     const ordered = notes.map(note => note.pinned === moving.pinned ? group[index++] : note);
@@ -360,9 +360,9 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     })().catch(() => notify('Could not reorder notes. Try again.'));
   }, [notes, notify, synchronize, persist]);
   const chooseImages = (files: FileList | null) => {
-    if (!files?.length) return;
+    if (!files?.length) {return;}
     try {
-      if (files.length > 6) throw new Error('Up to 6 images or videos per note.');
+      if (files.length > 6) {throw new Error('Up to 6 images or videos per note.');}
       [...files].forEach(validateVisualFile);
       setEditor({ files: [...files] });
     } catch (caught) { notify(caught instanceof Error ? caught.message : 'Could not attach these files.'); }
@@ -382,8 +382,8 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     setEditor(undefined);
   };
   const logout = async () => {
-    if (unsaved.current) return notify('Save your latest changes before signing out.');
-    if (await pendingLocalChanges()) return notify('Wait for your notes to finish syncing before signing out.');
+    if (unsaved.current) {return notify('Save your latest changes before signing out.');}
+    if (await pendingLocalChanges()) {return notify('Wait for your notes to finish syncing before signing out.');}
     await api.logout(); clearPreparedDocuments(); await clearLocalData(); await clearShares(); onLogout();
   };
 
@@ -405,17 +405,17 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     </main>
     <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={(note, color) => { void changeColor(note, color); }}/>}
-    <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) return remove(noteToDelete.current); }}/>
+    <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) {return remove(noteToDelete.current);} }}/>
     {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} locked={locked} syncState={editorSync} syncError={editorSyncError} onSave={save} onDelete={remove} onClose={retainReady => { void closeEditor(retainReady); }} onRetrySync={() => void synchronize()} onDirtyChange={setUnsaved}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...stylex.props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...stylex.props(styles.dialogTitle)}>{status.label}</h2><p {...stylex.props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...stylex.props(styles.syncError)}>{syncError}</p>}<div {...stylex.props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...stylex.props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...stylex.props(styles.primary)}>Sync now</button></div></dialog>
   </div>;
 }
 
 function syncStatus(state: SyncState, pending: number): { label: string; copy: string; icon: 'offline' | 'cloud-check' | 'refresh' } {
-  if (state === 'syncing' || state === 'connecting') return { label: 'Syncing…', copy: 'Checking your server for changes.', icon: 'refresh' };
-  if (state === 'offline') return { label: pending ? 'Saved on device' : 'Offline', copy: pending ? `${pending} change${pending === 1 ? '' : 's'} will sync when Shelf is open and connected.` : 'Your downloaded notes remain available on this device.', icon: 'offline' };
-  if (state === 'error') return { label: 'Sync needs attention', copy: 'Your notes are safe on this device. Try syncing again.', icon: 'offline' };
-  if (state === 'local' || pending) return { label: 'Saved on device', copy: `${pending} change${pending === 1 ? '' : 's'} still need${pending === 1 ? 's' : ''} to reach your server.`, icon: 'refresh' };
+  if (state === 'syncing' || state === 'connecting') {return { label: 'Syncing…', copy: 'Checking your server for changes.', icon: 'refresh' };}
+  if (state === 'offline') {return { label: pending ? 'Saved on device' : 'Offline', copy: pending ? `${pending} change${pending === 1 ? '' : 's'} will sync when Shelf is open and connected.` : 'Your downloaded notes remain available on this device.', icon: 'offline' };}
+  if (state === 'error') {return { label: 'Sync needs attention', copy: 'Your notes are safe on this device. Try syncing again.', icon: 'offline' };}
+  if (state === 'local' || pending) {return { label: 'Saved on device', copy: `${pending} change${pending === 1 ? '' : 's'} still need${pending === 1 ? 's' : ''} to reach your server.`, icon: 'refresh' };}
   return { label: 'Synced', copy: 'This device and your server are up to date.', icon: 'cloud-check' };
 }
 

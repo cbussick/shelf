@@ -40,7 +40,7 @@ export function createSession(database: AppDatabase, environment: Environment, r
 
 export function destroySession(database: AppDatabase, request: Request, response: Response): void {
   const token = sessionToken(request);
-  if (token) database.prepare('DELETE FROM sessions WHERE token_hash = ?').run(digest(token));
+  if (token) {database.prepare('DELETE FROM sessions WHERE token_hash = ?').run(digest(token));}
   for (const name of [DEVELOPMENT_COOKIE, PRODUCTION_COOKIE]) {
     response.append('Set-Cookie', serialize(name, '', { httpOnly: true, secure: name.startsWith('__Host-'), sameSite: 'strict', path: '/', maxAge: 0 }));
   }
@@ -48,7 +48,7 @@ export function destroySession(database: AppDatabase, request: Request, response
 
 export function isAuthenticated(database: AppDatabase, request: Request): boolean {
   const token = sessionToken(request);
-  if (!token) return false;
+  if (!token) {return false;}
   const session = database.prepare('SELECT expires_at FROM sessions WHERE token_hash = ?').get(digest(token)) as { expires_at: string } | undefined;
   return Boolean(session && session.expires_at > new Date().toISOString());
 }

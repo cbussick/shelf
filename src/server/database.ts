@@ -78,7 +78,7 @@ export function openDatabase(environment: Environment): AppDatabase {
 
 function expandNoteColors(database: AppDatabase) {
   const table = database.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notes'").get() as { sql: string };
-  if (noteColors.every(color => table.sql.includes(color))) return;
+  if (noteColors.every(color => table.sql.includes(color))) {return;}
 
   // SQLite cannot alter a CHECK constraint. Rebuild the parent table without
   // cascading deletion of its images, then validate references before committing.
@@ -92,7 +92,7 @@ function expandNoteColors(database: AppDatabase) {
         DROP TABLE notes;
         ALTER TABLE notes_expanded RENAME TO notes;
       `);
-      if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('Note color migration failed foreign key validation.');
+      if ((database.pragma('foreign_key_check') as unknown[]).length) {throw new Error('Note color migration failed foreign key validation.');}
     })();
   } finally {
     database.pragma('foreign_keys = ON');
@@ -115,7 +115,7 @@ type AudioRow = {
 
 export function readNote(database: AppDatabase, id: string): Note | undefined {
   const row = database.prepare('SELECT * FROM notes WHERE id = ?').get(id) as NoteRow | undefined;
-  if (!row) return undefined;
+  if (!row) {return undefined;}
   const images = database.prepare('SELECT * FROM images WHERE note_id = ? ORDER BY position').all(id) as ImageRow[];
   const audio = database.prepare('SELECT * FROM audio WHERE note_id = ? ORDER BY position').all(id) as AudioRow[];
   return mapNote(row, images, audio);

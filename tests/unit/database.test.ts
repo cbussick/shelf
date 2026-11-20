@@ -14,7 +14,7 @@ it('groups images and audio by note while preserving attachment order and empty 
   database = openDatabase({ NODE_ENV: 'test', PORT: 3000, DATA_DIR: directory, SESSION_DAYS: 30 });
   const insertNote = database.prepare("INSERT INTO notes (id,title,body,color,pinned,created_at,updated_at,version,position) VALUES (?,'','','paper',0,?,?,1,?)");
   const now = '2026-01-01T00:00:00.000Z';
-  for (const [position, id] of ['second', 'empty', 'first'].entries()) insertNote.run(id, now, now, position);
+  for (const [position, id] of ['second', 'empty', 'first'].entries()) {insertNote.run(id, now, now, position);}
   const insertImage = database.prepare("INSERT INTO images (id,note_id,filename,alt,mime_type,width,height,size,position) VALUES (?,?,?,'Image','image/jpeg',100,80,1024,?)");
   const insertAudio = database.prepare("INSERT INTO audio (id,note_id,filename,name,mime_type,size,duration,position) VALUES (?,?,?,'Audio','audio/wav',1024,1,?)");
   for (const noteId of ['first', 'second']) {
@@ -66,7 +66,7 @@ it.each([true, false])('expands the legacy palette without losing notes or image
   expect(database.pragma('foreign_keys', { simple: true })).toBe(1);
   expect(database.pragma('foreign_key_check')).toEqual([]);
   const update = database.prepare('UPDATE notes SET color = ? WHERE id = ?');
-  for (const color of ['blue', 'orange', 'rose']) expect(update.run(color, 'note').changes).toBe(1);
+  for (const color of ['blue', 'orange', 'rose']) {expect(update.run(color, 'note').changes).toBe(1);}
   expect(() => update.run('unknown', 'note')).toThrow(/CHECK constraint/);
   database.close();
   database = openDatabase(environment);

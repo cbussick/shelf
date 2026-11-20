@@ -91,7 +91,7 @@ describe('shared photo/video attachments', () => {
     expect(images.map((image: { mimeType: string }) => image.mimeType)).toEqual(['image/jpeg', 'video/webm']);
     const update = { ...input, expectedVersion: 1, retainedImageIds: images.map((image: { id: string }) => image.id) };
     let overflow = agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(update));
-    for (let i = 0; i < 5; i++) overflow = overflow.attach('images', 'tests/fixtures/video.webm');
+    for (let i = 0; i < 5; i++) {overflow = overflow.attach('images', 'tests/fixtures/video.webm');}
     expect((await overflow).status).toBe(400);
     expect((await agent.get('/api/notes')).body.notes[0].version).toBe(1);
     expect((await agent.delete(`/api/notes/${input.id}`).send({ expectedVersion: 1 })).status).toBe(204);

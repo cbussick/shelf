@@ -16,7 +16,7 @@ export async function stageShare(files: File[]): Promise<string> {
   let cursor = await transaction.store.openCursor();
   while (cursor) {
     const share = cursor.value as IncomingShare;
-    if (now - share.createdAt > lifetime) await cursor.delete();
+    if (now - share.createdAt > lifetime) {await cursor.delete();}
     cursor = await cursor.continue();
   }
   const id = crypto.randomUUID();
@@ -27,7 +27,7 @@ export async function stageShare(files: File[]): Promise<string> {
 
 export async function getShare(id: string): Promise<File[] | undefined> {
   const share = await (await shares).get('shares', id) as IncomingShare | undefined;
-  if (!share) return undefined;
+  if (!share) {return undefined;}
   if (Date.now() - share.createdAt > lifetime) {
     await discardShare(id);
     return undefined;

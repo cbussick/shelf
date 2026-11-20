@@ -27,7 +27,7 @@ async function request<T>(url: string, schema: ZodType<T>, init?: RequestInit): 
   }
   const body: unknown = response.status === 204 ? { ok: true } : await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (response.status === 401) sessionEvents.dispatchEvent(new Event('expired'));
+    if (response.status === 401) {sessionEvents.dispatchEvent(new Event('expired'));}
     const parsed = errorResponseSchema.safeParse(body);
     throw new ApiError(parsed.success ? parsed.data.error : 'Request failed.', response.status, body);
   }
@@ -44,8 +44,8 @@ export const api = {
   saveNote: (input: NoteWrite, images: File[], audio: File[] = []) => {
     const form = new FormData();
     form.set('payload', JSON.stringify(input));
-    for (const image of images) form.append('images', image, image.name);
-    for (const attachment of audio) form.append('audio', attachment, attachment.name);
+    for (const image of images) {form.append('images', image, image.name);}
+    for (const attachment of audio) {form.append('audio', attachment, attachment.name);}
     return request(`/api/notes/${input.id}`, noteResponseSchema, { method: 'PUT', body: form });
   },
   deleteNote: (id: string, expectedVersion: number) => request(`/api/notes/${id}`, okResponseSchema, jsonRequest({ expectedVersion }, 'DELETE')),

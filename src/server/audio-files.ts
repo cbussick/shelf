@@ -22,12 +22,12 @@ export async function inspectAudio(path: string) {
   // File signatures can include codec parameters (Opus: audio/ogg; codecs=opus).
   // Match the container type and keep the stored MIME type canonical.
   const format = detected && formats.get(detected.mime.split(';')[0].trim().toLowerCase());
-  if (!format) throw new Error('Choose an MP3, M4A, WAV, Ogg, WebM, FLAC or AAC audio file.');
+  if (!format) {throw new Error('Choose an MP3, M4A, WAV, Ogg, WebM, FLAC or AAC audio file.');}
   const metadata = await parseFile(path, { skipCovers: true, duration: true });
   if (!metadata.format.numberOfChannels || !metadata.format.sampleRate || metadata.format.trackInfo.some(track => track.type === TrackType.video)) {
     throw new Error('Choose an audio recording, not a video or an empty audio file.');
   }
   const duration = metadata.format.duration;
-  if (duration === 0) throw new Error('The audio file is empty.');
+  if (duration === 0) {throw new Error('The audio file is empty.');}
   return { ...format, duration: duration && Number.isFinite(duration) && duration > 0 ? duration : null };
 }

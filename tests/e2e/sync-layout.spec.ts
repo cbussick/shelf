@@ -34,7 +34,7 @@ for (const width of [1506, 834, 390, 320]) {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/api/notes/*', async route => {
-      if (route.request().method() === 'PUT') await gate;
+      if (route.request().method() === 'PUT') {await gate;}
       await route.continue();
     });
     try {
@@ -87,7 +87,7 @@ for (const width of [1506, 834, 390, 320]) {
     let release = () => {};
     let gate = Promise.resolve();
     await page.route('**/api/notes/*', async route => {
-      if (route.request().method() === 'PUT' && route.request().url().endsWith(`/${blockedId}`)) await gate;
+      if (route.request().method() === 'PUT' && route.request().url().endsWith(`/${blockedId}`)) {await gate;}
       await route.continue();
     });
     try {

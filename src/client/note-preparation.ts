@@ -9,7 +9,7 @@ import { whenNoteIdle } from './note-scheduling';
 // document is prepared; all other notes retain only bounded document data.
 export function useNotePreparation(notes: { id: string; body: string }[], paused: boolean, onPrepared?: (id: string, source: string) => void, preferredId?: string) {
   useEffect(() => {
-    if (paused || !notes.length || typeof IntersectionObserver === 'undefined') return;
+    if (paused || !notes.length || typeof IntersectionObserver === 'undefined') {return;}
     const owner = documentGeneration();
     const visible = new Map<string, string>();
     const attempted = new Set<string>();
@@ -18,12 +18,12 @@ export function useNotePreparation(notes: { id: string; body: string }[], paused
     let warming = false;
     const active = () => !cancelled && owner === documentGeneration();
     const schedule = () => {
-      if (!active() || cancelIdle || warming) return;
+      if (!active() || cancelIdle || warming) {return;}
       cancelIdle = whenNoteIdle(() => {
         cancelIdle = undefined;
-        if (!active() || document.hidden || document.querySelector('dialog[open]')) return;
+        if (!active() || document.hidden || document.querySelector('dialog[open]')) {return;}
         const candidate = [...visible].filter(([, source]) => !attempted.has(source)).sort((a, b) => Number(b[0] === preferredId) - Number(a[0] === preferredId) || b[1].length - a[1].length)[0];
-        if (!candidate) return;
+        if (!candidate) {return;}
         const [id, source] = candidate;
         if (!getPreparedDocument(source) && !hasDocumentParser()) {
           warming = true;
@@ -33,13 +33,13 @@ export function useNotePreparation(notes: { id: string; body: string }[], paused
             await bootstrap.editor.destroy();
           }).catch(() => { attempted.add(source); }).finally(() => {
             warming = false;
-            if (active() && hasDocumentParser()) schedule();
+            if (active() && hasDocumentParser()) {schedule();}
           });
           return;
         }
         attempted.add(source);
         try {
-          if (prepareDocument(source) && active()) onPrepared?.(id, source);
+          if (prepareDocument(source) && active()) {onPrepared?.(id, source);}
         } catch { /* Opening retains its normal fallback. */ }
         schedule();
       });
@@ -48,13 +48,13 @@ export function useNotePreparation(notes: { id: string; body: string }[], paused
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
         const id = (entry.target as HTMLElement).dataset.noteId!;
-        if (entry.isIntersecting) visible.set(id, sources.get(id)!);
-        else visible.delete(id);
+        if (entry.isIntersecting) {visible.set(id, sources.get(id)!);}
+        else {visible.delete(id);}
       }
       schedule();
     }, { rootMargin: '100px' });
     document.querySelectorAll<HTMLElement>('[data-note-id]').forEach(card => {
-      if (sources.has(card.dataset.noteId!)) observer.observe(card);
+      if (sources.has(card.dataset.noteId!)) {observer.observe(card);}
     });
     document.addEventListener('visibilitychange', schedule);
     return () => {

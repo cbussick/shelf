@@ -25,17 +25,17 @@ const extensions: Record<string, NoteAudio['mimeType']> = {
 export function audioMimeType(file: File): NoteAudio['mimeType'] {
   const mime = file.type.split(';')[0].toLowerCase();
   const type = types[mime] ?? extensions[file.name.split('.').at(-1)?.toLowerCase() ?? ''];
-  if (!type) throw new Error('Choose an MP3, M4A, WAV, Ogg, WebM, FLAC or AAC audio file.');
+  if (!type) {throw new Error('Choose an MP3, M4A, WAV, Ogg, WebM, FLAC or AAC audio file.');}
   return type;
 }
 
 export function validateAudioFile(file: File) {
   audioMimeType(file);
-  if (!file.size || file.size > MAX_AUDIO_BYTES) throw new Error('Audio files must be nonempty and under 100 MB.');
+  if (!file.size || file.size > MAX_AUDIO_BYTES) {throw new Error('Audio files must be nonempty and under 100 MB.');}
 }
 
 export function audioTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+  if (!Number.isFinite(seconds) || seconds < 0) {return '0:00';}
   const whole = Math.floor(seconds);
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }

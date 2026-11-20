@@ -23,8 +23,8 @@ function text(node: PreparedNode): string {
 }
 
 function nodeSize(node: PreparedNode): number {
-  if (node.type === 'text') return node.text?.length ?? 0;
-  if (['hardbreak', 'hr', 'image', 'html', 'footnote_reference'].includes(node.type)) return 1;
+  if (node.type === 'text') {return node.text?.length ?? 0;}
+  if (['hardbreak', 'hr', 'image', 'html', 'footnote_reference'].includes(node.type)) {return 1;}
   return (node.type === 'doc' ? 0 : 2) + (node.content?.reduce((size, child) => size + nodeSize(child), 0) ?? 0);
 }
 
@@ -52,7 +52,7 @@ function renderNode(dom: Document, node: PreparedNode, position = 0): Node {
       let content: Node = dom.createTextNode(node.text ?? '');
       for (const mark of node.marks ?? []) {
         const tag = markTags[mark.type];
-        if (typeof tag === 'string') content = wrap(tag, content);
+        if (typeof tag === 'string') {content = wrap(tag, content);}
         else if (mark.type === 'link' && typeof mark.attrs?.href === 'string') {
           const href = safeNoteLink(mark.attrs.href);
           if (href) {

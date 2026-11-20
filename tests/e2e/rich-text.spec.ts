@@ -192,7 +192,7 @@ test('opening existing Markdown is not a mutation and remote images never load',
   const markdown = '    indented code\n\n## Heading\n\n**Bold** and [unsafe](javascript:alert(1))\n\n![private](https://example.org/tracking.png)\n';
   await seed(page, markdown);
   const remoteRequests: string[] = [];
-  page.on('request', request => { if (request.url().includes('example.org')) remoteRequests.push(request.url()); });
+  page.on('request', request => { if (request.url().includes('example.org')) {remoteRequests.push(request.url());} });
   await page.goto('/');
   await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
   const body = noteBody(page);
@@ -212,12 +212,12 @@ for (const markdown of ['', 'A paragraph', '- First\n- Second', '- Parent\n  - C
     await page.goto('/');
     await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
     const body = noteBody(page);
-    if (markdown.includes('Child')) await body.locator('p').last().click();
-    else await body.click();
+    if (markdown.includes('Child')) {await body.locator('p').last().click();}
+    else {await body.click();}
     for (const key of ['Tab', 'Tab', 'Shift+Tab', 'Shift+Tab']) {
       await page.keyboard.press(key);
       await expect(body).toBeFocused();
-      if (key === 'Tab') await expect(body.locator('li li li')).toHaveCount(0);
+      if (key === 'Tab') {await expect(body.locator('li li li')).toHaveCount(0);}
     }
     await page.keyboard.type('Still editing');
     await expect(body).toContainText('Still editing');

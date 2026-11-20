@@ -110,7 +110,7 @@ for (const acknowledgeBeforeSave of [false, true]) {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/api/notes/*', async route => {
-      if (route.request().method() !== 'PUT') return route.continue();
+      if (route.request().method() !== 'PUT') {return route.continue();}
       const response = await route.fetch();
       uploaded();
       await gate;
@@ -131,7 +131,7 @@ for (const acknowledgeBeforeSave of [false, true]) {
     }
     await preview.getByRole('button', { name: 'Close image preview' }).click();
     await page.getByRole('button', { name: 'Close note' }).click();
-    if (!acknowledgeBeforeSave) release();
+    if (!acknowledgeBeforeSave) {release();}
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 10_000 });
     await expect.poll(async () => (await (await request.get('/api/notes')).json()).notes[0]?.images[0]?.rotation).toBe(90);
     const notes = (await (await request.get('/api/notes')).json()).notes;

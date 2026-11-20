@@ -50,7 +50,7 @@ test('changes every note color without opening it or altering its content, image
       images: original.images, pinned: true, position: original.position, createdAt: original.createdAt,
       color: name.toLowerCase(),
     });
-    if (name === 'Paper') expect(saved.version).toBe(original.version);
+    if (name === 'Paper') {expect(saved.version).toBe(original.version);}
     selected = name;
   }
   await page.reload();
@@ -175,7 +175,7 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
     const put = IDBObjectStore.prototype.put;
     (window as unknown as { restoreWrites: () => void }).restoreWrites = () => { IDBObjectStore.prototype.put = put; };
     IDBObjectStore.prototype.put = function (...args) {
-      if (this.name === 'notes') throw new DOMException('Storage unavailable', 'UnknownError');
+      if (this.name === 'notes') {throw new DOMException('Storage unavailable', 'UnknownError');}
       return put.apply(this, args);
     };
   });
@@ -203,7 +203,7 @@ test('reports a failed pin save without an unhandled rejection and allows retry'
     const put = IDBObjectStore.prototype.put;
     Object.assign(window, { restorePinWrites: () => { IDBObjectStore.prototype.put = put; } });
     IDBObjectStore.prototype.put = function (...args) {
-      if (this.name === 'notes') throw new DOMException('Storage unavailable', 'UnknownError');
+      if (this.name === 'notes') {throw new DOMException('Storage unavailable', 'UnknownError');}
       return put.apply(this, args);
     };
   });

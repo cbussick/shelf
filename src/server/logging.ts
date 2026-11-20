@@ -24,7 +24,7 @@ export function requestLogger(response: Response): Logger {
 
 export function recordRequestError(response: Response, error: unknown): void {
   const context = requests.get(response);
-  if (!context) return;
+  if (!context) {return;}
   if (error instanceof ZodError) {
     context.error = {
       code: 'validation_failed',
@@ -49,14 +49,14 @@ export function requestLogging(log: Logger): RequestHandler {
     const started = performance.now();
     let logged = false;
     const complete = () => {
-      if (logged) return;
+      if (logged) {return;}
       logged = true;
       const aborted = !response.writableFinished;
       // Only developer-defined route templates, never URLs, IDs or queries.
       // Express exposes route as any; the string guard retains only the configured path.
       // oxlint-disable-next-line typescript/no-unsafe-member-access
       const route = typeof request.route?.path === 'string' ? request.route.path : '(unmatched)';
-      if (route === '/healthz' && response.statusCode < 400 && !aborted) return;
+      if (route === '/healthz' && response.statusCode < 400 && !aborted) {return;}
       const level = response.statusCode >= 500 ? 'error' : response.statusCode >= 400 || aborted ? 'warn' : 'info';
       context.logger[level]({
         method: request.method, route, status: response.statusCode,
