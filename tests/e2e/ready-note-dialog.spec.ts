@@ -20,6 +20,9 @@ async function closeNote(page: Page) {
 async function pause(page: Page) {
   await page.getByRole('button', { name: 'Open note: Ready note', exact: true }).waitFor();
   await page.clock.install();
+  // Clock installation replaces requestIdleCallback, including the init-script
+  // stub. Keep background preparation disabled while freezing opening work.
+  await page.evaluate(() => { window.requestIdleCallback = () => 0; window.cancelIdleCallback = () => {}; });
   await page.clock.pauseAt(new Date(Date.now() + 1000));
 }
 
@@ -65,7 +68,9 @@ test('closing before initialization discards the unfinished instance safely', as
   await seed(page);
   await page.goto('/');
   await pause(page);
+  await expect(page.locator('dialog[aria-label="Edit note"]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Open note: Ready note', exact: true }).dispatchEvent('click');
+  await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Close note', exact: true }).dispatchEvent('click');
   await expect(page.locator('dialog[aria-label="Edit note"]')).toHaveCount(0);
   await page.clock.resume();
