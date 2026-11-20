@@ -11,7 +11,7 @@ export function afterNotePaint(work: () => void): () => void {
     clearTimeout(fallback);
   };
   const run = () => {
-    if (done) return;
+    if (done) {return;}
     done = true;
     cancel();
     work();

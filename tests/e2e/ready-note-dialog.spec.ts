@@ -20,6 +20,9 @@ async function closeNote(page: Page) {
 async function pause(page: Page) {
   await page.getByRole('button', { name: 'Open note: Ready note', exact: true }).waitFor();
   await page.clock.install();
+  // Clock installation replaces requestIdleCallback, including the init-script
+  // stub. Keep background preparation disabled while freezing opening work.
+  await page.evaluate(() => { window.requestIdleCallback = () => 0; window.cancelIdleCallback = () => {}; });
   await page.clock.pauseAt(new Date(Date.now() + 1000));
 }
 
@@ -33,7 +36,7 @@ test('an unchanged note reopens fully editable without rebuilding its dialog or 
   const original = await body(page).elementHandle();
   await body(page).evaluate(element => { element.scrollTop = 200; });
   await closeNote(page);
-  expect(await original!.evaluate(element => element.isConnected)).toBe(true);
+  expect(await original.evaluate(element => element.isConnected)).toBe(true);
   await pause(page);
   await card.dispatchEvent('click');
   await expect(body(page)).toBeVisible(); // No rAF/timer advancement needed.
@@ -65,7 +68,9 @@ test('closing before initialization discards the unfinished instance safely', as
   await seed(page);
   await page.goto('/');
   await pause(page);
+  await expect(page.locator('dialog[aria-label="Edit note"]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Open note: Ready note', exact: true }).dispatchEvent('click');
+  await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Close note', exact: true }).dispatchEvent('click');
   await expect(page.locator('dialog[aria-label="Edit note"]')).toHaveCount(0);
   await page.clock.resume();
@@ -86,7 +91,7 @@ test('undoing edits back to the original still discards the edited session', asy
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(body(page)).toHaveText('Original');
   await closeNote(page);
-  expect(await original!.evaluate(element => element.isConnected)).toBe(false);
+  expect(await original.evaluate(element => element.isConnected)).toBe(false);
   await card.click();
   await expect(body(page)).toHaveText('Original');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
@@ -104,7 +109,7 @@ test('edited notes discard the ready instance and do not retain old undo history
   await body(page).fill('Saved new body');
   await closeNote(page);
   await expect(card).toBeVisible();
-  expect(await original!.evaluate(element => element.isConnected)).toBe(false);
+  expect(await original.evaluate(element => element.isConnected)).toBe(false);
   await card.click();
   await expect(body(page)).toHaveText('Saved new body');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -125,7 +130,7 @@ test('a synced source change invalidates the parked dialog and uses the current 
   }) } })).ok()).toBe(true);
   await page.getByRole('button', { name: 'Synced', exact: true }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
-  await expect.poll(() => original!.evaluate(element => element.isConnected)).toBe(false);
+  await expect.poll(() => original.evaluate(element => element.isConnected)).toBe(false);
   await card.click();
   await expect(body(page)).toHaveText('Remote replacement');
   await body(page).fill('Saved after remote update');
@@ -157,7 +162,7 @@ test('switching notes disposes the prior dialog and never mixes document state',
   await closeNote(page);
   await page.getByRole('button', { name: 'Open note: Other note', exact: true }).click();
   await expect(body(page)).toHaveText('Other content');
-  expect(await original!.evaluate(element => element.isConnected)).toBe(false);
+  expect(await original.evaluate(element => element.isConnected)).toBe(false);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(body(page)).toHaveText('Other content');
 });

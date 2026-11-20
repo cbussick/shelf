@@ -1,25 +1,26 @@
+import { readNotes, requireNote } from '../fixtures/note-responses';
 import { test, expect } from '../fixtures/isolated-test';
 import { audioFile, editorFor, holdFirstPut, openCard, upload } from '../fixtures/audio-ui';
 import { chromium, webkit } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const recordingTest = test.extend({
-  page: async ({ isolatedServer }, use) => {
+  page: async ({ isolatedServer }, provide) => {
     const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
     try {
       const context = await browser.newContext({ baseURL: isolatedServer.url, storageState: isolatedServer.storageState, permissions: ['microphone'] });
-      await use(await context.newPage());
+      await provide(await context.newPage());
     } finally { await browser.close(); }
   },
 });
 const webkitTest = test.extend({
-  page: async ({ isolatedServer }, use) => {
+  page: async ({ isolatedServer }, provide) => {
     // WebKitGTK's ephemeral/private contexts cannot reliably persist blobs.
     // A temporary persistent profile models the normal browser/PWA storage.
     const context = await webkit.launchPersistentContext('', { baseURL: isolatedServer.url, viewport: { width: 820, height: 1180 }, hasTouch: true, headless: true });
     try {
       await context.addCookies(isolatedServer.storageState.cookies);
-      await use(await context.newPage());
+      await provide(await context.newPage());
     } finally { await context.close(); }
   },
 });
@@ -58,14 +59,14 @@ test('audio-only capture, card playback, seek, download, retention through pin/c
   await editorFor(page).getByRole('button', { name: 'Close note' }).click();
   await expect(editorFor(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  const remaining = (await (await page.request.get('/api/notes')).json()).notes;
+  const remaining = (await readNotes(page.request));
   expect(remaining).toHaveLength(1);
   expect(remaining[0].audio).toEqual([]); // Removing the last attachment is not permanent note deletion.
   await page.getByRole('button', { name: /^Open note:/ }).click();
   await editorFor(page).getByRole('button', { name: 'Delete note', exact: true }).click();
   await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
+  expect((await readNotes(page.request))).toEqual([]);
 });
 
 test('Opus upload syncs on mobile, survives reload, and does not block subsequent text notes', async ({ page }) => {
@@ -85,9 +86,9 @@ test('Opus upload syncs on mobile, survives reload, and does not block subsequen
   await editorFor(page).getByRole('button', { name: 'Close note' }).click();
   await expect(editorFor(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  const notes = (await (await page.request.get('/api/notes')).json()).notes;
+  const notes = (await readNotes(page.request));
   expect(notes).toHaveLength(2);
-  expect(notes.find((note: { audio: unknown[] }) => note.audio.length).audio[0].mimeType).toBe('audio/ogg');
+  expect(requireNote(notes, note => note.audio.length > 0).audio[0].mimeType).toBe('audio/ogg');
 });
 
 test('multiple audio attachments share a scrollable attachment area with images without a count limit', async ({ page }) => {
@@ -155,7 +156,7 @@ test('removing pending audio offline reclaims its stored bytes', async ({ page, 
       opening.onerror = () => reject(opening.error);
     });
     try {
-      return await new Promise<IDBValidKey[]>((resolve, reject) => {
+      return await new Promise<Array<IDBValidKey>>((resolve, reject) => {
         const request = database.transaction('blobs').objectStore('blobs').getAllKeys();
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
@@ -183,7 +184,7 @@ test('a newer edit during an audio upload reconciles IDs without dropping or dup
   await expect(editorFor(page)).toHaveCount(0);
   release();
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
-  const notes = (await (await page.request.get('/api/notes')).json()).notes;
+  const notes = (await readNotes(page.request));
   expect(notes).toHaveLength(1);
   expect(notes[0].title).toBe('Audio race updated');
   expect(notes[0].audio.map((audio: { name: string }) => audio.name)).toEqual(['First.wav', 'Second.wav']);
@@ -207,7 +208,7 @@ test('an editor opened before upload acknowledgement keeps its audio after ackno
   await editorFor(page).getByRole('button', { name: 'Close note' }).click();
   await expect(editorFor(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  const notes = (await (await page.request.get('/api/notes')).json()).notes;
+  const notes = (await readNotes(page.request));
   expect(notes).toHaveLength(1);
   expect(notes[0].audio).toHaveLength(1);
   expect(notes[0].title).toBe('Edited after upload');
@@ -227,7 +228,7 @@ test('deletion during an audio upload stays queued and does not resurrect the no
   await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note', exact: true }).click();
   release();
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
-  expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
+  expect((await readNotes(page.request))).toEqual([]);
 });
 
 test('conflict copies retain audio and uploaded audio does not autoplay or download merely to render cards', async ({ page }) => {
@@ -239,7 +240,7 @@ test('conflict copies retain audio and uploaded audio does not autoplay or downl
   await expect(editorFor(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   await openCard(page, 'Shared recording');
-  const note = (await (await page.request.get('/api/notes')).json()).notes[0];
+  const note = (await readNotes(page.request))[0];
   const response = await page.request.put(`/api/notes/${note.id}`, { multipart: { payload: JSON.stringify({ id: note.id, title: 'Remote version', body: '', color: 'paper', pinned: false, expectedVersion: note.version, retainedImageIds: [], retainedAudioIds: note.audio.map((audio: { id: string }) => audio.id) }) } });
   expect(response.ok()).toBe(true);
   await editorFor(page).getByRole('textbox', { name: 'Title' }).fill('Local version');
@@ -248,15 +249,15 @@ test('conflict copies retain audio and uploaded audio does not autoplay or downl
   await page.getByRole('button', { name: /^(Saved on device|Syncing…|Synced|Sync needs attention|\d+ not synced)$/ }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  const notes = (await (await page.request.get('/api/notes')).json()).notes;
+  const notes = (await readNotes(page.request));
   expect(notes).toHaveLength(2);
-  expect(notes.every((saved: { audio: unknown[] }) => saved.audio.length === 1)).toBe(true);
-  const requests: string[] = [];
-  page.on('request', request => { if (request.url().includes('/api/audio/')) requests.push(request.url()); });
+  expect(notes.every((saved: { audio: Array<unknown> }) => saved.audio.length === 1)).toBe(true);
+  const requests: Array<string> = [];
+  page.on('request', request => { if (request.url().includes('/api/audio/')) {requests.push(request.url());} });
   await page.reload();
   await expect(page.getByRole('button', { name: 'Play Keep me.wav' })).toHaveCount(2);
   expect(requests).toEqual([]);
-  expect(await page.locator('audio').evaluateAll(players => players.every(player => (player as HTMLAudioElement).paused))).toBe(true);
+  expect(await page.locator('audio').evaluateAll((players: Array<HTMLAudioElement>) => players.every(player => player.paused))).toBe(true);
 });
 
 recordingTest.describe('microphone recording', () => {
@@ -278,11 +279,11 @@ recordingTest.describe('microphone recording', () => {
     await recorder.getByRole('button', { name: 'Add to note', exact: true }).click();
     await expect(recorder).toHaveCount(0);
     await expect(editorFor(page).getByRole('region', { name: 'Audio attachments' })).toBeVisible();
-    expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
+    expect((await readNotes(page.request))).toEqual([]);
     await editorFor(page).getByRole('button', { name: 'Close note' }).click();
     await expect(editorFor(page)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
-    const note = (await (await page.request.get('/api/notes')).json()).notes[0];
+    const note = (await readNotes(page.request))[0];
     expect(note.audio).toHaveLength(1);
     expect(note.audio[0].duration).toBeGreaterThan(0);
     expect(note.audio[0].size).toBeGreaterThan(0);
@@ -299,7 +300,7 @@ recordingTest.describe('microphone recording', () => {
     await expect(recorder.getByRole('alert')).toContainText('Microphone access was denied');
     await recorder.getByRole('button', { name: 'Close audio recorder' }).click();
     await editorFor(page).getByRole('button', { name: 'Close note' }).click();
-    expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
+    expect((await readNotes(page.request))).toEqual([]);
   });
 
   recordingTest('permission resolving after the app is hidden does not start recording', async ({ page }) => {
@@ -307,8 +308,8 @@ recordingTest.describe('microphone recording', () => {
       const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
       navigator.mediaDevices.getUserMedia = async constraints => {
         const stream = await original(constraints);
-        await new Promise<void>(resolve => { (window as unknown as { releaseMicrophone: () => void }).releaseMicrophone = resolve; });
-        (window as unknown as { acquiredStream: MediaStream }).acquiredStream = stream;
+        await new Promise<void>(resolve => { (window).releaseMicrophone = resolve; });
+        (window).acquiredStream = stream;
         return stream;
       };
     });
@@ -317,15 +318,15 @@ recordingTest.describe('microphone recording', () => {
     await page.getByRole('button', { name: 'Record with microphone' }).click();
     const recorder = page.getByRole('dialog', { name: 'Record audio', exact: true });
     await recorder.getByRole('button', { name: 'Start recording' }).click();
-    await page.waitForFunction(() => typeof (window as unknown as { releaseMicrophone?: () => void }).releaseMicrophone === 'function');
+    await page.waitForFunction(() => typeof (window).releaseMicrophone === 'function');
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
       document.dispatchEvent(new Event('visibilitychange'));
-      (window as unknown as { releaseMicrophone: () => void }).releaseMicrophone();
+      (window).releaseMicrophone();
     });
     await expect(recorder.getByRole('status')).toContainText('Recording did not start');
     await expect(recorder.getByRole('button', { name: 'Start recording' })).toBeVisible();
-    expect(await page.evaluate(() => (window as unknown as { acquiredStream: MediaStream }).acquiredStream.getTracks().every(track => track.readyState === 'ended'))).toBe(true);
+    expect(await page.evaluate(() => (window).acquiredStream.getTracks().every(track => track.readyState === 'ended'))).toBe(true);
   });
 
   recordingTest('Discard dismisses a recording preview without attaching or saving it', async ({ page }) => {
@@ -342,7 +343,7 @@ recordingTest.describe('microphone recording', () => {
     await expect(editorFor(page).getByRole('region', { name: 'Audio attachments' })).toHaveCount(0);
     await editorFor(page).getByRole('button', { name: 'Close note' }).click();
     await expect(editorFor(page)).toHaveCount(0);
-    expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
+    expect((await readNotes(page.request))).toEqual([]);
   });
 
   recordingTest('explicit discard stops recording without attaching it', async ({ page }) => {
@@ -356,7 +357,7 @@ recordingTest.describe('microphone recording', () => {
     await recorder.getByRole('button', { name: 'Discard recording' }).click();
     await expect(editorFor(page).getByRole('region', { name: 'Audio attachments' })).toHaveCount(0);
     await editorFor(page).getByRole('button', { name: 'Close note' }).click();
-    expect((await (await page.request.get('/api/notes')).json()).notes).toEqual([]);
+    expect((await readNotes(page.request))).toEqual([]);
   });
 });
 

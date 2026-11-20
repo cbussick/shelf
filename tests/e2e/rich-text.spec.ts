@@ -1,10 +1,12 @@
 import { test, expect } from '../fixtures/isolated-test';
+import { readNotes } from '../fixtures/note-responses';
 import AxeBuilder from '@axe-core/playwright';
 import { webkit } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-const noteBody = (page: import('@playwright/test').Page) => page.getByRole('textbox', { name: 'Note', exact: true });
+const noteBody = (page: Page) => page.getByRole('textbox', { name: 'Note', exact: true });
 
-async function seed(page: import('@playwright/test').Page, body: string) {
+async function seed(page: Page, body: string) {
   const id = crypto.randomUUID();
   const response = await page.request.put(`/api/notes/${id}`, { multipart: { payload: JSON.stringify({
     id, title: 'Markdown test', body, color: 'mint', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [],
@@ -12,11 +14,11 @@ async function seed(page: import('@playwright/test').Page, body: string) {
   expect(response.ok()).toBeTruthy();
 }
 
-async function savedBody(page: import('@playwright/test').Page) {
+async function savedBody(page: Page) {
   await expect(page.getByRole('dialog', { name: /^(Add|Edit) note$/ })).toHaveCount(0);
-  await expect.poll(async () => ((await (await page.request.get('/api/notes')).json()).notes as unknown[]).length).toBe(1);
+  await expect.poll(async () => (await readNotes(page.request)).length).toBe(1);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
-  return ((await (await page.request.get('/api/notes')).json()).notes as { body: string }[])[0]!.body;
+  return (await readNotes(page.request))[0].body;
 }
 
 test('rich text formats and saves the latest keystroke without a debounce race', async ({ page }) => {
@@ -67,10 +69,10 @@ for (const marker of ['-', '1.', '- [ ]']) {
     const body = noteBody(page);
     await body.locator('p').filter({ hasText: 'Second' }).click();
     for (const [indent, outdent] of [['Tab', 'Shift+Tab'], ['Alt+ArrowRight', 'Alt+ArrowLeft']]) {
-      await page.keyboard.press(indent!);
+      await page.keyboard.press(indent);
       await expect(body.locator('li li')).toHaveText('Second');
       await expect(body).toBeFocused();
-      await page.keyboard.press(outdent!);
+      await page.keyboard.press(outdent);
       await expect(body.locator('li li')).toHaveCount(0);
       await expect(body.locator('li > .note-list-content > p')).toHaveText(['First', 'Second', 'Third']);
     }
@@ -191,8 +193,8 @@ test('checklists toggle, nest, undo and persist as Markdown', async ({ page }) =
 test('opening existing Markdown is not a mutation and remote images never load', async ({ page }) => {
   const markdown = '    indented code\n\n## Heading\n\n**Bold** and [unsafe](javascript:alert(1))\n\n![private](https://example.org/tracking.png)\n';
   await seed(page, markdown);
-  const remoteRequests: string[] = [];
-  page.on('request', request => { if (request.url().includes('example.org')) remoteRequests.push(request.url()); });
+  const remoteRequests: Array<string> = [];
+  page.on('request', request => { if (request.url().includes('example.org')) {remoteRequests.push(request.url());} });
   await page.goto('/');
   await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
   const body = noteBody(page);
@@ -212,12 +214,12 @@ for (const markdown of ['', 'A paragraph', '- First\n- Second', '- Parent\n  - C
     await page.goto('/');
     await page.getByRole('button', { name: 'Open note: Markdown test', exact: true }).click();
     const body = noteBody(page);
-    if (markdown.includes('Child')) await body.locator('p').last().click();
-    else await body.click();
+    if (markdown.includes('Child')) {await body.locator('p').last().click();}
+    else {await body.click();}
     for (const key of ['Tab', 'Tab', 'Shift+Tab', 'Shift+Tab']) {
       await page.keyboard.press(key);
       await expect(body).toBeFocused();
-      if (key === 'Tab') await expect(body.locator('li li li')).toHaveCount(0);
+      if (key === 'Tab') {await expect(body.locator('li li li')).toHaveCount(0);}
     }
     await page.keyboard.type('Still editing');
     await expect(body).toContainText('Still editing');

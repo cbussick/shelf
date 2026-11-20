@@ -567,7 +567,7 @@ test('image-only cards reserve only the compact sync slot without an empty conte
   const card = page.getByRole('button', { name: 'Open note: image.jpg' });
   await expect(card.getByRole('img')).toBeVisible();
   await expect(card.locator('span')).toHaveCount(0);
-  const dimensions = await card.evaluate(element => ({ card: element.getBoundingClientRect().height, image: element.querySelector('img')!.getBoundingClientRect().height, statusSlot: parseFloat(getComputedStyle(element).paddingBottom) }));
+  const dimensions = await card.evaluate(element => ({ card: element.getBoundingClientRect().height, image: element.querySelector('img')!.getBoundingClientRect().height, statusSlot: Number.parseFloat(getComputedStyle(element).paddingBottom) }));
   expect(dimensions.statusSlot).toBe(20);
   expect(dimensions.card - dimensions.image - dimensions.statusSlot).toBeLessThanOrEqual(2);
 
@@ -600,7 +600,7 @@ test('pasting an image from the overview opens a new note with the image attache
       const canvas = document.createElement('canvas');
       canvas.width = image.width; canvas.height = image.height;
       canvas.getContext('2d')!.drawImage(image, 0, 0);
-      const png = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'));
+      const png = await new Promise<Blob>(resolve => { canvas.toBlob(blob => resolve(blob!), 'image/png'); });
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
     } finally { URL.revokeObjectURL(url); }
   }, [...jpeg]);
@@ -645,7 +645,7 @@ test('pastes clipboard images into new and existing notes without disrupting tex
       const canvas = document.createElement('canvas');
       canvas.width = image.width; canvas.height = image.height;
       canvas.getContext('2d')!.drawImage(image, 0, 0);
-      const png = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'));
+      const png = await new Promise<Blob>(resolve => { canvas.toBlob(blob => resolve(blob!), 'image/png'); });
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
     } finally { URL.revokeObjectURL(url); }
   }, [...jpeg]);
@@ -658,7 +658,7 @@ test('pastes clipboard images into new and existing notes without disrupting tex
   await body.focus();
   expect(await pasteImage()).toBe(false);
   await expect(page.getByRole('button', { name: 'View image 2' })).toBeVisible();
-  for (let index = 3; index <= 6; index++) expect(await pasteImage()).toBe(false);
+  for (let index = 3; index <= 6; index++) {expect(await pasteImage()).toBe(false);}
   await expect(page.getByText('2 more images')).toBeVisible();
   expect(await pasteImage()).toBe(false);
   await expect(page.getByRole('alert')).toContainText('Up to 6 images or videos per note.');
@@ -749,11 +749,11 @@ for (const width of [390, 1440]) {
       await button.blur();
       await page.mouse.move(0, 0);
       const { data, info } = await sharp(await button.screenshot()).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-      const rows: number[] = [];
+      const rows: Array<number> = [];
       for (let y = 0; y < info.height; y++) {
         for (let x = 0; x < info.width; x++) {
           const offset = (y * info.width + x) * info.channels;
-          if (data[offset] > 200 && data[offset + 1] > 200 && data[offset + 2] > 200) rows.push(y);
+          if (data[offset] > 200 && data[offset + 1] > 200 && data[offset + 2] > 200) {rows.push(y);}
         }
       }
       expect(rows.length).toBeGreaterThan(0);
@@ -790,7 +790,7 @@ for (const width of [390, 1440]) {
       expect(trashBox.y).toBe(closeBox.y);
       expect(trashBox.x).toBeGreaterThanOrEqual(imageBox.x);
       expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(imageBox.y + imageBox.height);
-      if (index === 0) await preview.getByRole('button', { name: 'Next image' }).click();
+      if (index === 0) {await preview.getByRole('button', { name: 'Next image' }).click();}
     }
     await preview.getByRole('button', { name: 'Close image preview' }).click();
     await expect(preview).not.toBeVisible();
@@ -835,8 +835,8 @@ for (const width of [390, 1440]) {
     expect(closeBox.x - removeBox!.x - removeBox!.width).toBeCloseTo(8, 0);
     expect(closeBox.y).toBe(removeBox!.y);
     const bounds = await preview.boundingBox();
-    if (width === 390) expect(bounds?.width).toBe(width);
-    else expect(bounds?.width).toBeGreaterThan(800);
+    if (width === 390) {expect(bounds?.width).toBe(width);}
+    else {expect(bounds?.width).toBeGreaterThan(800);}
     await page.keyboard.press('Escape');
     await expect(preview).not.toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(`Photo preview ${width}`);
@@ -926,7 +926,7 @@ test('shows the same image mosaic on cards and in the editor', async ({ page }) 
       expect(boxes[2]!.x).toBe(boxes[0]!.x);
       expect(boxes[3]!.x).toBe(boxes[1]!.x);
     }
-    if (count > 4) await expect(editor.getByText(`${count - 4} more ${count === 5 ? 'image' : 'images'}`)).toBeVisible();
+    if (count > 4) {await expect(editor.getByText(`${count - 4} more ${count === 5 ? 'image' : 'images'}`)).toBeVisible();}
     if (count === 6) {
       await editor.getByRole('button', { name: 'View image 4' }).click();
       const preview = page.getByRole('dialog', { name: 'Image preview' });
@@ -938,11 +938,14 @@ test('shows the same image mosaic on cards and in the editor', async ({ page }) 
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible({ timeout: 15_000 });
     const card = page.getByRole('button', { name: `Open note: ${title}` });
     await expect(card.locator('img')).toHaveCount(Math.min(count, 4));
-    const cardBoxes = await card.evaluate(element => Array.from(element.querySelectorAll('img'), image => image.getBoundingClientRect().toJSON()));
+    const cardBoxes = await card.evaluate(element => Array.from(element.querySelectorAll('img'), image => {
+      const { width, y } = image.getBoundingClientRect();
+      return { width, y };
+    }));
     expect(cardBoxes[0].width).toBeGreaterThan(0);
     expect(cardBoxes[0].y).toBe(cardBoxes[1].y);
-    if (count === 3) expect(cardBoxes[2].width).toBeGreaterThan(cardBoxes[0].width * 1.9);
-    if (count > 4) await expect(card.getByText(`${count - 4} more ${count === 5 ? 'image' : 'images'}`)).toBeVisible();
+    if (count === 3) {expect(cardBoxes[2].width).toBeGreaterThan(cardBoxes[0].width * 1.9);}
+    if (count > 4) {await expect(card.getByText(`${count - 4} more ${count === 5 ? 'image' : 'images'}`)).toBeVisible();}
     await card.click();
     await page.getByRole('button', { name: 'Delete note' }).click();
     await page.getByRole('dialog', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete note' }).click();
@@ -964,9 +967,10 @@ test('receives an Android share as a draft and saves it on close', async ({ page
       document.body.append(input);
       return input;
     });
-    await chooser.asElement()!.setInputFiles('tests/fixtures/image.jpg');
+    await chooser.asElement().setInputFiles('tests/fixtures/image.jpg');
     return page.evaluate(async () => {
-      const input = document.querySelector('body > input[type=file]') as HTMLInputElement;
+      const input = document.querySelector<HTMLInputElement>('body > input[type=file]');
+      if (!input) { throw new Error('The share input did not mount'); }
       const form = new FormData();
       form.append('images', input.files![0]);
       input.remove();
@@ -1012,10 +1016,11 @@ test('can receive and save a shared screenshot offline', async ({ page, context 
     document.body.append(input);
     return input;
   });
-  await picker.asElement()!.setInputFiles('tests/fixtures/image.jpg');
+  await picker.asElement().setInputFiles('tests/fixtures/image.jpg');
   await context.setOffline(true);
   await page.evaluate(() => {
-    const picker = document.querySelector('body > input[type=file]') as HTMLInputElement;
+    const picker = document.querySelector<HTMLInputElement>('body > input[type=file]');
+    if (!picker) { throw new Error('The share picker did not mount'); }
     const form = document.createElement('form');
     form.action = '/share-target';
     form.method = 'POST';
@@ -1196,7 +1201,7 @@ for (const width of [390, 1280]) {
       expect(await preview.textContent()).toBe(text);
       const dimensions = await preview.evaluate(element => {
         const style = getComputedStyle(element);
-        return { height: element.getBoundingClientRect().height, lineHeight: parseFloat(style.lineHeight), clamp: style.webkitLineClamp };
+        return { height: element.getBoundingClientRect().height, lineHeight: Number.parseFloat(style.lineHeight), clamp: style.webkitLineClamp };
       });
       expect(dimensions.clamp).toBe(String(lines));
       expect(dimensions.height).toBeLessThanOrEqual(lines * dimensions.lineHeight + 1);

@@ -1,3 +1,4 @@
+import { readNotes, requireNote } from '../fixtures/note-responses';
 import { readFile } from 'node:fs/promises';
 import { test, expect } from '../fixtures/isolated-test';
 import { editorFor, holdFirstPut, openCard, upload } from '../fixtures/audio-ui';
@@ -21,7 +22,7 @@ test('a delayed conflict copies the newest local edit including subsequently add
   await editorFor(page).getByRole('textbox', { name: 'Title' }).fill('Original');
   await upload(editorFor(page), ['Original.wav']);
   await saveAndSync(page);
-  const note = (await (await page.request.get('/api/notes')).json()).notes[0];
+  const note = (await readNotes(page.request))[0];
   const { arrived, release } = await holdFirstPut(page);
   await openCard(page, 'Original');
   await editorFor(page).getByRole('textbox', { name: 'Title' }).fill('First edit');
@@ -38,9 +39,9 @@ test('a delayed conflict copies the newest local edit including subsequently add
   release();
   await expect(page.getByRole('button', { name: 'Open note: Newest edit (conflict copy)', exact: true })).toBeVisible();
   await syncConflictCopy(page);
-  const notes = (await (await page.request.get('/api/notes')).json()).notes;
+  const notes = (await readNotes(page.request));
   expect(notes).toHaveLength(2);
-  expect(notes.find((saved: { title: string }) => saved.title === 'Newest edit (conflict copy)').audio.map((audio: { name: string }) => audio.name)).toEqual(['Original.wav', 'Added later.wav']);
+  expect(requireNote(notes, (saved: { title: string }) => saved.title === 'Newest edit (conflict copy)').audio.map((audio: { name: string }) => audio.name)).toEqual(['Original.wav', 'Added later.wav']);
 });
 
 test('a recording removed on another device cannot block conflict recovery or lose newly attached audio', async ({ page, browser, isolatedServer }) => {
@@ -49,7 +50,7 @@ test('a recording removed on another device cannot block conflict recovery or lo
   await editorFor(page).getByRole('textbox', { name: 'Title' }).fill('Across devices');
   await upload(editorFor(page), ['Removed remotely.wav']);
   await saveAndSync(page);
-  const note = (await (await page.request.get('/api/notes')).json()).notes[0];
+  const note = (await readNotes(page.request))[0];
   const secondContext = await browser.newContext({ baseURL: isolatedServer.url, storageState: await page.context().storageState() });
   try {
     const second = await secondContext.newPage();
@@ -64,14 +65,14 @@ test('a recording removed on another device cannot block conflict recovery or lo
     await expect(second.getByRole('button', { name: 'Open note: Second device edit (conflict copy)', exact: true })).toBeVisible();
     await expect(second.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem').filter({ hasText: 'already been removed' })).toBeVisible();
     await syncConflictCopy(second);
-    const notes = (await (await second.request.get('/api/notes')).json()).notes;
-    const copy = notes.find((saved: { title: string }) => saved.title === 'Second device edit (conflict copy)');
+    const notes = (await readNotes(second.request));
+    const copy = requireNote(notes, (saved: { title: string }) => saved.title === 'Second device edit (conflict copy)');
     expect(copy.audio.map((audio: { name: string }) => audio.name)).toEqual(['New local recording.wav']);
     expect(copy.body).toContain('Removed remotely.wav');
     await second.getByRole('button', { name: 'New note' }).click();
     await editorFor(second).getByRole('textbox', { name: 'Title' }).fill('Sync still works');
     await saveAndSync(second);
-    expect((await (await second.request.get('/api/notes')).json()).notes).toHaveLength(3);
+    expect((await readNotes(second.request))).toHaveLength(3);
   } finally { await secondContext.close(); }
 });
 
@@ -81,7 +82,7 @@ test('removing pending audio during conflict preparation retries the newest edit
   await editorFor(page).getByRole('textbox', { name: 'Title' }).fill('Original for recovery');
   await upload(editorFor(page), ['Remote original.wav']);
   await saveAndSync(page);
-  const note = (await (await page.request.get('/api/notes')).json()).notes[0];
+  const note = (await readNotes(page.request))[0];
   const context = await browser.newContext({ baseURL: isolatedServer.url, storageState: await page.context().storageState() });
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
@@ -112,9 +113,9 @@ test('removing pending audio during conflict preparation retries the newest edit
     release();
     await expect(second.getByRole('button', { name: 'Open note: Removed during recovery (conflict copy)', exact: true })).toBeVisible();
     await syncConflictCopy(second);
-    const notes = (await (await second.request.get('/api/notes')).json()).notes;
+    const notes = (await readNotes(second.request));
     expect(notes).toHaveLength(2);
-    const copy = notes.find((saved: { title: string }) => saved.title === 'Removed during recovery (conflict copy)');
+    const copy = requireNote(notes, (saved: { title: string }) => saved.title === 'Removed during recovery (conflict copy)');
     expect(copy.audio.map((audio: { name: string }) => audio.name)).toEqual(['Remote original.wav']);
   } finally { release(); await context.close(); }
 });
@@ -123,7 +124,7 @@ test('identically named draft files retain separate players after one is removed
   await page.goto('/');
   await page.getByRole('button', { name: 'New note' }).click();
   await page.evaluate(buffers => {
-    const files = buffers.map(bytes => new File([new Uint8Array(bytes)], 'Same name.wav', { type: 'audio/wav', lastModified: 12345 }));
+    const files = buffers.map(bytes => new File([new Uint8Array(bytes)], 'Same name.wav', { type: 'audio/wav', lastModified: 12_345 }));
     const transfer = new DataTransfer();
     files.forEach(file => transfer.items.add(file));
     const input = document.querySelector<HTMLInputElement>('dialog[open] input[type=file][accept^="audio/"]')!;
@@ -141,5 +142,5 @@ test('identically named draft files retain separate players after one is removed
   const secondDownload = page.waitForEvent('download');
   await editor.getByRole('button', { name: 'Download Same name.wav' }).click();
   const downloaded = await secondDownload;
-  expect((await readFile((await downloaded.path())!)).length).toBe(wavAudio(2).length);
+  expect((await readFile((await downloaded.path()))).length).toBe(wavAudio(2).length);
 });

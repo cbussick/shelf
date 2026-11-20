@@ -1,12 +1,16 @@
+import { noteResponseSchema, noteListResponseSchema } from '../fixtures/note-responses';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import request, { type Agent } from 'supertest';
+import request from 'supertest';
+import type { Agent } from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../../src/server/app';
-import { openDatabase, type AppDatabase } from '../../src/server/database';
-import { MAX_AUDIO_BYTES, type Environment } from '../../src/shared/contracts';
+import { openDatabase } from '../../src/server/database';
+import type { AppDatabase } from '../../src/server/database';
+import { MAX_AUDIO_BYTES } from '../../src/shared/contracts';
+import type { Environment } from '../../src/shared/contracts';
 import { wavAudio } from '../fixtures/audio';
 
 let directory: string;
@@ -96,20 +100,20 @@ describe('image rotation', () => {
     const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...input, newImageIds: [imageId], imageRotations: [{ id: imageId, rotation: 90 }] }))
       .attach('images', 'tests/fixtures/image.jpg');
     expect(created.status).toBe(201);
-    expect(created.body.note.images[0]).toMatchObject({ id: imageId, rotation: 90 });
+    expect(noteResponseSchema.parse(created.body).note.images[0]).toMatchObject({ id: imageId, rotation: 90 });
     const original = await readFile('tests/fixtures/image.jpg');
-    expect((await agent.get(created.body.note.images[0].url)).body).toEqual(original);
+    expect((await agent.get(noteResponseSchema.parse(created.body).note.images[0].url)).body).toEqual(original);
     const retained = { ...input, retainedImageIds: [imageId], expectedVersion: 1 };
     const updated = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...retained, imageRotations: [{ id: imageId, rotation: 270 }] }));
     expect(updated.status).toBe(200);
-    expect(updated.body.note.images[0].rotation).toBe(270);
+    expect(noteResponseSchema.parse(updated.body).note.images[0].rotation).toBe(270);
     const oldClient = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...retained, expectedVersion: 2 }));
     expect(oldClient.status).toBe(200);
-    expect(oldClient.body.note.images[0].rotation).toBe(270);
+    expect(noteResponseSchema.parse(oldClient.body).note.images[0].rotation).toBe(270);
     const reset = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...retained, expectedVersion: 3, imageRotations: [{ id: imageId, rotation: 0 }] }));
     expect(reset.status).toBe(200);
-    expect((await agent.get('/api/notes')).body.notes[0].images[0].rotation).toBe(0);
-    expect((await agent.get(created.body.note.images[0].url)).body).toEqual(original);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes[0].images[0].rotation).toBe(0);
+    expect((await agent.get(noteResponseSchema.parse(created.body).note.images[0].url)).body).toEqual(original);
   });
 
   it('rejects invalid, duplicate and foreign rotation metadata without changing the note', async () => {
@@ -118,7 +122,7 @@ describe('image rotation', () => {
     const input = { id, title: 'Rotation', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [] };
     const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(input)).attach('images', 'tests/fixtures/image.jpg');
     expect(created.status).toBe(201);
-    const imageId = created.body.note.images[0].id;
+    const imageId = noteResponseSchema.parse(created.body).note.images[0].id;
     const retained = { ...input, expectedVersion: 1, retainedImageIds: [imageId] };
     for (const imageRotations of [
       [{ id: imageId, rotation: 45 }], [{ id: imageId, rotation: -90 }],
@@ -129,12 +133,31 @@ describe('image rotation', () => {
     }
     const otherId = crypto.randomUUID();
     expect((await agent.put(`/api/notes/${otherId}`).field('payload', JSON.stringify({ ...input, id: otherId, imageRotations: [{ id: imageId, rotation: 90 }] }))).status).toBe(400);
-    expect((await agent.get('/api/notes')).body.notes[0]).toMatchObject({ version: 1, images: [{ id: imageId, rotation: 0 }] });
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes[0]).toMatchObject({ version: 1, images: [{ id: imageId, rotation: 0 }] });
+  });
+});
+
+const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] as Array<string> });
+
+describe('wire-response test contracts', () => {
+  const image = { id: crypto.randomUUID(), url: `/api/images/${crypto.randomUUID()}`, alt: '', mimeType: 'image/jpeg', width: 1, height: 1, size: 1, rotation: 0, unexpected: 'keep-image-field' };
+  const note = { id: crypto.randomUUID(), title: '', body: '', color: 'paper', pinned: false, position: 0, version: 1, createdAt: '2026-11-20T00:00:00.000Z', updatedAt: '2026-11-20T00:00:00.000Z', images: [image], audio: [], unexpected: 'keep-note-field' };
+
+  it('retains extra wire fields so equality assertions cannot silently lose them', () => {
+    const response = { note, unexpected: 'keep-response-field' };
+    expect(noteResponseSchema.parse(response)).toEqual(response);
+    expect(noteListResponseSchema.parse({ notes: [note] })).toEqual({ notes: [note] });
+  });
+
+  it('does not supply absent fields that the application schema normally defaults', () => {
+    const { audio: _audio, ...withoutAudio } = note;
+    const { rotation: _rotation, ...withoutRotation } = image;
+    expect(() => noteResponseSchema.parse({ note: withoutAudio })).toThrow();
+    expect(() => noteResponseSchema.parse({ note: { ...note, images: [withoutRotation] } })).toThrow();
   });
 });
 
 describe('audio attachments', () => {
-  const payload = (id = crypto.randomUUID()) => ({ id, title: '', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [] as string[] });
 
   it('stores audio-only notes, authenticates playback, supports ranges and downloads, and removes bytes', async () => {
     await setup();
@@ -143,7 +166,7 @@ describe('audio attachments', () => {
     const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
       .attach('audio', bytes, { filename: 'A sound.wav', contentType: 'audio/wav' });
     expect(created.status).toBe(201);
-    const audio = created.body.note.audio[0];
+    const audio = noteResponseSchema.parse(created.body).note.audio[0];
     expect(audio).toMatchObject({ name: 'A sound.wav', mimeType: 'audio/wav', size: bytes.length, duration: 1 });
     expect((await request(app).get(audio.url)).status).toBe(401);
     const playback = await agent.get(audio.url).set('Range', 'bytes=0-43');
@@ -154,7 +177,7 @@ describe('audio attachments', () => {
     expect((await agent.get(`${audio.url}?download=1`)).headers['content-disposition']).toContain('A sound.wav');
     const removed = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, expectedVersion: 1 }));
     expect(removed.status).toBe(200);
-    expect(removed.body.note.audio).toEqual([]);
+    expect(noteResponseSchema.parse(removed.body).note.audio).toEqual([]);
     expect(await readdir(join(directory, 'audio'))).toEqual([]);
     await expect.poll(() => readdir(join(directory, 'uploads'))).toEqual([]);
     expect((await agent.get(audio.url)).status).toBe(404);
@@ -166,9 +189,9 @@ describe('audio attachments', () => {
     const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
       .attach('audio', 'tests/fixtures/audio.opus');
     expect(created.status).toBe(201);
-    expect(created.body.note.audio[0]).toMatchObject({ name: 'audio.opus', mimeType: 'audio/ogg' });
-    expect(created.body.note.audio[0].duration).toBeGreaterThan(0);
-    const playback = await agent.get(created.body.note.audio[0].url);
+    expect(noteResponseSchema.parse(created.body).note.audio[0]).toMatchObject({ name: 'audio.opus', mimeType: 'audio/ogg' });
+    expect(noteResponseSchema.parse(created.body).note.audio[0].duration).toBeGreaterThan(0);
+    const playback = await agent.get(noteResponseSchema.parse(created.body).note.audio[0].url);
     expect(playback.status).toBe(200);
     expect(playback.headers['content-type']).toContain('audio/ogg');
     expect(playback.body).toEqual(await readFile('tests/fixtures/audio.opus'));
@@ -178,18 +201,18 @@ describe('audio attachments', () => {
     await setup();
     const input = payload();
     let upload = agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input));
-    for (let index = 0; index < 9; index++) upload = upload.attach('audio', wavAudio(), { filename: `${index}.wav`, contentType: 'audio/wav' });
+    for (let index = 0; index < 9; index++) {upload = upload.attach('audio', wavAudio(), { filename: `${index}.wav`, contentType: 'audio/wav' });}
     const created = await upload.attach('images', 'tests/fixtures/image.jpg');
     expect(created.status).toBe(201);
-    expect(created.body.note.audio.map((audio: { name: string }) => audio.name)).toEqual(Array.from({ length: 9 }, (_, index) => `${index}.wav`));
-    const audioIds = created.body.note.audio.map((audio: { id: string }) => audio.id).reverse();
-    const updated = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, retainedImageIds: [created.body.note.images[0].id], retainedAudioIds: audioIds, expectedVersion: 1 }));
+    expect(noteResponseSchema.parse(created.body).note.audio.map((audio: { name: string }) => audio.name)).toEqual(Array.from({ length: 9 }, (_, index) => `${index}.wav`));
+    const audioIds = noteResponseSchema.parse(created.body).note.audio.map((audio: { id: string }) => audio.id).reverse();
+    const updated = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, retainedImageIds: [noteResponseSchema.parse(created.body).note.images[0].id], retainedAudioIds: audioIds, expectedVersion: 1 }));
     expect(updated.status).toBe(200);
-    expect(updated.body.note.audio.map((audio: { id: string }) => audio.id)).toEqual(audioIds);
+    expect(noteResponseSchema.parse(updated.body).note.audio.map((audio: { id: string }) => audio.id)).toEqual(audioIds);
     const { retainedAudioIds: _omitted, ...oldInput } = input;
     const oldClient = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...oldInput, title: 'Older client edit', expectedVersion: 2 }));
     expect(oldClient.status).toBe(200);
-    expect(oldClient.body.note.audio.map((audio: { id: string }) => audio.id)).toEqual(audioIds);
+    expect(noteResponseSchema.parse(oldClient.body).note.audio.map((audio: { id: string }) => audio.id)).toEqual(audioIds);
     expect((await agent.delete(`/api/notes/${input.id}`).send({ expectedVersion: 3 })).status).toBe(204);
     await expect.poll(() => readdir(join(directory, 'audio'))).toEqual([]);
   });
@@ -201,13 +224,13 @@ describe('audio attachments', () => {
     const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
       .attach('audio', bytes, { filename: 'large.wav', contentType: 'audio/wav' });
     expect(created.status).toBe(201);
-    expect(created.body.note.audio[0].size).toBe(bytes.length);
+    expect(noteResponseSchema.parse(created.body).note.audio[0].size).toBe(bytes.length);
     const rejected = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify({ ...input, expectedVersion: 1 }))
       .attach('audio', Buffer.alloc(MAX_AUDIO_BYTES + 1), { filename: 'too-large.wav', contentType: 'audio/wav' });
     expect(rejected.status).toBe(400);
     expect(rejected.body.error).toContain('100 MB');
     await expect.poll(() => readdir(join(directory, 'uploads'))).toEqual([]);
-    expect((await agent.get('/api/notes')).body.notes[0].version).toBe(1);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes[0].version).toBe(1);
   });
 
   it('rejects fake audio, empty files, and attachments belonging to another note, without orphaning files', async () => {
@@ -225,7 +248,7 @@ describe('audio attachments', () => {
     const created = await agent.put(`/api/notes/${input.id}`).field('payload', JSON.stringify(input))
       .attach('audio', wavAudio(), { filename: 'real.wav', contentType: 'audio/wav' });
     const other = payload();
-    const foreign = await agent.put(`/api/notes/${other.id}`).field('payload', JSON.stringify({ ...other, retainedAudioIds: [created.body.note.audio[0].id] }));
+    const foreign = await agent.put(`/api/notes/${other.id}`).field('payload', JSON.stringify({ ...other, retainedAudioIds: [noteResponseSchema.parse(created.body).note.audio[0].id] }));
     expect(foreign.status).toBe(400);
     expect(foreign.body.error).toContain('does not belong');
   });
@@ -238,7 +261,7 @@ describe('audio attachments', () => {
     expect(responses.map(response => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
     expect(await readdir(join(directory, 'audio'))).toHaveLength(1);
     await expect.poll(() => readdir(join(directory, 'uploads'))).toEqual([]);
-    expect((await agent.get('/api/notes')).body.notes[0].version).toBe(1);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes[0].version).toBe(1);
   });
 });
 
@@ -249,10 +272,10 @@ describe('notes API', () => {
     const payload = { id, title: 'New color', body: '', color, pinned: false, expectedVersion: 0, retainedImageIds: [] };
     const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(payload));
     expect(created.status).toBe(201);
-    expect(created.body.note.color).toBe(color);
+    expect(noteResponseSchema.parse(created.body).note.color).toBe(color);
     const updated = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, title: 'Updated', expectedVersion: 1 }));
     expect(updated.status).toBe(200);
-    expect((await agent.get('/api/notes')).body.notes[0]).toMatchObject({ color, title: 'Updated', version: 2 });
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes[0]).toMatchObject({ color, title: 'Updated', version: 2 });
   });
 
   it('validates, creates, updates, detects conflicts, and deletes a note', async () => {
@@ -262,15 +285,15 @@ describe('notes API', () => {
     expect((await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, color: 'unknown' }))).status).toBe(400);
     const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(payload));
     expect(created.status).toBe(201);
-    expect(created.body.note).toMatchObject({ id, title: 'A note', version: 1, pinned: true });
+    expect(noteResponseSchema.parse(created.body).note).toMatchObject({ id, title: 'A note', version: 1, pinned: true });
     const updated = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, title: 'Updated', expectedVersion: 1 }));
-    expect(updated.body.note).toMatchObject({ title: 'Updated', version: 2 });
+    expect(noteResponseSchema.parse(updated.body).note).toMatchObject({ title: 'Updated', version: 2 });
     const conflict = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, expectedVersion: 1 }));
     expect(conflict.status).toBe(409);
-    expect(conflict.body.note.version).toBe(2);
+    expect(noteResponseSchema.parse(conflict.body).note.version).toBe(2);
     expect((await agent.delete(`/api/notes/${id}`).send({ expectedVersion: 1 })).status).toBe(409);
     expect((await agent.delete(`/api/notes/${id}`).send({ expectedVersion: 2 })).status).toBe(204);
-    expect((await agent.get('/api/notes')).body.notes).toEqual([]);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes).toEqual([]);
   });
 
   it('accepts a version-zero deletion for an unsynced note without deleting a saved note', async () => {
@@ -281,8 +304,8 @@ describe('notes API', () => {
     expect((await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(payload))).status).toBe(201);
     const conflict = await agent.delete(`/api/notes/${id}`).send({ expectedVersion: 0 });
     expect(conflict.status).toBe(409);
-    expect(conflict.body.note).toMatchObject({ id, title: 'Keep me', version: 1 });
-    expect((await agent.get('/api/notes')).body.notes).toHaveLength(1);
+    expect(noteResponseSchema.parse(conflict.body).note).toMatchObject({ id, title: 'Keep me', version: 1 });
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes).toHaveLength(1);
     for (const expectedVersion of [-1, 0.5, '0', null]) {
       expect((await agent.delete(`/api/notes/${id}`).send({ expectedVersion })).status).toBe(400);
     }
@@ -295,14 +318,14 @@ describe('notes API', () => {
       expect((await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ id, title: `Note ${index}`, body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [] }))).status).toBe(201);
     }
     expect((await agent.put('/api/notes/order').send({ ids: [ids[0], ids[2], ids[1]] })).status).toBe(200);
-    expect((await agent.get('/api/notes')).body.notes.map((note: { id: string }) => note.id)).toEqual([ids[0], ids[2], ids[1]]);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes.map((note: { id: string }) => note.id)).toEqual([ids[0], ids[2], ids[1]]);
     expect((await agent.put('/api/notes/order').send({ ids: [ids[0]] })).status).toBe(200);
-    expect((await agent.get('/api/notes')).body.notes.map((note: { id: string }) => note.id)).toEqual([ids[0], ids[2], ids[1]]);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes.map((note: { id: string }) => note.id)).toEqual([ids[0], ids[2], ids[1]]);
     expect((await agent.put('/api/notes/order').send({ ids: [ids[0], ids[0]] })).status).toBe(400);
     expect((await agent.put('/api/notes/order').send({ ids: [crypto.randomUUID()] })).status).toBe(409);
     const updated = await agent.put(`/api/notes/${ids[1]}`).field('payload', JSON.stringify({ id: ids[1], title: 'Edited', body: '', color: 'paper', pinned: false, expectedVersion: 1, retainedImageIds: [] }));
     expect(updated.status).toBe(200);
-    expect((await agent.get('/api/notes')).body.notes.map((note: { id: string }) => note.id)).toEqual([ids[0], ids[2], ids[1]]);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes.map((note: { id: string }) => note.id)).toEqual([ids[0], ids[2], ids[1]]);
   });
 
   it('accepts images above 10 MB and rejects images above 20 MB', async () => {
@@ -314,7 +337,7 @@ describe('notes API', () => {
     const accepted = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(payload))
       .attach('images', image, { filename: 'large.jpg', contentType: 'image/jpeg' });
     expect(accepted.status).toBe(201);
-    expect(accepted.body.note.images[0].size).toBe(image.length);
+    expect(noteResponseSchema.parse(accepted.body).note.images[0].size).toBe(image.length);
 
     const oversized = Buffer.concat([jpeg, Buffer.alloc(20 * 1024 * 1024)]);
     const rejected = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, expectedVersion: 1 }))
@@ -329,10 +352,10 @@ describe('notes API', () => {
     const payload = { id, title: 'Original', body: '', color: 'paper', pinned: false, expectedVersion: 0, retainedImageIds: [] };
     const created = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify(payload)).attach('images', 'tests/fixtures/image.jpg');
     expect(created.status).toBe(201);
-    const imageId = created.body.note.images[0].id;
+    const imageId = noteResponseSchema.parse(created.body).note.images[0].id;
     const rejected = await agent.put(`/api/notes/${id}`).field('payload', JSON.stringify({ ...payload, title: 'Changed', expectedVersion: 1, retainedImageIds: [imageId, imageId] }));
     expect(rejected.status).toBe(400);
-    expect((await agent.get('/api/notes')).body.notes).toEqual([created.body.note]);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes).toEqual([noteResponseSchema.parse(created.body).note]);
   });
 
   it('rejects truncated images as client errors and cleans up staged files', async () => {
@@ -345,7 +368,7 @@ describe('notes API', () => {
       .attach('images', jpeg.subarray(0, 20), { filename: 'truncated.jpg', contentType: 'image/jpeg' });
     expect(response.status).toBe(400);
     expect(response.body.error).toContain('valid');
-    expect((await agent.get('/api/notes')).body.notes).toEqual([]);
+    expect(noteListResponseSchema.parse((await agent.get('/api/notes')).body).notes).toEqual([]);
     expect(await readdir(join(directory, 'images'))).toEqual([]);
     expect(await readdir(join(directory, 'uploads'))).toEqual([]);
   });

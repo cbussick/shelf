@@ -1,9 +1,10 @@
 import type { Locator, Page } from '@playwright/test';
 import { wavAudio } from './audio';
 
+export type NoteMultipart = { payload: string; images?: ReturnType<typeof audioFile>; audio?: ReturnType<typeof audioFile> };
 export const audioFile = (name = 'A sound.wav', seconds = 2) => ({ name, mimeType: 'audio/wav', buffer: wavAudio(seconds) });
 export const editorFor = (page: Page) => page.getByRole('dialog', { name: /^(Add|Edit) note$/ });
-export async function upload(editor: Locator, names: string[]) {
+export async function upload(editor: Locator, names: Array<string>) {
   await editor.getByRole('button', { name: 'Add audio', exact: true }).click();
   await editor.locator('input[type=file][accept^="audio/"]').setInputFiles(names.map(name => audioFile(name)));
 }

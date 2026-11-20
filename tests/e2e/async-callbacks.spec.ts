@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/isolated-test';
 
 test('reports a reorder failure even when the recovery read also fails', async ({ page }) => {
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
   for (const title of ['First', 'Second']) {
@@ -20,5 +20,5 @@ test('reports a reorder failure even when the recovery read also fails', async (
   await page.getByRole('button', { name: 'Open note: Second', exact: true }).press('ArrowDown');
   await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toHaveText('Could not reorder notes. Try again.');
   expect(errors).toEqual([]);
-  await page.evaluate(() => (window as unknown as { restoreReorderReads: () => void }).restoreReorderReads());
+  await page.evaluate(() => (window).restoreReorderReads());
 });

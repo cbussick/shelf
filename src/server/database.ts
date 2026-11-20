@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { noteColorSchema, type Environment, type Note } from '../shared/contracts.js';
+import { noteColorSchema } from '../shared/contracts.js';
+import type { Environment, Note } from '../shared/contracts.js';
 
 export type AppDatabase = Database.Database;
 
@@ -62,13 +63,13 @@ export function openDatabase(environment: Environment): AppDatabase {
     );
     CREATE INDEX IF NOT EXISTS audio_note ON audio(note_id, position);
   `);
-  if (!database.prepare('PRAGMA table_info(notes)').all().some(column => (column as { name: string }).name === 'position')) {
+  if (!database.prepare<Array<unknown>, { name: string }>('PRAGMA table_info(notes)').all().some(column => column.name === 'position')) {
     database.exec('ALTER TABLE notes ADD COLUMN position INTEGER NOT NULL DEFAULT 0');
-    const old = database.prepare('SELECT id FROM notes ORDER BY updated_at DESC, id ASC').all() as { id: string }[];
+    const old = database.prepare<Array<unknown>, { id: string }>('SELECT id FROM notes ORDER BY updated_at DESC, id ASC').all();
     const update = database.prepare('UPDATE notes SET position = ? WHERE id = ?');
     database.transaction(() => old.forEach((note, index) => update.run(index, note.id)))();
   }
-  if (!database.prepare('PRAGMA table_info(images)').all().some(column => (column as { name: string }).name === 'rotation')) {
+  if (!database.prepare<Array<unknown>, { name: string }>('PRAGMA table_info(images)').all().some(column => column.name === 'rotation')) {
     database.exec('ALTER TABLE images ADD COLUMN rotation INTEGER NOT NULL DEFAULT 0 CHECK (rotation IN (0,90,180,270))');
   }
   expandNoteColors(database);
@@ -77,8 +78,9 @@ export function openDatabase(environment: Environment): AppDatabase {
 }
 
 function expandNoteColors(database: AppDatabase) {
-  const table = database.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notes'").get() as { sql: string };
-  if (noteColors.every(color => table.sql.includes(color))) return;
+  const table = database.prepare<Array<unknown>, { sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notes'").get();
+  if (!table) { throw new Error('The notes table is missing during migration.'); }
+  if (noteColors.every(color => table.sql.includes(color))) {return;}
 
   // SQLite cannot alter a CHECK constraint. Rebuild the parent table without
   // cascading deletion of its images, then validate references before committing.
@@ -92,7 +94,7 @@ function expandNoteColors(database: AppDatabase) {
         DROP TABLE notes;
         ALTER TABLE notes_expanded RENAME TO notes;
       `);
-      if ((database.pragma('foreign_key_check') as unknown[]).length) throw new Error('Note color migration failed foreign key validation.');
+      if (database.prepare('PRAGMA foreign_key_check').all().length) {throw new Error('Note color migration failed foreign key validation.');}
     })();
   } finally {
     database.pragma('foreign_keys = ON');
@@ -114,24 +116,24 @@ type AudioRow = {
 };
 
 export function readNote(database: AppDatabase, id: string): Note | undefined {
-  const row = database.prepare('SELECT * FROM notes WHERE id = ?').get(id) as NoteRow | undefined;
-  if (!row) return undefined;
-  const images = database.prepare('SELECT * FROM images WHERE note_id = ? ORDER BY position').all(id) as ImageRow[];
-  const audio = database.prepare('SELECT * FROM audio WHERE note_id = ? ORDER BY position').all(id) as AudioRow[];
+  const row = database.prepare<Array<unknown>, NoteRow>('SELECT * FROM notes WHERE id = ?').get(id);
+  if (!row) {return undefined;}
+  const images = database.prepare<Array<unknown>, ImageRow>('SELECT * FROM images WHERE note_id = ? ORDER BY position').all(id);
+  const audio = database.prepare<Array<unknown>, AudioRow>('SELECT * FROM audio WHERE note_id = ? ORDER BY position').all(id);
   return mapNote(row, images, audio);
 }
 
-export function readNotes(database: AppDatabase): Note[] {
-  const notes = database.prepare('SELECT * FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all() as NoteRow[];
-  const images = database.prepare('SELECT * FROM images ORDER BY note_id, position').all() as ImageRow[];
-  const audio = database.prepare('SELECT * FROM audio ORDER BY note_id, position').all() as AudioRow[];
+export function readNotes(database: AppDatabase): Array<Note> {
+  const notes = database.prepare<Array<unknown>, NoteRow>('SELECT * FROM notes ORDER BY position ASC, updated_at DESC, id ASC').all();
+  const images = database.prepare<Array<unknown>, ImageRow>('SELECT * FROM images ORDER BY note_id, position').all();
+  const audio = database.prepare<Array<unknown>, AudioRow>('SELECT * FROM audio ORDER BY note_id, position').all();
   const imagesByNote = groupAttachments(images);
   const audioByNote = groupAttachments(audio);
   return notes.map(note => mapNote(note, imagesByNote.get(note.id) ?? [], audioByNote.get(note.id) ?? []));
 }
 
-function groupAttachments<T extends { note_id: string }>(attachments: T[]): Map<string, T[]> {
-  const groups = new Map<string, T[]>();
+function groupAttachments<T extends { note_id: string }>(attachments: Array<T>): Map<string, Array<T>> {
+  const groups = new Map<string, Array<T>>();
   for (const attachment of attachments) {
     const group = groups.get(attachment.note_id) ?? [];
     group.push(attachment);
@@ -140,7 +142,7 @@ function groupAttachments<T extends { note_id: string }>(attachments: T[]): Map<
   return groups;
 }
 
-function mapNote(row: NoteRow, images: ImageRow[], audio: AudioRow[]): Note {
+function mapNote(row: NoteRow, images: Array<ImageRow>, audio: Array<AudioRow>): Note {
   return {
     id: row.id,
     title: row.title,

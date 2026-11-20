@@ -18,7 +18,9 @@ for (const width of [390, 1024]) {
     await page.clock.install();
     await page.clock.pauseAt(new Date(Date.now() + 1000));
     const screenshot = async (state: string) => {
-      await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+      // Require same-document HTMLElement identity before focus/blur or keyboard handling.
+      // oxlint-disable-next-line @nkzw/no-instanceof
+      await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) {document.activeElement.blur();} });
       await page.screenshot({ path: testInfo.outputPath(`${width}-${state}.png`) });
       const layout = await page.locator('dialog[open] footer').evaluate(footer => {
         const status = footer.querySelector('[data-testid="note-save-status"]')!.getBoundingClientRect();
@@ -34,9 +36,9 @@ for (const width of [390, 1024]) {
     const blocked = new Promise<void>(resolve => { release = resolve; });
     let mode: 'held' | 'error' | 'normal' = 'held';
     await page.route('**/api/notes/*', async route => {
-      if (route.request().method() !== 'PUT') return route.continue();
-      if (mode === 'held') await blocked;
-      if (mode === 'error') return route.fulfill({ status: 503, json: { error: 'The sync service is temporarily unavailable.' } });
+      if (route.request().method() !== 'PUT') {return route.continue();}
+      if (mode === 'held') {await blocked;}
+      if (mode === 'error') {return route.fulfill({ status: 503, json: { error: 'The sync service is temporarily unavailable.' } });}
       return route.continue();
     });
     await body.fill('Remember the tickets.');
@@ -73,7 +75,7 @@ for (const width of [390, 1024]) {
       // oxlint-disable-next-line typescript/unbound-method
       const original = IDBDatabase.prototype.transaction;
       IDBDatabase.prototype.transaction = function (...args: Parameters<IDBDatabase['transaction']>) {
-        if (args[1] === 'readwrite' && Array.from(typeof args[0] === 'string' ? [args[0]] : args[0]).includes('notes')) throw new DOMException('Storage quota exceeded.', 'QuotaExceededError');
+        if (args[1] === 'readwrite' && Array.from(typeof args[0] === 'string' ? [args[0]] : args[0]).includes('notes')) {throw new DOMException('Storage quota exceeded.', 'QuotaExceededError');}
         return original.apply(this, args);
       };
       Object.assign(window, { restoreLocalWrites: () => { IDBDatabase.prototype.transaction = original; } });
@@ -99,7 +101,7 @@ for (const width of [390, 1024]) {
     await page.getByRole('textbox', { name: 'Password', exact: true }).fill('correct horse battery staple');
     await page.getByRole('button', { name: 'Open Shelf', exact: true }).click();
     await expect(body).toHaveText('A last-minute change that must not disappear.');
-    await page.evaluate(() => (window as unknown as { restoreLocalWrites: () => void }).restoreLocalWrites());
+    await page.evaluate(() => (window).restoreLocalWrites());
     await page.getByRole('button', { name: 'Retry save' }).click();
     await expect(status).toHaveText('Saved');
     await page.getByRole('button', { name: 'Close note' }).click();

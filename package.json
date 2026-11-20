@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
+    "@cloudflare/oxlint-config": "0.1.0",
     "@playwright/test": "^1.58.2",
     "@stylexjs/stylex": "^0.18.1",
     "@stylexjs/unplugin": "^0.18.1",
@@ -62,7 +63,7 @@
     "knip": "6.42.1",
     "oxlint": "1.94.0",
     "supertest": "^7.2.2",
-    "tsrs": "7.1.0-beta.tsrs3",
+    "tsrs": "0.25.0-ts7.1.0-beta",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.7",

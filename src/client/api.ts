@@ -1,8 +1,6 @@
 import type { ZodType } from 'zod';
-import {
-  authStatusSchema, credentialsSchema, errorResponseSchema, noteListResponseSchema, noteResponseSchema,
-  okResponseSchema, reorderNotesSchema, type NoteWrite,
-} from '../shared/contracts';
+import { authStatusSchema, credentialsSchema, errorResponseSchema, noteListResponseSchema, noteResponseSchema, okResponseSchema, reorderNotesSchema } from '../shared/contracts';
+import type { NoteWrite } from '../shared/contracts';
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly body?: unknown) { super(message); }
@@ -27,7 +25,7 @@ async function request<T>(url: string, schema: ZodType<T>, init?: RequestInit): 
   }
   const body: unknown = response.status === 204 ? { ok: true } : await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (response.status === 401) sessionEvents.dispatchEvent(new Event('expired'));
+    if (response.status === 401) {sessionEvents.dispatchEvent(new Event('expired'));}
     const parsed = errorResponseSchema.safeParse(body);
     throw new ApiError(parsed.success ? parsed.data.error : 'Request failed.', response.status, body);
   }
@@ -40,12 +38,12 @@ export const api = {
   login: (password: string) => request('/api/auth/login', okResponseSchema, jsonRequest(credentialsSchema.parse({ password }))),
   logout: () => request('/api/auth/logout', okResponseSchema, { method: 'POST' }),
   notes: () => request('/api/notes', noteListResponseSchema),
-  reorderNotes: (ids: string[]) => request('/api/notes/order', okResponseSchema, jsonRequest(reorderNotesSchema.parse({ ids }), 'PUT')),
-  saveNote: (input: NoteWrite, images: File[], audio: File[] = []) => {
+  reorderNotes: (ids: Array<string>) => request('/api/notes/order', okResponseSchema, jsonRequest(reorderNotesSchema.parse({ ids }), 'PUT')),
+  saveNote: (input: NoteWrite, images: Array<File>, audio: Array<File> = []) => {
     const form = new FormData();
     form.set('payload', JSON.stringify(input));
-    for (const image of images) form.append('images', image, image.name);
-    for (const attachment of audio) form.append('audio', attachment, attachment.name);
+    for (const image of images) {form.append('images', image, image.name);}
+    for (const attachment of audio) {form.append('audio', attachment, attachment.name);}
     return request(`/api/notes/${input.id}`, noteResponseSchema, { method: 'PUT', body: form });
   },
   deleteNote: (id: string, expectedVersion: number) => request(`/api/notes/${id}`, okResponseSchema, jsonRequest({ expectedVersion }, 'DELETE')),

@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures/isolated-test';
 
 async function createNote(page: Page, withImage = false) {
@@ -50,7 +50,7 @@ test('changes every note color without opening it or altering its content, image
       images: original.images, pinned: true, position: original.position, createdAt: original.createdAt,
       color: name.toLowerCase(),
     });
-    if (name === 'Paper') expect(saved.version).toBe(original.version);
+    if (name === 'Paper') {expect(saved.version).toBe(original.version);}
     selected = name;
   }
   await page.reload();
@@ -173,9 +173,9 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
     // Save the unbound method for restoration and explicit .apply(this, args) below.
     // oxlint-disable-next-line typescript/unbound-method
     const put = IDBObjectStore.prototype.put;
-    (window as unknown as { restoreWrites: () => void }).restoreWrites = () => { IDBObjectStore.prototype.put = put; };
+    (window).restoreWrites = () => { IDBObjectStore.prototype.put = put; };
     IDBObjectStore.prototype.put = function (...args) {
-      if (this.name === 'notes') throw new DOMException('Storage unavailable', 'UnknownError');
+      if (this.name === 'notes') {throw new DOMException('Storage unavailable', 'UnknownError');}
       return put.apply(this, args);
     };
   });
@@ -185,7 +185,7 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
   await menu.getByRole('menuitemradio', { name: 'Mint' }).click();
   await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toHaveText('Could not change note color. Try again.');
   await expect(card).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-  await page.evaluate(() => (window as unknown as { restoreWrites: () => void }).restoreWrites());
+  await page.evaluate(() => (window).restoreWrites());
   await card.click({ button: 'right' });
   await menu.getByRole('menuitem', { name: 'Change color' }).click();
   await menu.getByRole('menuitemradio', { name: 'Mint' }).click();
@@ -194,7 +194,7 @@ test('reports a failed color save and allows another attempt', async ({ page }) 
 });
 
 test('reports a failed pin save without an unhandled rejection and allows retry', async ({ page }) => {
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   page.on('pageerror', error => errors.push(error.message));
   await createNote(page);
   await page.evaluate(() => {
@@ -203,7 +203,7 @@ test('reports a failed pin save without an unhandled rejection and allows retry'
     const put = IDBObjectStore.prototype.put;
     Object.assign(window, { restorePinWrites: () => { IDBObjectStore.prototype.put = put; } });
     IDBObjectStore.prototype.put = function (...args) {
-      if (this.name === 'notes') throw new DOMException('Storage unavailable', 'UnknownError');
+      if (this.name === 'notes') {throw new DOMException('Storage unavailable', 'UnknownError');}
       return put.apply(this, args);
     };
   });
@@ -212,7 +212,7 @@ test('reports a failed pin save without an unhandled rejection and allows retry'
   await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByRole('listitem')).toHaveText('Could not pin note. Try again.');
   await expect(pin).toBeVisible();
   expect(errors).toEqual([]);
-  await page.evaluate(() => (window as unknown as { restorePinWrites: () => void }).restorePinWrites());
+  await page.evaluate(() => (window).restorePinWrites());
   await pin.click();
   await expect(page.getByRole('button', { name: 'Unpin note: Color target', exact: true })).toBeVisible();
 });

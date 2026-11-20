@@ -1,12 +1,21 @@
 import { build } from 'vite';
+import type { deleteLocalNote, localSyncOverview, noteSyncState, pendingLocalChanges, reorderLocalNotes, saveLocalNote, syncNotes } from '../../src/client/local-store';
 import { test, expect } from '../fixtures/isolated-test';
 
 declare global {
   interface Window {
-    storage: typeof import('../../src/client/local-store');
-    draft: Parameters<typeof import('../../src/client/local-store').saveLocalNote>[0];
-    syncing: ReturnType<typeof import('../../src/client/local-store').syncNotes>;
-    saving: ReturnType<typeof import('../../src/client/local-store').saveLocalNote>;
+    storage: {
+      deleteLocalNote: typeof deleteLocalNote;
+      localSyncOverview: typeof localSyncOverview;
+      noteSyncState: typeof noteSyncState;
+      pendingLocalChanges: typeof pendingLocalChanges;
+      reorderLocalNotes: typeof reorderLocalNotes;
+      saveLocalNote: typeof saveLocalNote;
+      syncNotes: typeof syncNotes;
+    };
+    draft: Parameters<typeof saveLocalNote>[0];
+    syncing: ReturnType<typeof syncNotes>;
+    saving: ReturnType<typeof saveLocalNote>;
     releaseMedia: () => void;
   }
 }
@@ -20,7 +29,7 @@ test.beforeAll(async () => {
   });
   const outputs = Array.isArray(result) ? result : [result];
   const chunk = outputs.flatMap(output => 'output' in output ? output.output : []).find(output => output.type === 'chunk');
-  if (!chunk || chunk.type !== 'chunk') throw new Error('Storage test bundle missing');
+  if (!chunk || chunk.type !== 'chunk') {throw new Error('Storage test bundle missing');}
   storageScript = chunk.code;
 });
 
@@ -32,6 +41,31 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => {
     window.draft = { id: crypto.randomUUID(), title: 'Autosave', body: '', color: 'paper', pinned: false, retainedImages: [], newImages: [] };
   });
+});
+
+test('malformed editor redirect metadata rejects a write without losing the saved note', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const draft = { ...window.draft, editorSession: 'redirect-validation', body: 'Keep this checkpoint' };
+    const saved = await window.storage.saveLocalNote(draft);
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('shelf');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction('meta', 'readwrite');
+    transaction.objectStore('meta').put({ id: 42, attachments: {} }, `editorRedirect:${draft.editorSession}:${saved.id}`);
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+    let rejected = false;
+    try { await window.storage.saveLocalNote({ ...draft, body: 'Must not replace the checkpoint' }); }
+    catch { rejected = true; }
+    const state = await window.storage.noteSyncState(saved.id);
+    return { rejected, body: state.note?.body, pending: state.pending };
+  });
+  expect(result).toEqual({ rejected: true, body: 'Keep this checkpoint', pending: true });
 });
 
 test('stable attachment retries reuse pending bytes and uploaded metadata, including rotations', async ({ page }) => {
@@ -50,6 +84,9 @@ test('stable attachment retries reuse pending bytes and uploaded metadata, inclu
     draft.retainedAudio = first.audio;
     draft.newImageRotations = [180];
     const retry = await storage.saveLocalNote(draft);
+    // Playwright serializes this callback into the browser; module hoisting would
+    // leave countBlobs undefined there (the closure cannot cross that boundary).
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const countBlobs = async () => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('shelf');
@@ -172,10 +209,10 @@ for (const failure of ['save', 'reorder'] as const) {
     await page.evaluate(async failure => {
       const { storage, draft } = window;
       await storage.saveLocalNote(draft);
-      if (failure === 'reorder') await storage.syncNotes();
+      if (failure === 'reorder') {await storage.syncNotes();}
       await storage.reorderLocalNotes([draft.id!]);
     }, failure);
-    const requests: string[] = [];
+    const requests: Array<string> = [];
     await page.route('**/api/notes**', async route => {
       requests.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
       await route.fulfill({ status: 401, json: { error: 'Unauthorized' } });
@@ -200,7 +237,7 @@ test('a conflict attachment 401 leaves the local edit queued and stops network w
     await storage.reorderLocalNotes([synced.id]);
     return synced;
   });
-  const requests: string[] = [];
+  const requests: Array<string> = [];
   await page.route('**/api/**', async route => {
     const request = route.request();
     requests.push(`${request.method()} ${new URL(request.url()).pathname}`);
@@ -242,6 +279,9 @@ test('session redirects fence continued text and stable media retries, including
     const decode = window.createImageBitmap;
     const gate = new Promise<void>(resolve => { window.releaseMedia = resolve; });
     // Forward either overload unchanged; Parameters models only the last overload.
+    // Forward all runtime overloads unchanged; Parameters models only the last
+    // overload, so TS cannot prove that this transparent async wrapper preserves both.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     window.createImageBitmap = (async (...args: Parameters<typeof createImageBitmap>) => {
       await gate;
       return decode(...args);
@@ -265,13 +305,15 @@ test('session redirects fence continued text and stable media retries, including
     const copy = (await storage.noteSyncState(draft.id!, draft.editorSession)).note!;
     const retry = await storage.saveLocalNote({ ...draft, title: 'Continued', body: 'New text', newImageRotations: [90] });
     const pending = await storage.noteSyncState(draft.id!, draft.editorSession);
+    // This helper must be inside the serialized browser callback, not Node's module scope.
+    // oxlint-disable-next-line unicorn/consistent-function-scoping
     const uploadBlobKeys = async () => {
       const database = await new Promise<IDBDatabase>(resolve => {
         const request = indexedDB.open('shelf');
         request.onsuccess = () => resolve(request.result);
       });
       try {
-        const keys = await new Promise<IDBValidKey[]>(resolve => {
+        const keys = await new Promise<Array<IDBValidKey>>(resolve => {
           const request = database.transaction('blobs').objectStore('blobs').getAllKeys();
           request.onsuccess = () => resolve(request.result);
         });
@@ -388,7 +430,7 @@ test('conflict recovery reports the preserved copy id and keeps the server origi
       form.set('payload', JSON.stringify({ ...original, title: 'Server edit', expectedVersion: original.version, retainedImageIds: [], newImageIds: [], retainedAudioIds: [], newAudio: [] }));
       return form;
     })() });
-    if (!remote.ok) throw new Error(`Remote edit failed: ${remote.status}`);
+    if (!remote.ok) {throw new Error(`Remote edit failed: ${remote.status}`);}
     await storage.saveLocalNote({ ...draft, title: 'Local edit' });
     const sync = await storage.syncNotes();
     return { sync, originalId: original.id, copyState: await storage.noteSyncState(sync.conflictCopies[original.id]) };
@@ -412,8 +454,8 @@ test('overview counts visible pending saves, not deletions or reorder work, and 
     await storage.deleteLocalNote(removed);
     await storage.reorderLocalNotes([draft.id!]);
     const overview = await storage.localSyncOverview();
-    if (overview.pending !== 3 || Object.keys(overview.notes).join() !== draft.id) throw new Error('Overview must count notes separately from other work');
-    return draft.id!;
+    if (overview.pending !== 3 || Object.keys(overview.notes).join() !== draft.id) {throw new Error('Overview must count notes separately from other work');}
+    return draft.id;
   });
   await page.route(`**/api/notes/${id}`, route => route.fulfill({ status: 503, json: { error: 'Try this upload again later.' } }));
   await page.evaluate(async () => { try { await window.storage.syncNotes(); } catch { /* Expected server failure. */ } });
@@ -433,7 +475,7 @@ test('a failed stale upload does not attach its error to a newer edit', async ({
   let requested!: () => void;
   const started = new Promise<void>(resolve => { requested = resolve; });
   await page.route('**/api/notes/*', async route => {
-    if (route.request().method() !== 'PUT') return route.continue();
+    if (route.request().method() !== 'PUT') {return route.continue();}
     requested(); await held;
     await route.fulfill({ status: 500, json: { error: 'The old upload failed.' } });
   });

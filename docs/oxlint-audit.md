@@ -1,5 +1,8 @@
 # Oxlint + tsrs setup
 
+This records the historical PR93 setup. Current preset/backend versions and rule
+policy are in the [Cloudflare migration report](cloudflare-oxlint-audit.md).
+
 ## Scope and versions
 
 Shelf had no lint script at baseline `1e314be`. This adds `npm run lint`,

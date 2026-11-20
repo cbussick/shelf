@@ -61,14 +61,22 @@ npm run build
 npm run audit
 ```
 
-Lint uses Oxlint with the tsrs backend for correctness and type-aware checks, including
+Lint uses stock `@cloudflare/oxlint-config` defaults plus stronger existing Shelf
+checks in `oxlint.config.ts`, and the tsrs backend for type-aware checks, including
 floating promises, misused async callbacks, and awaiting non-promises. It also reports
 type errors in linted files. Keep `npm run typecheck` and `npm run build`: lint ignores
 build output and dependencies, does not check every project/global diagnostic, and does
 not compile the server. `src/server/tsconfig.json` lets lint discover the existing
 NodeNext server configuration; the compiler/build scripts still use `tsconfig.server.json`.
 Tests and other files outside a discovered project use the backend's inferred program.
-See [the setup findings](docs/oxlint-audit.md) for versions, checks, and limitations.
+The default-preset migration is lint-clean, including explicit auth/editor
+lifecycles and subscribed immutable checkpoint snapshots. The full browser suite
+still has two unchanged baseline preview failures and an intermittent mobile
+title-entry failure reproduced on main. Local validation is not integration or
+deployment authorization.
+See [the migration report](docs/cloudflare-oxlint-audit.md) for versions,
+implemented fixes, strictly scoped exceptions, checks and cost, and
+[the original setup findings](docs/oxlint-audit.md) for PR93's historical baseline.
 
 Both Knip modes check unused code and dependencies. See [the audit notes](docs/knip-audit.md)
 for runtime roots, retained APIs, and verification limitations.

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast, Toaster } from 'sonner';
-import * as stylex from '@stylexjs/stylex';
+import { props } from '@stylexjs/stylex';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { registerSW } from 'virtual:pwa-register';
@@ -33,7 +33,7 @@ function UpdateNotice() {
       }
     };
     updates.addEventListener('available', show);
-    if (updateAvailable) show();
+    if (updateAvailable) {show();}
     addEventListener('online', connection); addEventListener('offline', connection);
     document.addEventListener('visibilitychange', check);
     const interval = setInterval(check, 60_000);
@@ -52,9 +52,9 @@ function UpdateNotice() {
       // Workers installed by older releases did not handle SKIP_WAITING. Fall back to
       // unregistering only if the new worker is still waiting after the request.
       setTimeout(() => {
-        if (navigator.serviceWorker.controller !== controller || !navigator.onLine) return;
+        if (navigator.serviceWorker.controller !== controller || !navigator.onLine) {return;}
         void navigator.serviceWorker.getRegistration().then(async registration => {
-          if (registration?.waiting) await registration.unregister();
+          if (registration?.waiting) {await registration.unregister();}
           location.reload();
         }).catch(() => setApplying(false));
       }, 3000);
@@ -64,8 +64,8 @@ function UpdateNotice() {
     if (!available) { toast.dismiss('app-update'); return; }
     toast('A new version of Shelf is ready. Finish editing before refreshing.', {
       id: 'app-update', duration: Infinity, dismissible: false, style: { flexWrap: 'wrap' },
-      action: <button type="button" disabled={applying || !online} onClick={() => void refresh()} {...stylex.props(styles.updateButton)}>{applying ? 'Refreshing…' : 'Refresh app'}</button>,
-      cancel: <button type="button" aria-label="Remind me later" onClick={() => setAvailable(false)} {...stylex.props(styles.updateDismiss)}>Later</button>,
+      action: <button type="button" disabled={applying || !online} onClick={() => void refresh()} {...props(styles.updateButton)}>{applying ? 'Refreshing…' : 'Refresh app'}</button>,
+      cancel: <button type="button" aria-label="Remind me later" onClick={() => setAvailable(false)} {...props(styles.updateDismiss)}>Later</button>,
     });
   }, [available, applying, online, refresh]);
   useEffect(() => () => { toast.dismiss('app-update'); }, []);
@@ -73,7 +73,9 @@ function UpdateNotice() {
 }
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: false } } });
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root');
+if (!root) { throw new Error('The application root is missing.'); }
+ReactDOM.createRoot(root).render(
   <React.StrictMode><QueryClientProvider client={queryClient}><App/><UpdateNotice/>
     <Toaster theme="dark" expand position="bottom-center" offset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }} mobileOffset={{ bottom: 'calc(92px + env(safe-area-inset-bottom))', left: 16, right: 16 }} style={{ fontFamily: 'inherit' }} toastOptions={{ style: { background: colors.ink, borderColor: colors.ink, borderRadius: 10 }, cancelButtonStyle: { minHeight: 44 } }}/>
   </QueryClientProvider></React.StrictMode>,

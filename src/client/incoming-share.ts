@@ -1,22 +1,26 @@
 import { openDB } from 'idb';
+import type { DBSchema } from 'idb';
+
+type IncomingShare = { files: Array<File>; createdAt: number };
+interface IncomingSharesDatabase extends DBSchema {
+  shares: { key: string; value: IncomingShare };
+}
 
 // Separate from the notes database so the service worker can stage a share without
 // opening (or upgrading) the notes database before the app has authenticated.
-const shares = openDB('shelf-incoming-shares', 1, {
+const shares = openDB<IncomingSharesDatabase>('shelf-incoming-shares', 1, {
   upgrade(database) { database.createObjectStore('shares'); },
 });
 const lifetime = 24 * 60 * 60 * 1000;
 
-type IncomingShare = { files: File[]; createdAt: number };
-
-export async function stageShare(files: File[]): Promise<string> {
+export async function stageShare(files: Array<File>): Promise<string> {
   const database = await shares;
   const now = Date.now();
   const transaction = database.transaction('shares', 'readwrite');
   let cursor = await transaction.store.openCursor();
   while (cursor) {
-    const share = cursor.value as IncomingShare;
-    if (now - share.createdAt > lifetime) await cursor.delete();
+    const share = cursor.value;
+    if (now - share.createdAt > lifetime) {await cursor.delete();}
     cursor = await cursor.continue();
   }
   const id = crypto.randomUUID();
@@ -25,9 +29,9 @@ export async function stageShare(files: File[]): Promise<string> {
   return id;
 }
 
-export async function getShare(id: string): Promise<File[] | undefined> {
-  const share = await (await shares).get('shares', id) as IncomingShare | undefined;
-  if (!share) return undefined;
+export async function getShare(id: string): Promise<Array<File> | undefined> {
+  const share = await (await shares).get('shares', id);
+  if (!share) {return undefined;}
   if (Date.now() - share.createdAt > lifetime) {
     await discardShare(id);
     return undefined;

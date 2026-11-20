@@ -141,7 +141,7 @@ test('keeps an unsaved editor mounted when background auth fails', async ({ page
   await failed;
   // Allow the failed background query and any local-access update to render.
   await page.waitForTimeout(250);
-  expect(await originalEditor!.evaluate(element => element.isConnected)).toBe(true);
+  expect(await originalEditor.evaluate(element => element.isConnected)).toBe(true);
   await expect(editor).toBeVisible();
   await expect(title).toHaveValue('Keep this unsaved title');
   await expect(body).toHaveText('Keep these unsaved words.');

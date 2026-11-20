@@ -88,7 +88,7 @@ for (const thrown of ['error', 'non-error'] as const) {
       // Keep the unbound original solely to restore the prototype after fault injection.
       // oxlint-disable-next-line typescript/unbound-method
       const transaction = IDBDatabase.prototype.transaction;
-      (window as unknown as { restoreTransactions: () => void }).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };
+      (window).restoreTransactions = () => { IDBDatabase.prototype.transaction = transaction; };
       IDBDatabase.prototype.transaction = function () { throw kind === 'error' ? new Error('Local storage is unavailable.') : null; };
     }, thrown);
     await page.getByRole('button', { name: 'Synced', exact: true }).click();
@@ -96,7 +96,7 @@ for (const thrown of ['error', 'non-error'] as const) {
     await expect(errorButton(page)).toBeVisible();
     await errorButton(page).click();
     await expect(page.getByRole('dialog').getByRole('alert')).toHaveText(thrown === 'error' ? 'Local storage is unavailable.' : 'An unexpected error prevented syncing.');
-    await page.evaluate(() => (window as unknown as { restoreTransactions: () => void }).restoreTransactions());
+    await page.evaluate(() => (window).restoreTransactions());
     await page.getByRole('dialog').getByRole('button', { name: 'Sync now' }).click();
     await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();
   });

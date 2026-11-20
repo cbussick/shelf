@@ -35,7 +35,7 @@ async function pauseOpening(page: Page) {
 test('visible cards prepare before their first opening without fetching inline resources', async ({ page }) => {
   const id = await seedNote(page);
   const unsafe = `${source}\n\n![External](https://tracker.example/image.png)\n\n<script>alert(1)</script>\n\n[Unsafe](javascript:alert(1))`;
-  const requests: string[] = [];
+  const requests: Array<string> = [];
   await page.route('https://tracker.example/**', route => { requests.push(route.request().url()); return route.abort(); });
   expect((await page.request.put(`/api/notes/${id}`, { multipart: { payload: JSON.stringify({
     id, title: 'Prepared note', body: unsafe, color: 'blue', pinned: false, expectedVersion: 1, retainedImageIds: [], retainedAudioIds: [],
@@ -145,7 +145,7 @@ test('native touch panning keeps the preview until the finger is released', asyn
   await page.clock.resume();
   await expect(page.getByRole('button', { name: 'Edit text', exact: true })).toBeEnabled();
   await preview.dispatchEvent('pointercancel', { pointerId: 1, pointerType: 'touch' });
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0))));
+  await page.evaluate(() => new Promise(resolve => { requestAnimationFrame(() => setTimeout(resolve, 0)); }));
   await expect(preview).toBeVisible();
   await preview.evaluate(element => { element.scrollTop = 240; });
   await preview.dispatchEvent('touchend');
@@ -199,7 +199,7 @@ test('structural commands read native selection before selectionchange is delive
   await seedAndWarm(page, '- First\n- Second\n- Third');
   await page.getByRole('button', { name: 'Open note: Prepared note', exact: true }).click();
   await body(page).evaluate(element => {
-    (element as HTMLElement).focus();
+    element.focus();
     const text = [...element.querySelectorAll('p')].find(p => p.textContent === 'Second')!.firstChild!;
     const range = document.createRange(); range.setStart(text, 0); range.collapse(true);
     window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
