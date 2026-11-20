@@ -288,10 +288,14 @@ export function createApp(database: AppDatabase, environment: Environment, log: 
 
   app.use('/api', (_request, response) => response.status(404).json({ error: 'Not found.' }));
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
+    // Only this trusted error class carries a conflict note; duck typing would accept untrusted fields.
+    // oxlint-disable-next-line @nkzw/no-instanceof
     if (error instanceof NoteConflict) {return response.status(409).json({ error: 'This note changed on another device.', note: error.note });}
     if (error instanceof ClientError) {return response.status(400).json({ error: error.message });}
     recordRequestError(response, error);
     if (error instanceof ZodError) {return response.status(400).json({ error: 'Invalid request.', issues: error.issues });}
+    // MulterError is an Error subclass; the preset only exempts bare *Error identifiers, not this qualified constructor.
+    // oxlint-disable-next-line @nkzw/no-instanceof
     if (error instanceof multer.MulterError) {return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Audio and videos must be under 100 MB; images must be under 20 MB.' : error.message });}
     response.status(500).json({ error: 'Something went wrong.' });
   });

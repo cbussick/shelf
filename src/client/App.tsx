@@ -261,10 +261,14 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if (lockedRef.current) {return;}
+      // Require same-document HTMLElement identity before focus/blur or keyboard handling.
+      // oxlint-disable-next-line @nkzw/no-instanceof
       if (event.target instanceof HTMLElement && event.target.closest('input,textarea,[contenteditable]')) {return;}
       if (document.querySelector('dialog[open]') || event.metaKey || event.ctrlKey || event.altKey) {return;}
       if (event.key.toLowerCase() === 'f') { event.preventDefault(); document.querySelector<HTMLInputElement>('#search')?.focus(); }
       if (event.key.toLowerCase() === 'n') { event.preventDefault(); setEditor({}); }
+      // Require same-document HTMLElement identity before focus/blur or keyboard handling.
+      // oxlint-disable-next-line @nkzw/no-instanceof
       if (event.key.toLowerCase() === 'd' && !event.repeat && event.target instanceof HTMLElement) {
         const id = event.target.dataset.noteId;
         const note = notes.find(item => item.id === id);

@@ -40,6 +40,8 @@ worker.addEventListener('fetch', event => {
       const form = await event.request.formData();
       const files = form.getAll('images');
       if (!files.length || files.length > 6 || !files.every((value): value is File =>
+        // FormData can contain strings; require a real File before validating MIME type and byte limits.
+        // oxlint-disable-next-line @nkzw/no-instanceof
         value instanceof File &&
         ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(value.type) &&
         value.size <= 20 * 1024 * 1024 && value.size !== 0

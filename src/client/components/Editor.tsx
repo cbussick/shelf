@@ -236,10 +236,14 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     <dialog ref={dialog} aria-label={note ? 'Edit note' : 'Add note'}
       onInputCapture={() => { canRetainReady.current = false; }}
       onClickCapture={event => {
+        // EventTarget must really be an Element before calling closest(); do not replace this guard with a cast.
+        // oxlint-disable-next-line @nkzw/no-instanceof
         if (event.target instanceof Element && event.target.closest('button:not([data-close-note])')) {canRetainReady.current = false;}
       }} onKeyDownCapture={event => {
       // ProseMirror consumes Escape. Handle it before the editing surface so
       // Shelf retains its existing save-on-Escape behavior.
+      // Require same-document HTMLElement identity before focus/blur or keyboard handling.
+      // oxlint-disable-next-line @nkzw/no-instanceof
       if (event.key === 'Escape' && !event.defaultPrevented && !event.nativeEvent.isComposing && event.target instanceof HTMLElement && event.target.closest('#note-body')) {
         event.preventDefault(); requestClose();
       }
@@ -316,6 +320,8 @@ function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: 
     if (!open) {return;}
     if (!editingFocus.current) {container.current?.querySelector<HTMLInputElement>('input:checked')?.focus();}
     const dismiss = (event: PointerEvent) => {
+      // contains() requires a real DOM Node, not an asserted or property-shaped EventTarget.
+      // oxlint-disable-next-line @nkzw/no-instanceof
       if (!(event.target instanceof Node) || !container.current?.contains(event.target)) { setOpen(false); editingFocus.current = null; }
     };
     const escape = (event: KeyboardEvent) => {
@@ -333,6 +339,8 @@ function ColorPicker({ color, onChange }: { color: NoteColor; onChange: (color: 
   }, [open]);
   return <div ref={container} onPointerDownCapture={event => { touchPress.current = event.pointerType !== 'mouse'; }} onMouseDownCapture={event => {
     const active = document.activeElement;
+    // Require same-document HTMLElement identity before focus/blur or keyboard handling.
+    // oxlint-disable-next-line @nkzw/no-instanceof
     if (touchPress.current && active instanceof HTMLElement && active.closest('#note-body')) {
       editingFocus.current = active;
       // Cancel compatibility mousedown, not pointerdown: WebKit suppresses
@@ -369,6 +377,8 @@ function ImagePreview({ gallery, index, onIndexChange, onRotate, onRemove, onClo
   const preview = gallery[index];
   const video = galleryVideo(preview);
   const move = (step: number) => onIndexChange((index + step + gallery.length) % gallery.length);
+  // Native video controls own arrow keys; retain the real element-class guard.
+  // oxlint-disable-next-line @nkzw/no-instanceof
   return <dialog ref={dialog} aria-label="Image preview" onClose={onClose} onClick={event => { if (event.target === event.currentTarget) {dialog.current?.close();} }} onKeyDown={event => { if (event.target instanceof HTMLVideoElement) {return;} if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); } }} {...props(styles.previewDialog)}>
     <div {...props(styles.previewStage)}><div {...props(styles.previewImage)}>
       {'image' in preview ? <LocalPhoto key={preview.image.id} image={preview.image} controls className={props(styles.previewPhoto).className}/> : <Photo key={preview.src} src={preview.src} mimeType={preview.mimeType} controls alt={preview.alt} rotation={preview.rotation} className={props(styles.previewPhoto).className}/>}

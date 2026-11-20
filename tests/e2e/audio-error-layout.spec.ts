@@ -36,6 +36,8 @@ for (const width of [390, 820, 1280]) {
     }));
     const initialGeometry = await geometry();
     await audioCard.getByRole('button', { name: 'Play A sound.wav' }).click();
+    // Keep the regression's native audio-element check before reading media errors.
+    // oxlint-disable-next-line @nkzw/no-instanceof
     await expect.poll(() => audioCard.locator('audio').evaluate(element => element instanceof HTMLAudioElement && !!element.error)).toBe(true);
     expect(await geometry()).toEqual(initialGeometry);
     const notifications = page.getByRole('region', { name: 'Notifications alt+T' });

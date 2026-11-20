@@ -64,8 +64,6 @@ export default defineConfig({
     // Imperative editor/recorder callbacks and retained checkpoint state intentionally use refs.
     // These components are not React-Compiler optimized; preserve tested save/lifecycle ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,AudioRecorder,RichTextEditor,Editor}.tsx'], rules: { 'react/refs': 'off' } },
-    // Same-realm DOM/File guards and trusted error subclasses must not become duck typing.
-    { files: ['src/client/{App.tsx,sw.ts}', 'src/client/components/{RichTextEditor,Editor}.tsx', 'src/server/{app,logging}.ts', 'tests/e2e/{audio-error-layout,note-autosave}.spec.ts'], rules: { '@nkzw/no-instanceof': 'off' } },
     // Synchronize external audio/dialog/auth/sync lifecycles; moving these updates changes ordering.
     { files: ['src/client/App.tsx', 'src/client/components/{AudioPlayer,Editor}.tsx'], rules: { 'react/set-state-in-effect': 'off' } },
     // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.

@@ -18,6 +18,8 @@ for (const width of [390, 1024]) {
     await page.clock.install();
     await page.clock.pauseAt(new Date(Date.now() + 1000));
     const screenshot = async (state: string) => {
+      // Require same-document HTMLElement identity before focus/blur or keyboard handling.
+      // oxlint-disable-next-line @nkzw/no-instanceof
       await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) {document.activeElement.blur();} });
       await page.screenshot({ path: testInfo.outputPath(`${width}-${state}.png`) });
       const layout = await page.locator('dialog[open] footer').evaluate(footer => {

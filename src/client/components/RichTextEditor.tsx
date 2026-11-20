@@ -143,6 +143,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
   useEffect(() => {
     let cancelled = false, interacted = false;
     const noticeInteraction = (event: Event) => {
+      // contains() requires a real DOM Node, not an asserted or property-shaped EventTarget.
+      // oxlint-disable-next-line @nkzw/no-instanceof
       if (event.target instanceof Node && root.current?.closest('dialog')?.contains(event.target)) {
         if (event.type !== 'focusin') {
           interacted = true;
@@ -321,6 +323,8 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
           onTouchStart={() => { gesture.current = true; touching.current = true; }}
           onKeyDown={event => { if (event.key === 'Enter' && mounted) { event.preventDefault(); reveal(true); } }}
           onClick={event => {
+            // EventTarget must really be an Element before calling closest(); do not replace this guard with a cast.
+            // oxlint-disable-next-line @nkzw/no-instanceof
             if (event.target instanceof Element && event.target.closest('a')) {return;}
             restore.current.point = { left: event.clientX, top: event.clientY };
             if (!window.getSelection()?.isCollapsed) {return;}
