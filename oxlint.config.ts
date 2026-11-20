@@ -126,7 +126,8 @@ export default defineConfig({
     // CheckpointWriter is a mutable external controller: flush errors and subscriptions update it.
     // This is not mutation of React state; replacing its tested protocol is outside lint migration.
     { files: ['src/client/components/Editor.tsx'], rules: { 'react/immutability': 'off' } },
-    { files: ['**/*'], rules: { 'react/button-has-type': 'off' } },
+    // Both flagged buttons spread buttonProps, which already contains `type: 'button' as const`.
+    { files: ['src/client/components/NoteBoard.tsx'], rules: { 'react/button-has-type': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-unknown-returns': 'off' } },
     { files: ['**/*'], rules: { 'unicorn/prefer-number-properties': 'off' } },
     { files: ['**/*'], rules: { '@nkzw/require-use-effect-arguments': 'off' } },
