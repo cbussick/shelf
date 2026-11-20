@@ -1,10 +1,11 @@
 import { test, expect } from '../fixtures/isolated-test';
 import AxeBuilder from '@axe-core/playwright';
 import { webkit } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-const noteBody = (page: import('@playwright/test').Page) => page.getByRole('textbox', { name: 'Note', exact: true });
+const noteBody = (page: Page) => page.getByRole('textbox', { name: 'Note', exact: true });
 
-async function seed(page: import('@playwright/test').Page, body: string) {
+async function seed(page: Page, body: string) {
   const id = crypto.randomUUID();
   const response = await page.request.put(`/api/notes/${id}`, { multipart: { payload: JSON.stringify({
     id, title: 'Markdown test', body, color: 'mint', pinned: false, expectedVersion: 0, retainedImageIds: [], retainedAudioIds: [],
@@ -12,7 +13,7 @@ async function seed(page: import('@playwright/test').Page, body: string) {
   expect(response.ok()).toBeTruthy();
 }
 
-async function savedBody(page: import('@playwright/test').Page) {
+async function savedBody(page: Page) {
   await expect(page.getByRole('dialog', { name: /^(Add|Edit) note$/ })).toHaveCount(0);
   await expect.poll(async () => ((await (await page.request.get('/api/notes')).json()).notes as Array<unknown>).length).toBe(1);
   await expect(page.getByRole('button', { name: 'Synced', exact: true })).toBeVisible();

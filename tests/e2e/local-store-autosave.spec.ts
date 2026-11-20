@@ -1,12 +1,21 @@
 import { build } from 'vite';
+import type { deleteLocalNote, localSyncOverview, noteSyncState, pendingLocalChanges, reorderLocalNotes, saveLocalNote, syncNotes } from '../../src/client/local-store';
 import { test, expect } from '../fixtures/isolated-test';
 
 declare global {
   interface Window {
-    storage: typeof import('../../src/client/local-store');
-    draft: Parameters<typeof import('../../src/client/local-store').saveLocalNote>[0];
-    syncing: ReturnType<typeof import('../../src/client/local-store').syncNotes>;
-    saving: ReturnType<typeof import('../../src/client/local-store').saveLocalNote>;
+    storage: {
+      deleteLocalNote: typeof deleteLocalNote;
+      localSyncOverview: typeof localSyncOverview;
+      noteSyncState: typeof noteSyncState;
+      pendingLocalChanges: typeof pendingLocalChanges;
+      reorderLocalNotes: typeof reorderLocalNotes;
+      saveLocalNote: typeof saveLocalNote;
+      syncNotes: typeof syncNotes;
+    };
+    draft: Parameters<typeof saveLocalNote>[0];
+    syncing: ReturnType<typeof syncNotes>;
+    saving: ReturnType<typeof saveLocalNote>;
     releaseMedia: () => void;
   }
 }
