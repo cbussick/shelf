@@ -119,6 +119,7 @@ export default defineConfig({
     // Playwright's fixture callback is named `use`, not React.use(). Keep real hook checks on.
     { files: ['tests/fixtures/isolated-test.ts', 'tests/e2e/audio.spec.ts'], rules: { 'react/rules-of-hooks': 'off' } },
 
+    // Keep readable byte/sample-rate constants; separator grouping is not a safety check.
     { files: ['**/*'], rules: { 'unicorn/numeric-separators-style': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-argument': 'off' } },
     { files: ['**/*'], rules: { 'react/exhaustive-deps': 'off' } },
