@@ -91,7 +91,8 @@ export default defineConfig({
     { files: ['src/client/sw.ts', 'tests/e2e/{diagnostics-cleanup,mobile-editor-keyboard,note-save-recovery,note-context-color,async-callbacks,note-autosave,sync-errors,audio}.spec.ts'], rules: { 'quality/no-chained-type-assertions': 'off' } },
     // StyleX's compiler recognizes its documented namespace import; retain other namespace checks.
     { files: ['**/*'], rules: { 'import/no-namespace': ['error', { ignore: ['@stylexjs/stylex'] }] } },
-    { files: ['**/*'], rules: { '@nkzw/no-instanceof': 'off' } },
+    // Same-realm DOM/File guards and trusted error subclasses must not become duck typing.
+    { files: ['src/client/{App.tsx,sw.ts}', 'src/client/components/{RichTextEditor,Editor}.tsx', 'src/server/{app,logging}.ts', 'tests/e2e/{audio-error-layout,note-autosave}.spec.ts'], rules: { '@nkzw/no-instanceof': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-assignment': 'off' } },
     { files: ['**/*'], rules: { 'typescript/no-unsafe-return': 'off' } },
     { files: ['**/*'], rules: { 'quality/no-known-value-widening': 'off' } },
