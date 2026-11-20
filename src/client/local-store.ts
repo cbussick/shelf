@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import type { DBSchema, IDBPDatabase } from 'idb';
 import { z } from 'zod';
 import { audioSchema, errorResponseSchema, imageSchema, MAX_RECORDING_SECONDS, noteSchema } from '../shared/contracts';
 import type { ImageRotation, Note, NoteAudio, NoteColor, NoteImage } from '../shared/contracts';
@@ -27,9 +28,18 @@ async function prepareVisual(file: File) {
   catch (error) { visualMetadata.delete(file); throw error; }
 }
 
-let databasePromise: ReturnType<typeof openDB> | undefined;
+// Persisted values are untrusted until the existing parsers validate them.
+// Only store names are known here; do not claim reads already contain domain objects.
+type RawStore = { key: IDBValidKey; value: unknown };
+interface LocalDatabase extends DBSchema {
+  notes: RawStore;
+  outbox: RawStore;
+  blobs: RawStore;
+  meta: RawStore;
+}
+let databasePromise: Promise<IDBPDatabase<LocalDatabase>> | undefined;
 function openDatabase() {
-  const opening = openDB('shelf', 1, {
+  const opening = openDB<LocalDatabase>('shelf', 1, {
     upgrade(database) {
       database.createObjectStore('notes', { keyPath: 'id' });
       database.createObjectStore('outbox', { keyPath: 'noteId' });
@@ -122,7 +132,7 @@ export async function hasLocalData(): Promise<boolean> {
 export async function clearLocalData(): Promise<void> {
   const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'blobs', 'meta'], 'readwrite');
-  await Promise.all(['notes', 'outbox', 'blobs', 'meta'].map(name => transaction.objectStore(name).clear()));
+  await Promise.all((['notes', 'outbox', 'blobs', 'meta'] as const).map(name => transaction.objectStore(name).clear()));
   await transaction.done;
 }
 

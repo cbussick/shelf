@@ -85,9 +85,6 @@ export default defineConfig({
     { files: ['src/client/sw.ts', 'tests/e2e/{diagnostics-cleanup,mobile-editor-keyboard,note-save-recovery,note-context-color,async-callbacks,note-autosave,sync-errors,audio}.spec.ts'], rules: { 'quality/no-chained-type-assertions': 'off' } },
     // Same-realm DOM/File guards and trusted error subclasses must not become duck typing.
     { files: ['src/client/{App.tsx,sw.ts}', 'src/client/components/{RichTextEditor,Editor}.tsx', 'src/server/{app,logging}.ts', 'tests/e2e/{audio-error-layout,note-autosave}.spec.ts'], rules: { '@nkzw/no-instanceof': 'off' } },
-    // IDB reads are parsed after retrieval; ProseMirror attrs and Express route metadata are untyped.
-    // Do not invent a typed storage schema that pretends persisted bytes have been validated.
-    { files: ['src/client/{local-store,rich-text}.ts', 'src/server/logging.ts'], rules: { 'typescript/no-unsafe-assignment': 'off' } },
     // ProseMirror's toJSON() returns any; test API/IDB fixtures intentionally inspect raw payloads.
     { files: ['src/client/rich-text.ts', 'tests/e2e/{app,autosave-conflicts,image-rotation,video}.spec.ts'], rules: { 'typescript/no-unsafe-return': 'off' } },
     // Synchronize external audio/dialog/auth/sync lifecycles; moving these updates changes ordering.

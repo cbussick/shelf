@@ -33,7 +33,7 @@ function mergeAdjacentLists(tr: Transaction) {
     // A non-default ordered start is intentional unless it continues the list.
     if (after.type.name === 'ordered_list' && after.attrs.order !== 1 && after.attrs.order !== before.attrs.order + before.childCount) {continue;}
     if (!canJoin(tr.doc, pos)) {continue;}
-    const spread = before.attrs.spread || after.attrs.spread;
+    const spread: unknown = before.attrs.spread || after.attrs.spread;
     tr.join(pos);
     if (spread !== before.attrs.spread) {
       tr.setNodeMarkup(pos - before.nodeSize, undefined, { ...before.attrs, spread });

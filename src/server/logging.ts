@@ -61,9 +61,9 @@ export function requestLogging(log: Logger): RequestHandler {
       logged = true;
       const aborted = !response.writableFinished;
       // Only developer-defined route templates, never URLs, IDs or queries.
-      // Express exposes route as any; the string guard retains only the configured path.
-      // oxlint-disable-next-line typescript/no-unsafe-member-access
-      const route = typeof request.route?.path === 'string' ? request.route.path : '(unmatched)';
+      const configuredRoute: unknown = request.route;
+      const route = typeof configuredRoute === 'object' && configuredRoute !== null &&
+        'path' in configuredRoute && typeof configuredRoute.path === 'string' ? configuredRoute.path : '(unmatched)';
       if (route === '/healthz' && response.statusCode < 400 && !aborted) {return;}
       const level = response.statusCode >= 500 ? 'error' : response.statusCode >= 400 || aborted ? 'warn' : 'info';
       const entry: RequestCompletion = {
