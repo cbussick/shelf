@@ -315,6 +315,17 @@ export function createNoteEditor({ root, markdown, onChange, onLimit, onSelectio
       }));
       ctx.set(editorViewOptionsCtx, {
         editable,
+        handleClick: (view, _position, event) => {
+          // Editable anchors do not navigate natively. Follow safe links without
+          // replacing the note or giving the destination access to this window.
+          // oxlint-disable-next-line @nkzw/no-instanceof
+          const anchor = event.target instanceof Element ? event.target.closest('a') : null;
+          if (!anchor || !view.dom.contains(anchor)) {return false;}
+          const href = safeNoteLink(anchor.getAttribute('href') ?? '');
+          event.preventDefault();
+          if (href) {window.open(href, '_blank', 'noopener,noreferrer');}
+          return true;
+        },
         handleKeyDown: (view, event) => {
           const structural = event.key === 'Tab' ||
             (event.altKey && ['ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft'].includes(event.key)) ||
