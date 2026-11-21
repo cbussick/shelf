@@ -39,7 +39,7 @@
   .note-rich-text{min-height:0;margin-top:4px;overflow:hidden}
   .note-rich-host{min-height:0}
   .note-rich-host :is(.ProseMirror,.note-reading){min-height:0;overscroll-behavior:contain}
-  .note-formatting{order:2;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 0;border-top:1px solid #26363020;border-bottom:0}
+  .note-formatting{order:2;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;padding:4px 16px 4px 0;border-top:1px solid #26363020;border-bottom:0;mask-image:linear-gradient(to right,#000 calc(100% - 12px),transparent)}
   .note-formatting button{min-height:44px;min-width:40px;flex-shrink:0}
   .note-link-form{order:1;flex-shrink:0}
   .note-rich-text textarea{min-height:0}

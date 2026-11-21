@@ -25,6 +25,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   const suppressClick = useRef<string | undefined>(undefined);
   const preview = useRef<{ source: string; target: string } | null>(null);
   const ghost = useRef<HTMLElement | null>(null);
+  const slots = useRef<Array<{ id: string; rect: DOMRect }>>([]);
   const positions = useRef<Map<string, DOMRect> | null>(null);
   const [placement, setPlacement] = useState<{ source: string; target: string } | null>(null);
   const displayed = useMemo(() => {
@@ -45,6 +46,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
       if (!id) { throw new Error('A note card is missing its identity.'); }
       const old = before.get(id);
       if (!old || item.dataset.itemId === drag.current?.source) {return;}
+      for (const animation of item.getAnimations()) {animation.cancel();}
       const next = item.getBoundingClientRect();
       const dx = old.left - next.left, dy = old.top - next.top;
       if (dx || dy) {item.animate([{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }], { duration: 180, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' });}
@@ -61,6 +63,12 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   const activate = (id: string) => {
     const card = Array.from(board.current?.querySelectorAll<HTMLElement>('[data-item-id]') ?? []).find(item => item.dataset.itemId === id)?.querySelector<HTMLElement>(':scope > :first-child');
     if (!card) {return;}
+    // Freeze document-space hit regions for this gesture. Animated/reflowing
+    // cards must not change the destination under an almost stationary pointer.
+    slots.current = Array.from(board.current?.querySelectorAll<HTMLElement>('[data-item-id]') ?? [], item => {
+      const itemRect = item.getBoundingClientRect();
+      return { id: item.dataset.itemId ?? '', rect: new DOMRect(itemRect.x + scrollX, itemRect.y + scrollY, itemRect.width, itemRect.height) };
+    });
     const rect = card.getBoundingClientRect();
     // Native cloneNode preserves this HTMLElement's concrete element class;
     // lib.dom erases that guarantee to Node (it has no generic clone overload).
@@ -85,6 +93,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   const cancel = () => {
     clearTimeout(timer.current);
     drag.current = null;
+    slots.current = [];
     removeGhost();
     if (preview.current) {snapshot();}
     preview.current = null;
@@ -105,8 +114,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
     }, 400);}
   };
   const noteAt = (event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
-    const item = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-item-id]');
-    return item && board.current?.contains(item) ? item.dataset.itemId : undefined;
+    return slots.current.find(slot => within({ clientX: event.clientX + scrollX, clientY: event.clientY + scrollY }, slot.rect))?.id;
   };
   const move = useEffectEvent((event: PointerEvent) => {
     const active = drag.current;
@@ -139,12 +147,23 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   const end = useEffectEvent((event: PointerEvent) => {
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) {return;}
-    const id = active.active && !within(event, active.origin) ? noteAt(event) : undefined;
     const insideBoard = board.current?.getBoundingClientRect();
     const inBoard = insideBoard && within(event, insideBoard);
-    const destination = within(event, active.origin) ? undefined : id && id !== active.source ? id : inBoard ? preview.current?.target : undefined;
+    // Commit exactly the displayed preview, not whatever animated card happens
+    // to be under the pointer on release. Dropping outside still cancels.
+    const destination = active.active && inBoard && !within(event, active.origin) ? preview.current?.target : undefined;
+    // A committed preview already has the correct layout. Finish its visual
+    // movement and do not animate it back through the old source on release.
+    if (destination && destination !== active.source) {
+      board.current?.querySelectorAll<HTMLElement>('[data-item-id]').forEach(item => {
+        for (const animation of item.getAnimations()) {animation.finish();}
+      });
+    }
     cancel();
-    if (destination && destination !== active.source) {onReorder(active.source, destination);}
+    if (destination && destination !== active.source) {
+      positions.current = null;
+      onReorder(active.source, destination);
+    }
     if (active.active) {setTimeout(() => { if (suppressClick.current === active.source) {suppressClick.current = undefined;} }, 0);}
   });
   const onCancel = useEffectEvent(() => { cancel(); suppressClick.current = undefined; });
