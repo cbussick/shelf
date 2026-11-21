@@ -22,6 +22,8 @@ test('release after a reordered card loses capture clears the floating preview',
   await page.mouse.move(to.x + 20, to.y + 20, { steps: 5 });
   const floating = page.locator('body > button[aria-hidden="true"]');
   await expect(floating).toBeVisible();
+  // Pointer crossings use stable hit targets rather than overlapping FLIP moves.
+  expect(await page.locator('[data-item-id]').evaluateAll(items => items.flatMap(item => item.getAnimations()).length)).toBe(0);
   await expect.poll(order).toEqual([second, first, third]);
   // Reparenting a captured card can drop capture (notably on Safari).
   await source.evaluate(button => {

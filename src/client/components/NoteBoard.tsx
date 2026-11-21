@@ -39,12 +39,16 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   useLayoutEffect(() => {
     const before = positions.current;
     positions.current = null;
-    if (!before || matchMedia('(prefers-reduced-motion: reduce)').matches) {return;}
+    // Live previews retarget on every pointer crossing. Keep them immediate so
+    // hit testing uses settled slots, not cards still moving from an old target.
+    // The floating card follows the pointer; settling after release can animate.
+    if (!before || drag.current?.active || matchMedia('(prefers-reduced-motion: reduce)').matches) {return;}
     board.current?.querySelectorAll<HTMLElement>('[data-item-id]').forEach(item => {
       const id = item.dataset.itemId;
       if (!id) { throw new Error('A note card is missing its identity.'); }
       const old = before.get(id);
       if (!old || item.dataset.itemId === drag.current?.source) {return;}
+      for (const animation of item.getAnimations()) {animation.cancel();}
       const next = item.getBoundingClientRect();
       const dx = old.left - next.left, dy = old.top - next.top;
       if (dx || dy) {item.animate([{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }], { duration: 180, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' });}
