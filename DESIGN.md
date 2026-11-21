@@ -21,7 +21,7 @@ Shelf is a single-owner, self-hosted home for text, image, and audio notes. It s
 - Desktop and tablet use a capture bar and modal editor.
 - Phones use a fixed bottom capture dock and full-screen editor.
 - Unpinned card controls appear on desktop hover/focus and remain visible on touch-oriented layouts. Phone text cards reserve a compact top control row rather than a side strip, keeping two-column titles readable. Phone workspace margins are 20 px per side; tablet margins are 40 px.
-- Drag previews update sibling slots immediately so rapidly changing targets stay stable. The dragged card follows the pointer; release/cancel settling may use a short transform animation, disabled for reduced motion.
+- During dragging, the floating card follows the pointer and sibling cards slide into their preview slots using a 180 ms transform animation. Reduced motion keeps sibling slot changes immediate.
 - Note bodies use a bounded, internally scrolling rich-text surface. A stationary padded focus frame surrounds the clipping viewport so partially visible text cannot intersect the focus ring. The formatting controls stay in one horizontally scrolling row on phones to preserve text space, especially with a short viewport or keyboard open. A subtle trailing fade hints at overflow, with end padding keeping the last control clear of the fade; Tab moves focus normally, and list nesting uses buttons or Ctrl/Cmd+[ and Ctrl/Cmd+].
 
 ## Note bodies
