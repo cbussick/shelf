@@ -340,7 +340,7 @@ test('pins from the board and shows pin controls on hover for both groups', asyn
 test.describe('touch note pins', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
-  test('hides board pins and lets a note be pinned after opening it', async ({ page }) => {
+  test('shows working board pins on touch and lets a note be pinned after opening it', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'New note' }).tap();
     await page.getByRole('textbox', { name: 'Title' }).fill('Mobile pin test');
@@ -348,7 +348,13 @@ test.describe('touch note pins', () => {
 
     const card = page.getByRole('button', { name: 'Open note: Mobile pin test' });
     const boardPin = page.getByRole('button', { name: 'Pin note: Mobile pin test', includeHidden: true });
-    await expect(boardPin).toBeHidden();
+    await expect(boardPin).toBeVisible();
+    await boardPin.tap();
+    const boardUnpin = page.getByRole('button', { name: 'Unpin note: Mobile pin test', exact: true });
+    await expect(boardUnpin).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('dialog', { name: 'Edit note' })).not.toBeVisible();
+    await boardUnpin.tap();
+    await expect(boardPin).toHaveAttribute('aria-pressed', 'false');
     await card.tap();
     const editor = page.getByRole('dialog', { name: 'Edit note' });
     const editorPin = editor.getByRole('button', { name: 'Pin note' });
@@ -357,7 +363,8 @@ test.describe('touch note pins', () => {
     await expect(editor.getByRole('button', { name: 'Unpin note' })).toHaveAttribute('aria-pressed', 'true');
     await editor.getByRole('button', { name: 'Close note' }).tap();
     await expect(page.getByRole('heading', { name: 'Pinned', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Unpin note: Mobile pin test', includeHidden: true })).toBeHidden();
+    await expect(boardUnpin).toBeVisible();
+    await expect(boardUnpin).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
