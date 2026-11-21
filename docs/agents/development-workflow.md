@@ -37,4 +37,6 @@ git worktree prune
 git branch -d <task-branch>
 ```
 
+Remove task-generated artifacts when delivery and review are complete, including screenshots, recordings, comparison galleries, throwaway scripts, logs, test databases, and temporary build or test output, whether inside the repository or elsewhere such as `/tmp`. Stop task-owned preview servers and other temporary processes. Limit cleanup to artifacts and processes known to belong to the task; preserve shared resources, other agents' work, committed fixtures, and intended deliverables. Retain artifacts still needed for review or explicitly requested by the user, report their locations and why they remain, and remove them once that need ends. User-provided files, including uploaded recordings, require explicit permission before deletion. Before declaring cleanup complete, verify that no task-owned temporary processes or unneeded generated artifacts remain.
+
 Delete the remote task branch if one was published. With a clean primary checkout, fast-forward `main` from the remote before starting the next task. Confirm `git worktree list`, `git branch`, and `git status` show no leftover task worktree, branch, or uncommitted task files. Never force-remove a worktree or force-delete an unmerged branch as routine cleanup.
