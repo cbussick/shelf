@@ -10,17 +10,26 @@ From the primary checkout, create a short, task-specific branch from the current
 git worktree add .worktrees/<task-name> -b <task-branch> main
 ```
 
-For an existing task branch that is not already checked out, attach it with `git worktree add .worktrees/<task-name> <task-branch>` instead. Resume an existing worktree only for its own task. Do implementation, verification, commits, and PR work from that task's worktree. Keep unrelated work out of its commits.
+For an existing task branch that is not already checked out, attach it with `git worktree add .worktrees/<task-name> <task-branch>` instead. Resume an existing worktree only for its own task. Do implementation, verification, and commits from that task's worktree. Keep unrelated work out of its commits.
 
 ## Deliver
 
-Run the applicable checks from `package.json`, review the diff against the request, and commit the task's changes on its branch. Deliver changes to `main` through a reviewed pull request; do not commit, push, or locally merge directly to `main`. Include the purpose, verification results, and any remaining risks in the PR. Address review feedback on the same branch. Merge using GitHub's PR controls after required checks and reviews pass.
+Run the applicable checks from `package.json` locally, review the diff against the request, and commit the task's changes on its branch. All applicable checks must pass before merging into `main`. Pull requests are optional; local merges and pushes to `main` are allowed.
 
-If the work is not merged yet, leave its branch and worktree intact for review or continuation, and tell the user where it lives. Do not call it cleaned up while it is still awaiting merge.
+From the clean primary checkout, update `main` with `git pull --ff-only`, then merge the task branch locally and push:
+
+```sh
+git merge --ff-only <task-branch>
+git push origin main
+```
+
+If the task branch has diverged from `main`, merge the updated `main` into the task branch from its worktree, resolve any conflicts, and rerun the applicable checks locally before retrying delivery. Keep task changes on their task branch until verification passes.
+
+Report the purpose, verification results, and any remaining risks to the user. If the work is not merged and pushed yet, leave its branch and worktree intact for continuation, and tell the user where it lives. If a push is rejected by remote protection, report the blocker rather than bypassing it or force-pushing.
 
 ## Clean up after merge
 
-Once the PR is merged, check that the task worktree contains no uncommitted changes. Preserve unexpected edits and ask before removing anything. Then, from the primary checkout:
+Once the task is merged into `main` and pushed, check that the task worktree contains no uncommitted changes. Preserve unexpected edits and ask before removing anything. Then, from the primary checkout:
 
 ```sh
 git worktree remove .worktrees/<task-name>
@@ -28,4 +37,4 @@ git worktree prune
 git branch -d <task-branch>
 ```
 
-Delete the remote task branch if GitHub has not already deleted it. With a clean primary checkout, fast-forward `main` from the remote before starting the next task. Confirm `git worktree list`, `git branch`, and `git status` show no leftover task worktree, branch, or uncommitted task files. Never force-remove a worktree or force-delete an unmerged branch as routine cleanup.
+Delete the remote task branch if one was published. With a clean primary checkout, fast-forward `main` from the remote before starting the next task. Confirm `git worktree list`, `git branch`, and `git status` show no leftover task worktree, branch, or uncommitted task files. Never force-remove a worktree or force-delete an unmerged branch as routine cleanup.
