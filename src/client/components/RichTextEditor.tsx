@@ -146,7 +146,9 @@ export function RichTextEditor({ initialValue, onChange, autoFocus, disabled, re
       // contains() requires a real DOM Node, not an asserted or property-shaped EventTarget.
       // oxlint-disable-next-line @nkzw/no-instanceof
       if (event.target instanceof Node && root.current?.closest('dialog')?.contains(event.target)) {
-        if (event.type !== 'focusin') {
+        // Focusing a form field is already user intent, even before its first
+        // input event. Deferred body autofocus must not redirect that keystroke.
+        if (event.type !== 'focusin' || (event.target === document.activeElement && document.activeElement?.matches('input, textarea, select'))) {
           interacted = true;
           userInteracted.current = true;
         }

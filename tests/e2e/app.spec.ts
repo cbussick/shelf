@@ -1197,8 +1197,9 @@ for (const width of [390, 1280]) {
     await expect(card).toBeVisible();
     for (const [index, lines, text] of [[1, 2, title], [2, 4, body]] as const) {
       const preview = card.locator('span').nth(index);
-      // The full text remains available; only its rendered preview is truncated.
-      expect(await preview.textContent()).toBe(text);
+      // Cards mount a bounded excerpt, then visually clamp it; neither cap
+      // may alter the saved note. Keep this expectation independent of helpers.
+      expect(await preview.textContent()).toBe(index === 2 ? `${body.slice(0, 511)}…` : text);
       const dimensions = await preview.evaluate(element => {
         const style = getComputedStyle(element);
         return { height: element.getBoundingClientRect().height, lineHeight: Number.parseFloat(style.lineHeight), clamp: style.webkitLineClamp };
@@ -1206,6 +1207,8 @@ for (const width of [390, 1280]) {
       expect(dimensions.clamp).toBe(String(lines));
       expect(dimensions.height).toBeLessThanOrEqual(lines * dimensions.lineHeight + 1);
     }
+    // Reload before opening so an in-memory editor cannot mask save-time loss.
+    await page.reload();
     await card.click();
     await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue(title);
     await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toHaveText(body);
