@@ -22,8 +22,15 @@ for (const width of [320, 390]) {
       await expect(page.getByRole('heading', { name: 'Pinned', exact: true })).toBeVisible();
       await page.getByRole('button', { name: 'Open note: Shopping list', exact: true }).tap();
       const toolbar = page.locator('.note-formatting');
-      await expect(toolbar).toHaveCSS('flex-wrap', 'wrap');
-      expect(await toolbar.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+      await page.setViewportSize({ width, height: 400 });
+      await expect(toolbar).toHaveCSS('flex-wrap', 'nowrap');
+      expect(await toolbar.evaluate(element => element.getBoundingClientRect().height)).toBeLessThan(65);
+      expect(await toolbar.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+      const lastControl = toolbar.getByRole('button').last();
+      await lastControl.focus();
+      await expect(lastControl).toBeInViewport();
+      expect(await toolbar.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+      await expect(page.getByRole('textbox', { name: 'Note', exact: true })).toBeInViewport();
       await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeInViewport();
     } finally {await context.close();}
   });
