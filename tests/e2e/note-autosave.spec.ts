@@ -46,11 +46,16 @@ for (const width of [390, 1024]) {
     await screenshot('saving');
     await page.clock.runFor(600);
     const cardStatus = page.getByTestId('note-card-sync');
+    await expect(cardStatus).toHaveText('Syncing…');
+    await expect(status).toHaveText('Syncing…');
+    await screenshot('syncing');
+    // A new revision queues while the older upload is still in flight.
+    await expect(body).toBeEditable();
+    await body.fill('Remember the tickets and passports.');
+    await page.clock.runFor(600);
     await expect(cardStatus).toHaveText('Waiting to sync');
     await expect(status).toHaveText('Waiting to sync');
     await screenshot('waiting-to-sync');
-    // Input remains enabled while the server request is outstanding.
-    await expect(body).toBeEditable();
     mode = 'normal'; release();
     await expect(status).toHaveText('Saved');
     await expect(cardStatus).toHaveCount(0);

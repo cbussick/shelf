@@ -88,7 +88,7 @@ export async function pendingLocalChanges(): Promise<number> {
   return count + Number(Boolean(order));
 }
 
-export type PendingNoteSync = { error?: string };
+export type PendingNoteSync = { mutationId: string; error?: string };
 export type LocalSyncOverview = { pending: number; notes: Record<string, PendingNoteSync> };
 
 // One snapshot: count only visible, pending saves as unsynced notes. Deletions
@@ -106,11 +106,11 @@ export async function localSyncOverview(): Promise<LocalSyncOverview> {
   const existing = new Set(ids);
   return {
     pending: operations.length + Number(Boolean(order)),
-    notes: Object.fromEntries(operations.filter(entry => entry.type === 'save' && existing.has(entry.noteId)).map(entry => [entry.noteId, entry.error ? { error: entry.error } : {}])),
+    notes: Object.fromEntries(operations.filter(entry => entry.type === 'save' && existing.has(entry.noteId)).map(entry => [entry.noteId, { mutationId: entry.mutationId, error: entry.error }])),
   };
 }
 
-type NoteSyncState = { note?: LocalNote; pending: boolean; error?: string };
+type NoteSyncState = { note?: LocalNote; pending: boolean; mutationId?: string; error?: string };
 export async function noteSyncState(id: string, editorSession?: string): Promise<NoteSyncState> {
   const database = await getDatabase();
   const transaction = database.transaction(['notes', 'outbox', 'meta']);
@@ -122,6 +122,7 @@ export async function noteSyncState(id: string, editorSession?: string): Promise
   await transaction.done;
   const pending = parseOptionalOperation(operation);
   const state: NoteSyncState = { note: parseOptionalNote(note), pending: Boolean(pending) };
+  if (pending?.type === 'save') { state.mutationId = pending.mutationId; }
   if (pending?.error) { state.error = pending.error; }
   return state;
 }
@@ -305,15 +306,22 @@ async function reportSyncFailure(entry: z.infer<typeof outboxSchema>, error: unk
   catch { /* Keep the original failure if the local database also failed. */ }
 }
 
-export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ notes: Array<LocalNote>; pending: number; conflict: boolean; missingAttachments: Array<string>; conflictCopies: Record<string, string>; connection: 'connected' | 'offline' | 'unauthorized' }> {
+export async function syncNotes(onProgress?: () => Promise<void>, onUploadChange?: (mutationId: string | undefined) => void): Promise<{ notes: Array<LocalNote>; pending: number; conflict: boolean; missingAttachments: Array<string>; conflictCopies: Record<string, string>; connection: 'connected' | 'offline' | 'unauthorized' }> {
   let database = await getDatabase();
-  const entries = z.array(outboxSchema).parse(await database.getAll('outbox'));
+  const queuedIds = await database.getAllKeys('outbox');
   let conflict = false;
   const conflictCopies: Record<string, string> = {};
   const missingAttachments: Array<string> = [];
   let connection: 'connected' | 'offline' | 'unauthorized' = 'connected';
-  syncEntries: for (const entry of entries) {
-    const note = parseOptionalNote(await database.get('notes', entry.noteId));
+  syncEntries: for (const id of queuedIds) {
+    // A note can change while an earlier upload is running. Read its payload
+    // and mutation together so the in-flight indicator identifies that revision.
+    const snapshot = database.transaction(['notes', 'outbox']);
+    const [rawEntry, rawNote] = await Promise.all([snapshot.objectStore('outbox').get(id), snapshot.objectStore('notes').get(id)]);
+    await snapshot.done;
+    const entry = parseOptionalOperation(rawEntry);
+    if (!entry) {continue;}
+    const note = parseOptionalNote(rawNote);
     try {
       if (entry.error && (typeof navigator === 'undefined' || navigator.onLine)) { await recordSyncError(entry); await onProgress?.(); }
       if (entry.type === 'delete') {
@@ -326,6 +334,11 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
           return new File([blob], image.alt || 'image', { type: image.mimeType });
         }));
         const retainedImageIds = note.images.filter(image => !image.blobId).map(image => image.id);
+        const audioFiles = await Promise.all(localAudio.map(async audio => {
+          const blob = parseBlob(await database.get('blobs', audio.blobId));
+          return new File([blob], audio.name || 'recording', { type: audio.mimeType });
+        }));
+        onUploadChange?.(entry.mutationId);
         const result = await api.saveNote({
           id: note.id, title: note.title, body: note.body, color: note.color, pinned: note.pinned,
           expectedVersion: entry.expectedVersion,
@@ -334,10 +347,7 @@ export async function syncNotes(onProgress?: () => Promise<void>): Promise<{ not
           imageRotations: note.images.map(image => ({ id: image.id, rotation: image.rotation })),
           retainedAudioIds: note.audio.filter(audio => !audio.blobId).map(audio => audio.id),
           newAudio: localAudio.map(audio => ({ id: audio.id, duration: audio.duration && audio.duration <= MAX_RECORDING_SECONDS ? audio.duration : null })),
-        }, files, await Promise.all(localAudio.map(async audio => {
-          const blob = parseBlob(await database.get('blobs', audio.blobId));
-          return new File([blob], audio.name || 'recording', { type: audio.mimeType });
-        })));
+        }, files, audioFiles).finally(() => onUploadChange?.(undefined));
         database = await getDatabase();
         // Reconcile the server acknowledgement and any newer local edit in one transaction.
         // A save can arrive while the request is in flight; never overwrite it with the old response.

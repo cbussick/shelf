@@ -47,7 +47,7 @@ for (const width of [1506, 834, 390, 320]) {
       await expect(page.getByRole('dialog', { name: 'Add note' })).not.toBeVisible();
       const note = page.getByRole('button', { name: 'Open note: Keller zumachen 12345', exact: true });
       const id = await note.getAttribute('data-note-id');
-      await expect(note.getByTestId('note-card-sync')).toHaveText('Waiting to sync');
+      await expect(note.getByTestId('note-card-sync')).toHaveText('Syncing…');
       const pending = await positions(page);
       const own = pending[id!];
       expect(Object.entries(pending).some(([otherId, box]) => otherId !== id && Math.abs(box.x - own.x) < 1 && box.y > own.y)).toBe(true);
@@ -105,7 +105,7 @@ for (const width of [1506, 834, 390, 320]) {
         await orange.focus();
         await orange.press('Enter');
         const status = card.getByTestId('note-card-sync');
-        await expect(status).toHaveText('Waiting to sync');
+        await expect(status).toHaveText('Syncing…');
         const pending = await positions(page);
         samePositions(before, pending);
         const overlap = await status.evaluate(element => {

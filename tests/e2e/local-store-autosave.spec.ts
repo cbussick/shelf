@@ -490,7 +490,8 @@ test('a failed stale upload does not attach its error to a newer edit', async ({
   expect(result.state.note?.body).toBe('A newer revision');
   expect(result.state.error).toBeUndefined();
   expect(result.overview.pending).toBe(1);
-  expect(Object.values(result.overview.notes)).toEqual([{}]);
+  expect(result.state.mutationId).toEqual(expect.any(String));
+  expect(Object.values(result.overview.notes)).toEqual([{ mutationId: result.state.mutationId }]);
 });
 
 test('a conflict-copy attachment failure is attributed to that queued note', async ({ page }) => {

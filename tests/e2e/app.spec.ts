@@ -13,10 +13,10 @@ test('creates, edits, pins, searches, and deletes a note', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('A private thought.');
   await page.getByRole('button', { name: 'Note color' }).click();
   await page.getByRole('radio', { name: 'Mint' }).click();
-  const editorPin = page.getByRole('button', { name: 'Pin note' });
+  const editorPin = page.getByRole('button', { name: 'Pin note', exact: true });
   await expect(editorPin.locator('svg')).not.toHaveAttribute('fill', 'currentColor');
   await editorPin.click();
-  await expect(page.getByRole('button', { name: 'Unpin note' }).locator('svg')).toHaveAttribute('fill', 'currentColor');
+  await expect(page.getByRole('button', { name: 'Unpin note', exact: true }).locator('svg')).toHaveAttribute('fill', 'currentColor');
   await expect(page.getByRole('button', { name: 'Save note' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close note' }).click();
   const card = page.getByRole('button', { name: 'Open note: Keep this close' });

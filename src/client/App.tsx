@@ -70,7 +70,9 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   const activeNoteId = useRef<string | undefined>(undefined);
   const activeEditorSession = useRef<string | undefined>(undefined);
   const activeEditorKeyRef = useRef<string | undefined>(undefined);
-  const [editorSync, setEditorSync] = useState<EditorSyncState>('syncing');
+  const [editorSync, setEditorSync] = useState<EditorSyncState>('waiting');
+  const [editorMutation, setEditorMutation] = useState<string>();
+  const [uploadingMutation, setUploadingMutation] = useState<string>();
   const [editorSyncError, setEditorSyncError] = useState<string>();
   const editorStatusRequest = useRef(0);
   useLayoutEffect(() => {
@@ -148,7 +150,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     toast(message, { id: 'note-notification', duration: 3500 });
   }, []);
   useEffect(() => () => { toast.dismiss('note-notification'); }, []);
-  const updateEditorSync = useCallback(async (connection: EditorSyncState, retrying = false) => {
+  const updateEditorSync = useCallback(async (offline: boolean) => {
     const request = ++editorStatusRequest.current;
     const id = activeNoteId.current;
     if (!id) {return;}
@@ -156,8 +158,9 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       const state = await noteSyncState(id, activeEditorSession.current);
       if (request === editorStatusRequest.current && id === activeNoteId.current) {
         if (state.note) {activeNoteId.current = state.note.id;}
+        setEditorMutation(state.mutationId);
         setEditorSyncError(state.pending ? state.error : undefined);
-        setEditorSync(!state.pending && state.note?.version ? 'synced' : connection === 'offline' ? 'offline' : !retrying && state.error ? 'error' : 'syncing');
+        setEditorSync(!state.pending && state.note?.version ? 'synced' : offline ? 'offline' : state.error ? 'error' : 'waiting');
       }
     } catch {
       if (request === editorStatusRequest.current && id === activeNoteId.current) {
@@ -170,9 +173,10 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     activeNoteId.current = id;
     activeEditorSession.current = undefined;
     unsaved.current = false;
-    setEditorSync('syncing');
+    setEditorSync('waiting');
+    setEditorMutation(undefined);
     setEditorSyncError(undefined);
-    void updateEditorSync(navigator.onLine ? 'syncing' : 'offline');
+    void updateEditorSync(!navigator.onLine);
   }, [updateEditorSync]);
   const openEditor = useCallback((value: EditorSession) => {
     const entry = editorEntry(value, crypto.randomUUID());
@@ -183,22 +187,22 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   const openNote = useCallback((note: LocalNote) => { openEditor({ note }); }, [openEditor]);
   const reportSyncProgress = useCallback(async () => {
     await refreshOverview();
-    await updateEditorSync(navigator.onLine ? 'syncing' : 'offline');
+    await updateEditorSync(!navigator.onLine);
   }, [refreshOverview, updateEditorSync]);
   const synchronize = useCallback(async () => {
     if (lockedRef.current) {return;}
     if (syncing.current) { syncRequested.current = true; return; }
     syncing.current = true;
-    void updateEditorSync(navigator.onLine ? 'syncing' : 'offline', true);
+    void updateEditorSync(!navigator.onLine);
     try {
       do {
         syncRequested.current = false;
         setSyncState(navigator.onLine ? 'syncing' : 'offline');
         try {
-          const result = await syncNotes(reportSyncProgress);
+          const result = await syncNotes(reportSyncProgress, setUploadingMutation);
           await refreshOverview();
           if (result.connection === 'unauthorized') { onSessionExpired(); return; }
-          await updateEditorSync(!navigator.onLine ? 'offline' : result.connection === 'offline' ? 'error' : result.pending ? 'syncing' : 'synced');
+          await updateEditorSync(!navigator.onLine);
           if (!syncRequested.current) {
             setNotes(result.notes);
             setSyncError(result.connection === 'offline' ? 'The server is unreachable.' : undefined);
@@ -212,7 +216,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
           setSyncError(syncErrorDetails(error));
           const state = error instanceof ApiError && error.status === 0 ? 'offline' : 'error';
           setSyncState(state);
-          await updateEditorSync(!navigator.onLine ? 'offline' : state === 'offline' ? 'error' : state);
+          await updateEditorSync(!navigator.onLine);
         }
       } while (syncRequested.current && !lockedRef.current);
     } finally { syncing.current = false; }
@@ -232,7 +236,7 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       if (active) { setSyncError(syncErrorDetails(error)); setSyncState('error'); }
     });
     const online = () => void synchronize();
-    const offline = () => { setSyncState('offline'); void updateEditorSync('offline'); };
+    const offline = () => { setSyncState('offline'); void updateEditorSync(true); };
     const visible = () => { if (document.visibilityState === 'visible') {void synchronize();} };
     const interval = setInterval(() => { if (document.visibilityState === 'visible') {void synchronize();} }, 15_000);
     addEventListener('online', online); addEventListener('offline', offline); document.addEventListener('visibilitychange', visible);
@@ -320,8 +324,10 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
       setLifecycle(current => editorTransition(current, { type: 'saved', key: ownerKey, id: saved.id }));
       activeNoteId.current = saved.id;
       activeEditorSession.current = value.editorSession;
-      setEditorSync(navigator.onLine ? 'syncing' : 'offline');
+      setEditorSync(navigator.onLine ? 'waiting' : 'offline');
+      setEditorMutation(undefined);
       setEditorSyncError(undefined);
+      void updateEditorSync(!navigator.onLine);
     }
     setNotes(current => [saved, ...current.filter(note => note.id !== saved.id)].sort((a, b) => a.position - b.position));
     // The local checkpoint is acknowledged independently of server availability.
@@ -400,6 +406,8 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
   };
 
   const status = localWrites ? { label: 'Saving…', copy: 'Saving the latest changes on this device.', icon: 'clock' as const } : syncStatus(syncState, pending);
+  const activeUpload = syncState === 'offline' ? undefined : uploadingMutation;
+  const currentEditorSync = editorSync === 'waiting' && activeUpload && editorMutation === activeUpload ? 'syncing' : editorSync;
   const unsyncedCount = Object.keys(pendingNotes).length;
   const hasSyncFailures = Object.values(pendingNotes).some(note => note.error);
   const overviewLabel = unsyncedCount ? `${unsyncedCount} not synced` : status.label;
@@ -411,14 +419,14 @@ function NotesApp({ offlineEntry, locked, onSessionExpired, onLogout }: { offlin
     </header>
     <main id="main" {...props(styles.workspace)}><section {...props(styles.pageHeading)}><h1 {...props(styles.h1)}>Your notes</h1></section>
       <nav aria-label="Create a note" {...props(styles.floatingCapture)}><button type="button" aria-label="Add an image or video" onClick={() => imageInput.current?.click()} {...props(styles.mobileButton)}><Icon name="image"/></button><AddAudio bottom onUpload={chooseAudio} onRecord={() => openEditor({ recording: true })}/><span {...props(styles.mobileDivider)}/><button type="button" onClick={() => openEditor({})} {...props(styles.mobileButton)}><Icon name="plus"/>New note</button></nav>
-      {pinned.length > 0 && <NoteBoard notes={pinned} pendingSync={pendingNotes} heading="Pinned" label="Pinned notes" onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/>}
-      {others.length > 0 && <div {...props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} pendingSync={pendingNotes} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
+      {pinned.length > 0 && <NoteBoard notes={pinned} pendingSync={pendingNotes} uploadingMutation={activeUpload} heading="Pinned" label="Pinned notes" onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/>}
+      {others.length > 0 && <div {...props(pinned.length > 0 && styles.sectionAfter)}><NoteBoard notes={others} pendingSync={pendingNotes} uploadingMutation={activeUpload} heading={pinned.length ? 'Other notes' : undefined} label={pinned.length ? 'Other notes' : 'Notes'} onOpen={openNote} onPin={pin} onContextMenu={showMenu} onReorder={reorder}/></div>}
       {filtered.length === 0 && <section {...props(styles.empty)}><Icon name="search" width={40}/><h2>Nothing here just yet.</h2><p>{query ? 'Try another search, or make a little note.' : 'Make a little note whenever you’re ready.'}</p>{query && <button type="button" onClick={() => setQuery('')} {...props(styles.secondary)}>Clear search</button>}</section>}
     </main>
     <input ref={imageInput} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { chooseImages(event.target.files); event.target.value = ''; }}/>
     {menu && <NoteContextMenu target={menu} onClose={closeMenu} onOpen={openNote} onPin={pin} onDelete={confirmDelete} onColor={(note, color) => { void changeColor(note, color); }}/>}
     <ConfirmDialog ref={deleteDialog} title="Delete this note?" copy="This is permanent. There’s no trash to come back to." cancel="Keep note" confirm="Delete note" onConfirm={() => { if (noteToDelete.current) {return remove(noteToDelete.current);} }}/>
-    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} locked={locked} syncState={editorSync} syncError={editorSyncError} onSave={save} onDelete={remove} onClose={retainReady => { void closeEditor(retainReady); }} onRetrySync={() => void synchronize()} onDirtyChange={setUnsaved}/>}
+    {renderedEditor && <Editor key={activeEditorKey ?? parkedEditorKey} open={Boolean(editor)} note={renderedEditor.note} initialImages={renderedEditor.files} initialAudio={renderedEditor.audio} initialRecording={renderedEditor.recording} locked={locked} syncState={currentEditorSync} syncError={editorSyncError} onSave={save} onDelete={remove} onClose={retainReady => { void closeEditor(retainReady); }} onRetrySync={() => void synchronize()} onDirtyChange={setUnsaved}/>}
     <dialog ref={syncDialog} aria-labelledby="sync-title" {...props(styles.dialog, styles.smallDialog)}><Icon name={status.icon} width={32}/><h2 id="sync-title" {...props(styles.dialogTitle)}>{status.label}</h2><p {...props(styles.dialogCopy)}>{status.copy}</p>{syncError && <p role="alert" {...props(styles.syncError)}>{syncError}</p>}<div {...props(styles.dialogActions)}><button type="button" onClick={() => syncDialog.current?.close()} {...props(styles.secondary)}>Back</button><button type="button" onClick={() => { syncDialog.current?.close(); void synchronize(); }} {...props(styles.primary)}>Sync now</button></div></dialog>
   </div>;
 }

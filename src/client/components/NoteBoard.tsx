@@ -13,8 +13,8 @@ import { noteExcerpt } from '../note-excerpt';
 
 const within = (event: Pick<PointerEvent, 'clientX' | 'clientY'>, rect: DOMRect) => event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
 
-export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
-  notes: Array<LocalNote>; pendingSync?: Readonly<Record<string, PendingNoteSync>>; heading?: string; label: string;
+export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, uploadingMutation, heading, label, onOpen, onPin, onContextMenu, onReorder }: {
+  notes: Array<LocalNote>; pendingSync?: Readonly<Record<string, PendingNoteSync>>; uploadingMutation?: string; heading?: string; label: string;
   onOpen: (note: LocalNote) => void; onPin: (note: LocalNote) => void;
   onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void;
   onReorder: (source: string, target: string) => void;
@@ -182,7 +182,7 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   return <section {...props(styles.section)}>
     {heading && <h2 {...props(styles.sectionHeading)}>{heading}</h2>}
     <ul ref={board} aria-label={label} {...props(styles.board)}>
-      {displayed.map((note) => <NoteCard key={note.id} note={note} sync={pendingSync?.[note.id]} onPin={onPin} onContextMenu={onContextMenu} dropTarget={placement?.source === note.id}
+      {displayed.map((note) => <NoteCard key={note.id} note={note} sync={pendingSync?.[note.id]} uploading={uploadingMutation !== undefined && pendingSync?.[note.id]?.mutationId === uploadingMutation} onPin={onPin} onContextMenu={onContextMenu} dropTarget={placement?.source === note.id}
         onPointerDown={event => start(event, note.id)}
         onCardClick={() => { if (suppressClick.current === note.id) { suppressClick.current = undefined; return; } onOpen(note); }}
         onKeyDown={event => {
@@ -196,8 +196,8 @@ export const NoteBoard = memo(function NoteBoard({ notes, pendingSync, heading, 
   </section>;
 });
 
-function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, onPointerDown, onKeyDown }: {
-  note: LocalNote; sync?: PendingNoteSync; onCardClick: () => void; onPin: (note: LocalNote) => void; onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void; dropTarget: boolean;
+function NoteCard({ note, sync, uploading, onCardClick, onPin, onContextMenu, dropTarget, onPointerDown, onKeyDown }: {
+  note: LocalNote; sync?: PendingNoteSync; uploading: boolean; onCardClick: () => void; onPin: (note: LocalNote) => void; onContextMenu: (note: LocalNote, event: React.MouseEvent<HTMLButtonElement>) => void; dropTarget: boolean;
   onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
 }) {
@@ -220,7 +220,7 @@ function NoteCard({ note, sync, onCardClick, onPin, onContextMenu, dropTarget, o
       <AudioPlayer key={note.audio[0].id} audio={note.audio[0]} compact/>
       {note.audio.length > 1 && <button type="button" onClick={onCardClick} {...props(styles.audioMore)}>{note.audio.length - 1} more audio {note.audio.length === 2 ? 'file' : 'files'}</button>}
     </div>}
-    {sync && <span id={`note-sync-${note.id}`} data-testid="note-card-sync" {...props(styles.noteSyncStatus, Boolean(sync.error) && styles.saveStatusWarning)}><Icon name={sync.error ? 'cloud-warning' : 'clock'} width={14} {...props(styles.noteSyncIcon)}/><span {...props(styles.noteSyncLabel)}>{sync.error ? 'Sync failed' : 'Waiting to sync'}</span></span>}
+    {sync && <span id={`note-sync-${note.id}`} data-testid="note-card-sync" {...props(styles.noteSyncStatus, Boolean(sync.error) && styles.saveStatusWarning)}><Icon name={sync.error ? 'cloud-warning' : uploading ? 'refresh' : 'clock'} width={14} {...props(styles.noteSyncIcon)}/><span {...props(styles.noteSyncLabel)}>{sync.error ? 'Sync failed' : uploading ? 'Syncing…' : 'Waiting to sync'}</span></span>}
   </>;
   const buttonProps = {
     'data-note-id': note.id,

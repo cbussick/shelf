@@ -19,8 +19,14 @@ for (const width of [390, 1024]) {
     await expect(page.getByTestId('sync-overview')).toHaveText('Synced');
     await expect(page.getByTestId('note-card-sync')).toHaveCount(0);
     let rejectWeekend = true;
-    await page.route(`**/api/notes/${weekend}`, route => route.request().method() === 'PUT' && rejectWeekend
-      ? route.fulfill({ status: 503, json: { error: 'The sync service is temporarily unavailable.' } }) : route.continue());
+    let weekendGate = Promise.resolve();
+    await page.route(`**/api/notes/${weekend}`, async route => {
+      if (route.request().method() === 'PUT') {
+        if (rejectWeekend) {return route.fulfill({ status: 503, json: { error: 'The sync service is temporarily unavailable.' } });}
+        await weekendGate;
+      }
+      return route.continue();
+    });
     await page.getByRole('button', { name: 'Open note: Weekend away', exact: true }).click();
     const body = page.getByRole('textbox', { name: 'Note', exact: true });
     await body.click();
@@ -90,16 +96,28 @@ for (const width of [390, 1024]) {
       if (route.request().method() === 'PUT') {await held;}
       await route.continue();
     });
+    let releaseWeekend!: () => void;
+    weekendGate = new Promise<void>(resolve => { releaseWeekend = resolve; });
     rejectWeekend = false;
-    await page.getByTestId('sync-overview').click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Sync now' }).click();
-    // An acknowledged card clears before another queued upload has completed.
-    await expect(weekendCard.getByTestId('note-card-sync')).toHaveCount(0);
-    await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
-    await expect(shoppingCard.getByTestId('note-card-sync')).toHaveText('Waiting to sync');
-    await page.mouse.move(0, 0);
-    await page.screenshot({ path: testInfo.outputPath(`${width}-overview-waiting.png`) });
-    release();
+    try {
+      await page.getByTestId('sync-overview').click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Sync now' }).click();
+      await expect(weekendCard.getByTestId('note-card-sync')).toHaveText('Syncing…');
+      await expect(shoppingCard.getByTestId('note-card-sync')).toHaveText('Waiting to sync');
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: testInfo.outputPath(`${width}-overview-waiting.png`) });
+      await page.getByRole('button', { name: 'Open note: Shopping', exact: true }).click();
+      await expect(page.getByTestId('note-save-status')).toHaveText('Waiting to sync');
+      await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Milk, lemons, coffee, bread and apples.');
+      await expect(page.getByTestId('note-save-status')).toHaveText('Waiting to sync');
+      releaseWeekend();
+      // An acknowledged card clears before the next upload completes.
+      await expect(weekendCard.getByTestId('note-card-sync')).toHaveCount(0);
+      await expect(page.getByTestId('sync-overview')).toHaveText('1 not synced');
+      await expect(shoppingCard.getByTestId('note-card-sync')).toHaveText('Syncing…');
+      await expect(page.getByTestId('note-save-status')).toHaveText('Syncing…');
+      await page.getByRole('button', { name: 'Close note' }).click();
+    } finally { releaseWeekend(); release(); }
     await expect(page.getByTestId('sync-overview')).toHaveText('Synced');
     await expect(page.getByTestId('note-card-sync')).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`${width}-overview-synced.png`) });
