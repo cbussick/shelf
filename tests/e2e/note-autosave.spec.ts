@@ -45,12 +45,15 @@ for (const width of [390, 1024]) {
     await expect(status).toHaveText('Saving…');
     await screenshot('saving');
     await page.clock.runFor(600);
-    await expect(status).toHaveText('Syncing…');
-    await screenshot('syncing');
+    const cardStatus = page.getByTestId('note-card-sync');
+    await expect(cardStatus).toHaveText('Waiting to sync');
+    await expect(status).toHaveText('Waiting to sync');
+    await screenshot('waiting-to-sync');
     // Input remains enabled while the server request is outstanding.
     await expect(body).toBeEditable();
     mode = 'normal'; release();
     await expect(status).toHaveText('Saved');
+    await expect(cardStatus).toHaveCount(0);
     await screenshot('saved');
     await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
 

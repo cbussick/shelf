@@ -235,7 +235,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
     }
   };
   const localError = saveFailed ? saveError(checkpoint.error) : '';
-  const status = saveFailed ? 'Changes not saved' : dirty || checkpoint.saving ? 'Saving…' : !committedNote ? '' : syncState === 'offline' ? 'Saved on this device · Offline' : syncState === 'error' ? 'Saved on this device · Sync failed' : syncState === 'synced' ? 'Saved' : 'Syncing…';
+  const status = saveFailed ? 'Changes not saved' : dirty || checkpoint.saving ? 'Saving…' : !committedNote ? '' : syncState === 'offline' ? 'Saved on this device · Offline' : syncState === 'error' ? 'Saved on this device · Sync failed' : syncState === 'synced' ? 'Saved' : 'Waiting to sync';
   const syncFailed = !saveFailed && !dirty && !checkpoint.saving && syncState === 'error';
   const showSyncError = Boolean(committedNote && syncError && !saveFailed && !dirty && !checkpoint.saving);
   const showRetry = saveFailed || syncFailed && onRetrySync !== undefined;
@@ -295,7 +295,7 @@ export function Editor({ note, open = true, locked = false, syncState = 'syncing
           <button type="button" aria-label="Attach an image or video" onClick={() => input.current?.click()} {...props(styles.iconButton)}><Icon name="image"/></button>
           <input ref={input} type="file" accept={VISUAL_ACCEPT} multiple hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }}/>
           <ColorPicker color={color} onChange={setColor}/>
-        </div><div data-testid="note-save-status" aria-live="off" {...props(styles.editorSaveStatus, saveFailed && styles.saveStatusError, syncFailed && styles.saveStatusWarning)}>{status && <><Icon name={saveFailed ? 'warning' : dirty || checkpoint.saving ? 'clock' : syncFailed ? 'warning' : syncState === 'syncing' ? 'refresh' : 'check'} width={15} {...props(styles.saveStatusIcon)}/><span>{status}</span></>}</div>{showRetry && <button type="button" aria-label={saveFailed ? 'Retry save' : 'Retry sync'} disabled={checkpoint.saving} onClick={retry} {...props(styles.editorRetry, saveFailed ? styles.saveStatusError : styles.saveStatusWarning)}>Retry</button>}<button type="button" data-close-note disabled={saving || deleting} onClick={requestClose} {...props(styles.secondary, styles.editorClose)}>Close</button></footer>
+        </div><div data-testid="note-save-status" aria-live="off" {...props(styles.editorSaveStatus, saveFailed && styles.saveStatusError, syncFailed && styles.saveStatusWarning)}>{status && <><Icon name={saveFailed ? 'warning' : dirty || checkpoint.saving ? 'clock' : syncFailed ? 'warning' : syncState === 'syncing' ? 'clock' : 'check'} width={15} {...props(styles.saveStatusIcon)}/><span>{status}</span></>}</div>{showRetry && <button type="button" aria-label={saveFailed ? 'Retry save' : 'Retry sync'} disabled={checkpoint.saving} onClick={retry} {...props(styles.editorRetry, saveFailed ? styles.saveStatusError : styles.saveStatusWarning)}>Retry</button>}<button type="button" data-close-note disabled={saving || deleting} onClick={requestClose} {...props(styles.secondary, styles.editorClose)}>Close</button></footer>
       </div>
     </dialog>
     {recordingOpen && <AudioRecorder suspended={locked} onKeep={file => { addAudio([file]); setRecordingOpen(false); }} onClose={() => setRecordingOpen(false)}/>}

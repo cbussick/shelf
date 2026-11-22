@@ -132,7 +132,7 @@ test('identically named draft files retain separate players after one is removed
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }, [Array.from(wavAudio(1)), Array.from(wavAudio(2))]);
   const editor = editorFor(page);
-  await expect(editor.getByTestId('note-save-status')).toHaveText(/Saving…|Syncing…|Saved/);
+  await expect(editor.getByTestId('note-save-status')).toHaveText(/Saving…|Waiting to sync|Saved/);
   const firstDownload = page.waitForEvent('download');
   await editor.getByRole('button', { name: 'Download Same name.wav' }).first().click();
   await firstDownload;
