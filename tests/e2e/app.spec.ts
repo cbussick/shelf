@@ -769,7 +769,7 @@ for (const width of [390, 1440]) {
     }
   });
 
-  test(`keeps lightbox close and trash on portrait and landscape images at ${width}px`, async ({ page }) => {
+  test(`keeps lightbox close and trash above portrait and landscape images at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/');
     await page.getByRole('button', { name: 'New note' }).click();
@@ -791,12 +791,9 @@ for (const width of [390, 1440]) {
       expect(closeBox.height).toBe(44);
       expect(trashBox.width).toBe(44);
       expect(trashBox.height).toBe(44);
-      expect(closeBox.y - imageBox.y).toBeCloseTo(8, 0);
-      expect(imageBox.x + imageBox.width - closeBox.x - closeBox.width).toBeCloseTo(8, 0);
       expect(closeBox.x - trashBox.x - trashBox.width).toBeCloseTo(8, 0);
       expect(trashBox.y).toBe(closeBox.y);
-      expect(trashBox.x).toBeGreaterThanOrEqual(imageBox.x);
-      expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(imageBox.y + imageBox.height);
+      expect(closeBox.y + closeBox.height).toBeLessThan(imageBox.y);
       if (index === 0) {await preview.getByRole('button', { name: 'Next image' }).click();}
     }
     await preview.getByRole('button', { name: 'Close image preview' }).click();
@@ -833,14 +830,9 @@ for (const width of [390, 1440]) {
     await expect(closePreview).toHaveCSS('outline-width', '3px');
     const imageBox = await preview.getByRole('img').boundingBox();
     const removeBox = await preview.getByRole('button', { name: 'Remove image 1' }).boundingBox();
-    expect(removeBox!.x).toBeGreaterThan(imageBox!.x + imageBox!.width / 2);
-    expect(removeBox!.x + removeBox!.width).toBeLessThanOrEqual(imageBox!.x + imageBox!.width);
-    expect(removeBox!.y).toBeLessThan(imageBox!.y + 16);
     const closeBox = (await closePreview.boundingBox())!;
-    expect(closeBox.y - imageBox!.y).toBeCloseTo(8, 0);
-    expect(imageBox!.x + imageBox!.width - closeBox.x - closeBox.width).toBeCloseTo(8, 0);
-    expect(closeBox.x - removeBox!.x - removeBox!.width).toBeCloseTo(8, 0);
-    expect(closeBox.y).toBe(removeBox!.y);
+    expect(removeBox!.y + removeBox!.height).toBeLessThan(imageBox!.y);
+    expect(closeBox.y + closeBox.height).toBeLessThan(imageBox!.y);
     const bounds = await preview.boundingBox();
     if (width === 390) {expect(bounds?.width).toBe(width);}
     else {expect(bounds?.width).toBeGreaterThan(800);}

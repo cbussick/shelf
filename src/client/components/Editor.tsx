@@ -388,19 +388,22 @@ function ImagePreview({ gallery, index, onIndexChange, onRotate, onRemove, onClo
   // Native video controls own arrow keys; retain the real element-class guard.
   // oxlint-disable-next-line @nkzw/no-instanceof
   return <dialog ref={dialog} aria-label="Image preview" onClose={onClose} onClick={event => { if (event.target === event.currentTarget) {dialog.current?.close();} }} onKeyDown={event => { if (event.target instanceof HTMLVideoElement) {return;} if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); } }} {...props(styles.previewDialog)}>
-    <div {...props(styles.previewStage)}><div {...props(styles.previewImage)}>
-      {'image' in preview ? <LocalPhoto key={preview.image.id} image={preview.image} controls className={props(styles.previewPhoto).className}/> : <Photo key={preview.src} src={preview.src} mimeType={preview.mimeType} controls alt={preview.alt} rotation={preview.rotation} className={props(styles.previewPhoto).className}/>}
+    <div {...props(styles.previewLayout)}>
       <div {...props(styles.previewImageActions)}>
         <button type="button" aria-label={`Remove ${video ? 'video' : 'image'} ${index + 1}`} onClick={onRemove} {...props(styles.previewImageAction)}><Icon name="trash" width={20}/></button>
         <button type="button" aria-label="Close image preview" onClick={() => dialog.current?.close()} {...props(styles.previewImageAction)}><Icon name="x"/></button>
       </div>
-    </div></div>
-    {!video && <div role="group" aria-label="Image rotation" {...props(styles.previewRotationActions)}>
-      <button type="button" aria-label="Rotate image counterclockwise" title="Rotate counterclockwise" onClick={() => onRotate(-90)} {...props(styles.previewImageAction)}><Icon name="rotate-left" width={20}/></button>
-      <button type="button" aria-label="Rotate image clockwise" title="Rotate clockwise" onClick={() => onRotate(90)} {...props(styles.previewImageAction)}><Icon name="rotate-right" width={20}/></button>
-      <span role="status" className="sr-only">Image rotation: {'image' in preview ? preview.image.rotation : preview.rotation} degrees</span>
-    </div>}
-    {gallery.length > 1 && <><button type="button" aria-label="Previous image" onClick={() => move(-1)} {...props(styles.previewPrevious)}><Icon name="chevron-left"/></button><button type="button" aria-label="Next image" onClick={() => move(1)} {...props(styles.previewNext)}><Icon name="chevron-right"/></button><span {...props(styles.previewCount)}>{index + 1} / {gallery.length}</span></>}
+      <div {...props(styles.previewStage)}>
+        {'image' in preview ? <LocalPhoto key={preview.image.id} image={preview.image} controls className={props(styles.previewPhoto).className}/> : <Photo key={preview.src} src={preview.src} mimeType={preview.mimeType} controls alt={preview.alt} rotation={preview.rotation} className={props(styles.previewPhoto).className}/>}
+      </div>
+      {!video && <div role="group" aria-label="Image rotation" {...props(styles.previewRotationActions)}>
+        <button type="button" aria-label="Rotate image counterclockwise" title="Rotate counterclockwise" onClick={() => onRotate(-90)} {...props(styles.previewImageAction)}><Icon name="rotate-left" width={20}/></button>
+        <button type="button" aria-label="Rotate image clockwise" title="Rotate clockwise" onClick={() => onRotate(90)} {...props(styles.previewImageAction)}><Icon name="rotate-right" width={20}/></button>
+        <span role="status" className="sr-only">Image rotation: {'image' in preview ? preview.image.rotation : preview.rotation} degrees</span>
+      </div>}
+      {gallery.length > 1 && <span {...props(styles.previewCount)}>{index + 1} / {gallery.length}</span>}
+    </div>
+    {gallery.length > 1 && <><button type="button" aria-label="Previous image" onClick={() => move(-1)} {...props(styles.previewPrevious)}><Icon name="chevron-left"/></button><button type="button" aria-label="Next image" onClick={() => move(1)} {...props(styles.previewNext)}><Icon name="chevron-right"/></button></>}
   </dialog>;
 }
 

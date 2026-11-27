@@ -5,6 +5,9 @@ export const colors = defineVars({
   butter: '#f8ebad', mint: '#dbebe1', lilac: '#eae4f3', peach: '#f6dfd2', blue: '#d9e8f8', orange: '#f8d2a8', rose: '#f3dce5', danger: '#a03832',
 });
 
+const editorAttachmentsHeight = 'min(440px, 45dvh)';
+const mobileEditorAttachmentsHeight = 'min(220px, calc((var(--editor-viewport-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 4))';
+
 export const styles = create({
   skipLink: { position: 'fixed', left: 16, top: -80, padding: 12, backgroundColor: 'white', zIndex: 30, ':focus': { top: 12 } },
   header: {
@@ -83,10 +86,10 @@ export const styles = create({
   iconButton: { width: 44, height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, ':hover': { backgroundColor: '#2636300c' } },
   editorFields: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: '8px 30px 12px', overflow: 'auto', '@media (max-width: 700px)': { padding: '0 16px', overflow: 'hidden' } },
   titleInput: { borderWidth: 0, backgroundColor: 'transparent', width: '100%', color: colors.ink, fontSize: 25, fontWeight: 700, lineHeight: 1.6, flexShrink: 0 },
-  editorAttachments: { overflowY: 'auto', flexShrink: 0, maxHeight: 'min(440px, 45dvh)', '@media (max-width: 700px)': { maxHeight: 'min(220px, 25%)' } },
+  editorAttachments: { overflowY: 'auto', flexShrink: 0, maxHeight: editorAttachmentsHeight, '@media (max-width: 700px)': { maxHeight: mobileEditorAttachmentsHeight } },
   audioList: { display: 'flex', flexDirection: 'column', gap: 10, padding: '12px 30px', '@media (max-width: 700px)': { paddingInline: 24 } },
   audioListHeading: { margin: 0, fontSize: 12, fontWeight: 700, color: colors.muted },
-  mixedEditorPhoto: { maxHeight: 'min(220px, 23dvh)' },
+  mixedEditorPhoto: { maxHeight: 'min(220px, 23dvh)', '@media (max-width: 700px)': { maxHeight: `min(23dvh, ${mobileEditorAttachmentsHeight})` } },
   audioPlayer: { position: 'relative', minWidth: 0, padding: '12px 14px 4px', border: '1px solid #26363020', borderRadius: 10, backgroundColor: '#ffffff60', cursor: 'default' },
   compactAudio: { zIndex: 1, pointerEvents: 'none', padding: 0, borderWidth: 0, backgroundColor: 'transparent' },
   cardAudio: { padding: '16px 18px 0', pointerEvents: 'none', '@media (max-width: 700px)': { padding: '12px 10px 0' } },
@@ -103,26 +106,26 @@ export const styles = create({
   bottomAudioPopover: { left: -64 },
   audioRecorderHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   recordingStatus: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, minHeight: 96, color: colors.danger, fontSize: 20, fontVariantNumeric: 'tabular-nums' },
-  editorImages: { display: 'flex', overflowX: 'hidden', overflowY: 'auto', paddingInline: 30, flexShrink: 0, maxHeight: 'min(440px, 45dvh)', alignItems: 'flex-start' },
+  editorImages: { display: 'flex', paddingInline: 30, alignItems: 'flex-start' },
   editorMosaic: { width: 'calc(100% - 60px)', maxWidth: 520, margin: '0 auto 8px', borderRadius: 8, aspectRatio: '2.3 / 1', flexShrink: 0, '@media (max-width: 700px)': { width: 'calc(100% - 48px)' } },
   editorImage: { position: 'relative', maxWidth: '100%', flexShrink: 1, marginInline: 'auto' },
   photoButton: { display: 'block', maxWidth: '100%', padding: 0, borderRadius: 8, cursor: 'zoom-in', ':focus-visible': { outline: `3px solid ${colors.green}`, outlineOffset: 2 } },
-  editorPhoto: { display: 'block', maxWidth: '100%', maxHeight: 'min(440px, 45dvh)', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8 },
+  editorPhoto: { display: 'block', maxWidth: '100%', maxHeight: editorAttachmentsHeight, width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8, '@media (max-width: 700px)': { maxHeight: mobileEditorAttachmentsHeight } },
   previewDialog: {
     position: 'fixed', width: 'min(1100px, calc(100% - 64px))', height: 'min(860px, 90dvh)', maxWidth: 'none', maxHeight: 'none', padding: 24,
     borderWidth: 0, borderRadius: 16, backgroundColor: 'transparent', color: '#fff', boxShadow: 'none',
     '::backdrop': { backgroundColor: '#101a16ed', backdropFilter: 'blur(6px)' },
-    '@media (max-width: 700px)': { width: '100%', height: '100dvh', padding: 'calc(56px + env(safe-area-inset-top)) 16px calc(32px + env(safe-area-inset-bottom))', borderRadius: 0 },
+    '@media (max-width: 700px)': { width: '100%', height: '100dvh', padding: 'calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))', borderRadius: 0 },
   },
-  previewStage: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  previewImage: { position: 'relative', maxWidth: '100%', maxHeight: '100%' },
-  previewPhoto: { width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: 'calc(min(860px, 90dvh) - 48px)', objectFit: 'contain', display: 'block', '@media (max-width: 700px)': { maxHeight: 'calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom))' } },
-  previewRotationActions: { position: 'absolute', bottom: 'calc(32px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 },
-  previewImageActions: { position: 'absolute', top: 8, right: 8, display: 'flex', gap: 8 },
+  previewLayout: { display: 'flex', flexDirection: 'column', height: '100%', gap: 8 },
+  previewStage: { flex: 1, minHeight: 0, display: 'grid', placeItems: 'center', containerType: 'size' },
+  previewPhoto: { width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100cqh', objectFit: 'contain', display: 'block' },
+  previewRotationActions: { display: 'flex', justifyContent: 'center', gap: 8 },
+  previewImageActions: { display: 'flex', justifyContent: 'flex-end', gap: 8 },
   previewImageAction: { width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: 8, backgroundColor: '#1d2823cc', color: '#fff', ':hover': { backgroundColor: '#1d2823' } },
   previewPrevious: { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: 8, backgroundColor: '#ffffff24', color: '#fff', ':hover': { backgroundColor: '#ffffff40' } },
   previewNext: { position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: 8, backgroundColor: '#ffffff24', color: '#fff', ':hover': { backgroundColor: '#ffffff40' } },
-  previewCount: { position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', color: '#fff', fontSize: 13 },
+  previewCount: { textAlign: 'center', color: '#fff', fontSize: 13 },
   editorFooter: { padding: '14px 18px', borderTop: '1px solid #26363012', display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto auto', alignItems: 'center', gap: 8, '@media (max-width: 700px)': { padding: '8px 16px 12px', gridTemplateColumns: 'minmax(0, 1fr) auto auto', flexShrink: 0 } },
   editorTools: { '@media (max-width: 700px)': { gridColumn: '1 / -1' } },
   editorSaveStatus: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, minWidth: 0, color: '#546358', fontSize: 12, lineHeight: 1.5, overflowWrap: 'anywhere', '@media (max-width: 700px)': { gridColumn: 1, gridRow: 2, justifyContent: 'flex-start' } },
